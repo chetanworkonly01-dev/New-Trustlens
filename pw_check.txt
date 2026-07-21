@@ -1,0 +1,32 @@
+﻿Chrome for Testing 147.0.7727.15 (playwright chromium v1217)
+  Install location:    C:\Users\Kavya\AppData\Local\ms-playwright\chromium-1217
+  Download url:        https://cdn.playwright.dev/builds/cft/147.0.7727.15/win64/chrome-win64.zip
+
+Chrome Headless Shell 147.0.7727.15 (playwright chromium-headless-shell v1217)
+  Install location:    C:\Users\Kavya\AppData\Local\ms-playwright\chromium_headless_shell-1217
+  Download url:        https://cdn.playwright.dev/builds/cft/147.0.7727.15/win64/chrome-headless-shell-win64.zip
+
+Firefox 148.0.2 (playwright firefox v1511)
+  Install location:    C:\Users\Kavya\AppData\Local\ms-playwright\firefox-1511
+  Download url:        https://cdn.playwright.dev/dbazure/download/playwright/builds/firefox/1511/firefox-win64.zip
+  Download fallback 1: https://playwright.download.prss.microsoft.com/dbazure/download/playwright/builds/firefox/1511/firefox-win64.zip
+  Download fallback 2: https://cdn.playwright.dev/builds/firefox/1511/firefox-win64.zip
+
+WebKit 26.4 (playwright webkit v2272)
+  Install location:    C:\Users\Kavya\AppData\Local\ms-playwright\webkit-2272
+  Download url:        https://cdn.playwright.dev/dbazure/download/playwright/builds/webkit/2272/webkit-win64.zip
+  Download fallback 1: https://playwright.download.prss.microsoft.com/dbazure/download/playwright/builds/webkit/2272/webkit-win64.zip
+  Download fallback 2: https://cdn.playwright.dev/builds/webkit/2272/webkit-win64.zip
+
+FFmpeg (playwright ffmpeg v1011)
+  Install location:    C:\Users\Kavya\AppData\Local\ms-playwright\ffmpeg-1011
+  Download url:        https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1011/ffmpeg-win64.zip
+  Download fallback 1: https://playwright.download.prss.microsoft.com/dbazure/download/playwright/builds/ffmpeg/1011/ffmpeg-win64.zip
+  Download fallback 2: https://cdn.playwright.dev/builds/ffmpeg/1011/ffmpeg-win64.zip
+
+Winldd (playwright winldd v1007)
+  Install location:    C:\Users\Kavya\AppData\Local\ms-playwright\winldd-1007
+  Download url:        https://cdn.playwright.dev/dbazure/download/playwright/builds/winldd/1007/winldd-win64.zip
+  Download fallback 1: https://playwright.download.prss.microsoft.com/dbazure/download/playwright/builds/winldd/1007/winldd-win64.zip
+  Download fallback 2: https://cdn.playwright.dev/builds/winldd/1007/winldd-win64.zip
+

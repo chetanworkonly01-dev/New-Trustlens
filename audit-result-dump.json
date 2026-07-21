@@ -1,0 +1,1764 @@
+﻿{
+  "id": "221860e6-6433-49d2-9f6a-bc59537e9ab6",
+  "config": {
+    "url": "https://www.wikipedia.org",
+    "type": "website",
+    "crawlDepth": 2,
+    "maxPages": 3,
+    "includeAI": false,
+    "wcagLevels": ["A", "AA"]
+  },
+  "status": "complete",
+  "progress": 100,
+  "progressMessage": "Audit complete!",
+  "pages": [
+    {
+      "url": "https://www.wikipedia.org",
+      "title": "Wikipedia",
+      "timestamp": "2026-04-09T06:17:11.861Z"
+    }
+  ],
+  "issues": [
+    {
+      "id": "6e1f01ee-6b67-46b2-b582-a352f3fc29f0",
+      "testId": "P-02",
+      "title": "Decorative images not properly marked",
+      "description": "Image with empty alt text should also have role=\"presentation\" or aria-hidden=\"true\" to properly convey decorative intent.",
+      "element": "img[alt=\"\"]",
+      "elementHtml": "\u003cimg class=\"central-featured-logo\" src=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2.png\" srcset=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2@1.5x.png 1.5x, portal/wikipedia.org/assets/img/",
+      "pageUrl": "https://www.wikipedia.org",
+      "wcagCriterion": "1.1.1",
+      "wcagName": "Non-text Content",
+      "wcagLevel": "A",
+      "severity": "medium",
+      "impact": "Screen reader users cannot understand non-text content",
+      "recommendation": "Add role=\"presentation\" or aria-hidden=\"true\" for decorative images with empty alt text.",
+      "codeFix": "\u003cimg role=\"presentation\" class=\"central-featured-logo\" src=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2.png\" srcset=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2@1.5x.png 1.5x, portal/wikipedia.org/assets/img/Wikipedia-logo-v2@2x.png 2x\" width=\"200\" height=\"183\" alt=\"\"\u003e",
+      "category": "perceivable",
+      "source": "custom-rule",
+      "confidence": "medium"
+    },
+    {
+      "id": "e0c6108f-8c9b-4fc4-8ac6-f48c775d04dc",
+      "testId": "P-03",
+      "title": "Missing captions for video content",
+      "description": "Video element is missing captions track. Deaf and hard-of-hearing users cannot access audio content.",
+      "element": "video",
+      "elementHtml": "\u003cvideo id=\"wikipedia25-video\" class=\"wikipedia25-video\" data-idle-light=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-light.webm\" data-idle-dark=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-dark.webm\" data-click-light=\"portal/wikipedia.org/assets/img/wikipedia25-synt",
+      "pageUrl": "https://www.wikipedia.org",
+      "wcagCriterion": "1.2.2",
+      "wcagName": "Captions (Prerecorded)",
+      "wcagLevel": "A",
+      "severity": "critical",
+      "impact": "Deaf or hard-of-hearing users cannot access audio content",
+      "recommendation": "Add a \u003ctrack\u003e element with kind=\"captions\" and a valid .vtt caption file.",
+      "codeFix": "\u003cvideo controls\u003e\n  \u003csource src=\"video.mp4\" type=\"video/mp4\" /\u003e\n  \u003ctrack kind=\"captions\" src=\"captions.vtt\" srclang=\"en\" label=\"English\" default /\u003e\n\u003c/video\u003e",
+      "category": "perceivable",
+      "source": "custom-rule",
+      "confidence": "medium"
+    },
+    {
+      "id": "dba218ce-de5c-4063-bb73-68200f41aec1",
+      "testId": "P-04",
+      "title": "Missing audio descriptions for video",
+      "description": "Video element is missing audio descriptions track for blind users.",
+      "element": "video",
+      "elementHtml": "\u003cvideo id=\"wikipedia25-video\" class=\"wikipedia25-video\" data-idle-light=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-light.webm\" data-idle-dark=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-dark.webm\" data-click-light=\"portal/wikipedia.org/assets/img/wikipedia25-synt",
+      "pageUrl": "https://www.wikipedia.org",
+      "wcagCriterion": "1.2.5",
+      "wcagName": "Audio Description (Prerecorded)",
+      "wcagLevel": "AA",
+      "severity": "medium",
+      "impact": "Blind users cannot access visual information in videos",
+      "recommendation": "Add a \u003ctrack\u003e element with kind=\"descriptions\" to describe important visual information.",
+      "codeFix": "\u003ctrack kind=\"descriptions\" src=\"descriptions.vtt\" srclang=\"en\" label=\"English\" /\u003e",
+      "category": "perceivable",
+      "source": "custom-rule",
+      "confidence": "medium"
+    },
+    {
+      "id": "13521f2b-d436-48d8-8d21-be14cdc1349b",
+      "testId": "R-08",
+      "title": "Inaccessible SVG elements",
+      "description": "SVG element is missing accessible name. Screen readers cannot describe this graphic.",
+      "element": "svg",
+      "elementHtml": "\u003csvg xmlns=\"http://www.w3.org/2000/svg\"\u003e\u003cfilter id=\"filter\"\u003e\u003cfeComponentTransfer color-interpolation-filters=\"sRGB\"\u003e\u003cfeFuncR type=\"table\" tableValues=\"1 0\" /\u003e\u003cfeFuncG type=\"table\" tableValues=\"1 0\" /\u003e",
+      "pageUrl": "https://www.wikipedia.org",
+      "wcagCriterion": "1.1.1",
+      "wcagName": "Non-text Content",
+      "wcagLevel": "A",
+      "severity": "high",
+      "impact": "Screen reader users cannot understand non-text content",
+      "recommendation": "Add role=\"img\" and aria-label to the SVG, or add a \u003ctitle\u003e element as the first child. Use aria-hidden=\"true\" for purely decorative SVGs.",
+      "codeFix": "\u003csvg role=\"img\" aria-label=\"Description of graphic\"\u003e\n  \u003ctitle\u003eDescription of graphic\u003c/title\u003e\n  \u003c!-- SVG content --\u003e\n\u003c/svg\u003e",
+      "category": "robust",
+      "source": "custom-rule",
+      "confidence": "medium"
+    },
+    {
+      "id": "a7d8f521-d52f-42c9-b4d3-8abc04fe8491",
+      "testId": "O-03",
+      "title": "Missing skip navigation link",
+      "description": "Page is missing a \"Skip to main content\" link. Keyboard users must tab through all navigation elements on every page.",
+      "element": "body",
+      "pageUrl": "https://www.wikipedia.org",
+      "wcagCriterion": "2.4.1",
+      "wcagName": "Bypass Blocks",
+      "wcagLevel": "A",
+      "severity": "high",
+      "impact": "Keyboard users must tab through all navigation on every page",
+      "recommendation": "Add a skip navigation link as the first focusable element in the page.",
+      "codeFix": "\u003c!-- Add as first child of \u003cbody\u003e --\u003e\n\u003ca href=\"#main-content\" class=\"skip-link\"\u003eSkip to main content\u003c/a\u003e\n\n\u003c!-- Style to show on focus --\u003e\n\u003cstyle\u003e\n.skip-link {\n  position: absolute;\n  left: -10000px;\n  top: auto;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n}\n.skip-link:focus {\n  position: fixed;\n  top: 10px;\n  left: 10px;\n  width: auto;\n  height: auto;\n  padding: 12px 24px;\n  background: #1a1a2e;\n  color: white;\n  z-index: 10000;\n  border-radius: 4px;\n}\n\u003c/style\u003e",
+      "category": "operable",
+      "source": "custom-rule",
+      "confidence": "medium"
+    },
+    {
+      "id": "1c9156fc-f5e1-4116-baff-9b43ebbbdce3",
+      "testId": "O-07",
+      "title": "Focus visibility suppressed via CSS",
+      "description": "CSS removes focus outline without providing an alternative focus indicator.",
+      "element": ":focus styles",
+      "elementHtml": ":focus{unicode-bidi:embed;outline:0;color:var(--color-progressive);text-decoration:none}",
+      "pageUrl": "https://www.wikipedia.org",
+      "wcagCriterion": "2.4.7",
+      "wcagName": "Focus Visible",
+      "wcagLevel": "AA",
+      "severity": "critical",
+      "impact": "Keyboard users cannot see which element has focus",
+      "recommendation": "Never remove focus indicators without providing a visible alternative (e.g., box-shadow, border, or custom outline).",
+      "codeFix": "/* Provide visible focus indicator */\n:focus {\n  outline: 2px solid #3B82F6;\n  outline-offset: 2px;\n}\n\n/* Or use :focus-visible for mouse-click users */\n:focus:not(:focus-visible) {\n  outline: none;\n}\n:focus-visible {\n  outline: 2px solid #3B82F6;\n  outline-offset: 2px;\n}",
+      "category": "operable",
+      "source": "custom-rule",
+      "confidence": "medium"
+    },
+    {
+      "id": "d9dd23e5-d7a6-4015-9300-a2571c520fa0",
+      "testId": "O-11",
+      "title": "Auto-playing media content",
+      "description": "Media element auto-plays, which can be disruptive to screen reader users and users with cognitive disabilities.",
+      "element": "video",
+      "elementHtml": "\u003cvideo id=\"wikipedia25-video\" class=\"wikipedia25-video\" data-idle-light=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-light.webm\" data-idle-dark=\"portal/wikipedia.org/assets/img/wikipe",
+      "pageUrl": "https://www.wikipedia.org",
+      "wcagCriterion": "2.2.2",
+      "wcagName": "Pause, Stop, Hide",
+      "wcagLevel": "A",
+      "severity": "high",
+      "impact": "Users with cognitive disabilities or vestibular disorders are affected",
+      "recommendation": "Remove the autoplay attribute, or provide a mechanism to pause, stop, or mute the media within 3 seconds.",
+      "codeFix": "\u003c!-- Remove autoplay --\u003e\n\u003cvideo controls\u003e\n  \u003c!-- sources --\u003e\n\u003c/video\u003e",
+      "category": "operable",
+      "source": "custom-rule",
+      "confidence": "medium"
+    },
+    {
+      "id": "35145475-5c13-473c-bc44-32e19769ca99",
+      "testId": "R-04",
+      "title": "Duplicate element IDs",
+      "description": "Duplicate id=\"filter\" found 2 times. IDs must be unique for ARIA associations (aria-labelledby, aria-describedby) to work correctly.",
+      "element": "#filter",
+      "pageUrl": "https://www.wikipedia.org",
+      "wcagCriterion": "4.1.2",
+      "wcagName": "Name, Role, Value",
+      "wcagLevel": "A",
+      "severity": "high",
+      "impact": "Assistive technologies cannot determine the purpose of UI components",
+      "recommendation": "Ensure each id value is unique within the page. Use classes for styling and unique IDs for ARIA references.",
+      "category": "robust",
+      "source": "custom-rule",
+      "confidence": "medium"
+    },
+    {
+      "id": "a8b0546d-1659-48d3-a3cd-b52d91011cdd",
+      "testId": "DA-S1-02",
+      "title": "Multiple h1 headings",
+      "description": "Page has 2 h1 headings. Use exactly one h1 per page for clear document structure.",
+      "element": "page-level",
+      "pageUrl": "https://www.wikipedia.org",
+      "wcagCriterion": "1.3.1",
+      "wcagName": "Info and Relationships",
+      "wcagLevel": "A",
+      "severity": "medium",
+      "impact": "Affects users relying on assistive technologies",
+      "recommendation": "Keep only one h1 that describes the page purpose. Convert others to h2 or lower.",
+      "category": "perceivable",
+      "source": "custom-rule",
+      "confidence": "high"
+    },
+    {
+      "id": "ed66597a-e7cd-4eec-a7a8-86a828518df1",
+      "testId": "DA-S2-02",
+      "title": "Hidden element still focusable",
+      "description": "Visually hidden element remains in tab order: \u003cinput type=\"hidden\" name=\"family\" value=\"wikipedia\"\u003e",
+      "element": "page-level",
+      "pageUrl": "https://www.wikipedia.org",
+      "wcagCriterion": "2.4.3",
+      "wcagName": "Focus Order",
+      "wcagLevel": "A",
+      "severity": "medium",
+      "impact": "Affects users relying on assistive technologies",
+      "recommendation": "Add tabindex=\"-1\" or aria-hidden=\"true\" to hidden interactive elements.",
+      "category": "operable",
+      "source": "custom-rule",
+      "confidence": "high"
+    },
+    {
+      "id": "00a2c1ca-bb34-422c-8115-fd68cf751a7d",
+      "testId": "DA-S7-03",
+      "title": "Link opens new window without warning",
+      "description": "Link \"you can support our work with a donation.\" opens in a new tab/window without informing the user.",
+      "element": "page-level",
+      "pageUrl": "https://www.wikipedia.org",
+      "wcagCriterion": "3.2.2",
+      "wcagName": "On Input",
+      "wcagLevel": "A",
+      "severity": "medium",
+      "impact": "Affects users relying on assistive technologies",
+      "recommendation": "Add \"(opens in new tab)\" to the link text or aria-label.",
+      "category": "understandable",
+      "source": "custom-rule",
+      "confidence": "medium"
+    },
+    {
+      "id": "5f731823-6189-401a-9854-7ac0b44a9c56",
+      "testId": "JRN-241",
+      "title": "Missing skip navigation link",
+      "description": "Page does not have a skip-to-main-content link. Keyboard users must tab through all navigation on every page.",
+      "element": "page-level",
+      "pageUrl": "https://www.wikipedia.org",
+      "wcagCriterion": "2.4.1",
+      "wcagName": "Bypass Blocks",
+      "wcagLevel": "A",
+      "severity": "high",
+      "impact": "Detected during user journey testing â affects real user flows",
+      "recommendation": "Add a \"Skip to main content\" link as the first focusable element.",
+      "category": "operable",
+      "source": "journey-test",
+      "confidence": "high"
+    }
+  ],
+  "score": {
+    "overall": 48,
+    "categoryScores": {
+      "perceivable": 83,
+      "operable": 72,
+      "understandable": 98,
+      "robust": 90,
+      "pdf": 100
+    },
+    "complianceLevel": "non-compliant",
+    "totalIssues": 12,
+    "uniqueIssues": 12,
+    "issueBySeverity": {
+      "critical": 2,
+      "high": 5,
+      "medium": 5,
+      "low": 0
+    },
+    "issueByLevel": {
+      "A": 10,
+      "AA": 2,
+      "AAA": 0
+    },
+    "journeyScore": 85
+  },
+  "report": {
+    "id": "report-221860e6-6433-49d2-9f6a-bc59537e9ab6",
+    "auditId": "221860e6-6433-49d2-9f6a-bc59537e9ab6",
+    "executiveSummary": "This accessibility audit evaluated the target against WCAG 2.2 guidelines. The overall accessibility score is 48/100, classified as \"Non-Compliant\". A total of 12 issues were identified (12 unique issue types) across 1 page(s). \n\nð CRAWL COVERAGE: 1 of 1 discovered pages were audited (100% coverage). \n\n URGENT: 2 critical issue(s) require immediate attention. These block access for users with disabilities. 5 high-severity issue(s) significantly impact usability. \n\nð¥ WIDESPREAD: 12 issue(s) appear on more than 50% of pages: \"Missing captions for video content\" (1 pages), \"Focus visibility suppressed via CSS\" (1 pages), \"Inaccessible SVG elements\" (1 pages).\n\nð¶ USER JOURNEY TESTS: 2/4 journeys passed. Failed: Keyboard Navigation, Error State Handling.\n\nCategory breakdown: Perceivable: 83/100, Operable: 72/100, Understandable: 98/100, Robust: 90/100.\n\nð¯ CONFIDENCE: 3 high, 9 medium, 0 low confidence issues.",
+    "score": {
+      "overall": 48,
+      "categoryScores": {
+        "perceivable": 83,
+        "operable": 72,
+        "understandable": 98,
+        "robust": 90,
+        "pdf": 100
+      },
+      "complianceLevel": "non-compliant",
+      "totalIssues": 12,
+      "uniqueIssues": 12,
+      "issueBySeverity": {
+        "critical": 2,
+        "high": 5,
+        "medium": 5,
+        "low": 0
+      },
+      "issueByLevel": {
+        "A": 10,
+        "AA": 2,
+        "AAA": 0
+      },
+      "journeyScore": 85
+    },
+    "issues": [
+      {
+        "id": "6e1f01ee-6b67-46b2-b582-a352f3fc29f0",
+        "testId": "P-02",
+        "title": "Decorative images not properly marked",
+        "description": "Image with empty alt text should also have role=\"presentation\" or aria-hidden=\"true\" to properly convey decorative intent.",
+        "element": "img[alt=\"\"]",
+        "elementHtml": "\u003cimg class=\"central-featured-logo\" src=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2.png\" srcset=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2@1.5x.png 1.5x, portal/wikipedia.org/assets/img/",
+        "pageUrl": "https://www.wikipedia.org",
+        "wcagCriterion": "1.1.1",
+        "wcagName": "Non-text Content",
+        "wcagLevel": "A",
+        "severity": "medium",
+        "impact": "Screen reader users cannot understand non-text content",
+        "recommendation": "Add role=\"presentation\" or aria-hidden=\"true\" for decorative images with empty alt text.",
+        "codeFix": "\u003cimg role=\"presentation\" class=\"central-featured-logo\" src=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2.png\" srcset=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2@1.5x.png 1.5x, portal/wikipedia.org/assets/img/Wikipedia-logo-v2@2x.png 2x\" width=\"200\" height=\"183\" alt=\"\"\u003e",
+        "category": "perceivable",
+        "source": "custom-rule",
+        "confidence": "medium"
+      },
+      {
+        "id": "e0c6108f-8c9b-4fc4-8ac6-f48c775d04dc",
+        "testId": "P-03",
+        "title": "Missing captions for video content",
+        "description": "Video element is missing captions track. Deaf and hard-of-hearing users cannot access audio content.",
+        "element": "video",
+        "elementHtml": "\u003cvideo id=\"wikipedia25-video\" class=\"wikipedia25-video\" data-idle-light=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-light.webm\" data-idle-dark=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-dark.webm\" data-click-light=\"portal/wikipedia.org/assets/img/wikipedia25-synt",
+        "pageUrl": "https://www.wikipedia.org",
+        "wcagCriterion": "1.2.2",
+        "wcagName": "Captions (Prerecorded)",
+        "wcagLevel": "A",
+        "severity": "critical",
+        "impact": "Deaf or hard-of-hearing users cannot access audio content",
+        "recommendation": "Add a \u003ctrack\u003e element with kind=\"captions\" and a valid .vtt caption file.",
+        "codeFix": "\u003cvideo controls\u003e\n  \u003csource src=\"video.mp4\" type=\"video/mp4\" /\u003e\n  \u003ctrack kind=\"captions\" src=\"captions.vtt\" srclang=\"en\" label=\"English\" default /\u003e\n\u003c/video\u003e",
+        "category": "perceivable",
+        "source": "custom-rule",
+        "confidence": "medium"
+      },
+      {
+        "id": "dba218ce-de5c-4063-bb73-68200f41aec1",
+        "testId": "P-04",
+        "title": "Missing audio descriptions for video",
+        "description": "Video element is missing audio descriptions track for blind users.",
+        "element": "video",
+        "elementHtml": "\u003cvideo id=\"wikipedia25-video\" class=\"wikipedia25-video\" data-idle-light=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-light.webm\" data-idle-dark=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-dark.webm\" data-click-light=\"portal/wikipedia.org/assets/img/wikipedia25-synt",
+        "pageUrl": "https://www.wikipedia.org",
+        "wcagCriterion": "1.2.5",
+        "wcagName": "Audio Description (Prerecorded)",
+        "wcagLevel": "AA",
+        "severity": "medium",
+        "impact": "Blind users cannot access visual information in videos",
+        "recommendation": "Add a \u003ctrack\u003e element with kind=\"descriptions\" to describe important visual information.",
+        "codeFix": "\u003ctrack kind=\"descriptions\" src=\"descriptions.vtt\" srclang=\"en\" label=\"English\" /\u003e",
+        "category": "perceivable",
+        "source": "custom-rule",
+        "confidence": "medium"
+      },
+      {
+        "id": "13521f2b-d436-48d8-8d21-be14cdc1349b",
+        "testId": "R-08",
+        "title": "Inaccessible SVG elements",
+        "description": "SVG element is missing accessible name. Screen readers cannot describe this graphic.",
+        "element": "svg",
+        "elementHtml": "\u003csvg xmlns=\"http://www.w3.org/2000/svg\"\u003e\u003cfilter id=\"filter\"\u003e\u003cfeComponentTransfer color-interpolation-filters=\"sRGB\"\u003e\u003cfeFuncR type=\"table\" tableValues=\"1 0\" /\u003e\u003cfeFuncG type=\"table\" tableValues=\"1 0\" /\u003e",
+        "pageUrl": "https://www.wikipedia.org",
+        "wcagCriterion": "1.1.1",
+        "wcagName": "Non-text Content",
+        "wcagLevel": "A",
+        "severity": "high",
+        "impact": "Screen reader users cannot understand non-text content",
+        "recommendation": "Add role=\"img\" and aria-label to the SVG, or add a \u003ctitle\u003e element as the first child. Use aria-hidden=\"true\" for purely decorative SVGs.",
+        "codeFix": "\u003csvg role=\"img\" aria-label=\"Description of graphic\"\u003e\n  \u003ctitle\u003eDescription of graphic\u003c/title\u003e\n  \u003c!-- SVG content --\u003e\n\u003c/svg\u003e",
+        "category": "robust",
+        "source": "custom-rule",
+        "confidence": "medium"
+      },
+      {
+        "id": "a7d8f521-d52f-42c9-b4d3-8abc04fe8491",
+        "testId": "O-03",
+        "title": "Missing skip navigation link",
+        "description": "Page is missing a \"Skip to main content\" link. Keyboard users must tab through all navigation elements on every page.",
+        "element": "body",
+        "pageUrl": "https://www.wikipedia.org",
+        "wcagCriterion": "2.4.1",
+        "wcagName": "Bypass Blocks",
+        "wcagLevel": "A",
+        "severity": "high",
+        "impact": "Keyboard users must tab through all navigation on every page",
+        "recommendation": "Add a skip navigation link as the first focusable element in the page.",
+        "codeFix": "\u003c!-- Add as first child of \u003cbody\u003e --\u003e\n\u003ca href=\"#main-content\" class=\"skip-link\"\u003eSkip to main content\u003c/a\u003e\n\n\u003c!-- Style to show on focus --\u003e\n\u003cstyle\u003e\n.skip-link {\n  position: absolute;\n  left: -10000px;\n  top: auto;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n}\n.skip-link:focus {\n  position: fixed;\n  top: 10px;\n  left: 10px;\n  width: auto;\n  height: auto;\n  padding: 12px 24px;\n  background: #1a1a2e;\n  color: white;\n  z-index: 10000;\n  border-radius: 4px;\n}\n\u003c/style\u003e",
+        "category": "operable",
+        "source": "custom-rule",
+        "confidence": "medium"
+      },
+      {
+        "id": "1c9156fc-f5e1-4116-baff-9b43ebbbdce3",
+        "testId": "O-07",
+        "title": "Focus visibility suppressed via CSS",
+        "description": "CSS removes focus outline without providing an alternative focus indicator.",
+        "element": ":focus styles",
+        "elementHtml": ":focus{unicode-bidi:embed;outline:0;color:var(--color-progressive);text-decoration:none}",
+        "pageUrl": "https://www.wikipedia.org",
+        "wcagCriterion": "2.4.7",
+        "wcagName": "Focus Visible",
+        "wcagLevel": "AA",
+        "severity": "critical",
+        "impact": "Keyboard users cannot see which element has focus",
+        "recommendation": "Never remove focus indicators without providing a visible alternative (e.g., box-shadow, border, or custom outline).",
+        "codeFix": "/* Provide visible focus indicator */\n:focus {\n  outline: 2px solid #3B82F6;\n  outline-offset: 2px;\n}\n\n/* Or use :focus-visible for mouse-click users */\n:focus:not(:focus-visible) {\n  outline: none;\n}\n:focus-visible {\n  outline: 2px solid #3B82F6;\n  outline-offset: 2px;\n}",
+        "category": "operable",
+        "source": "custom-rule",
+        "confidence": "medium"
+      },
+      {
+        "id": "d9dd23e5-d7a6-4015-9300-a2571c520fa0",
+        "testId": "O-11",
+        "title": "Auto-playing media content",
+        "description": "Media element auto-plays, which can be disruptive to screen reader users and users with cognitive disabilities.",
+        "element": "video",
+        "elementHtml": "\u003cvideo id=\"wikipedia25-video\" class=\"wikipedia25-video\" data-idle-light=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-light.webm\" data-idle-dark=\"portal/wikipedia.org/assets/img/wikipe",
+        "pageUrl": "https://www.wikipedia.org",
+        "wcagCriterion": "2.2.2",
+        "wcagName": "Pause, Stop, Hide",
+        "wcagLevel": "A",
+        "severity": "high",
+        "impact": "Users with cognitive disabilities or vestibular disorders are affected",
+        "recommendation": "Remove the autoplay attribute, or provide a mechanism to pause, stop, or mute the media within 3 seconds.",
+        "codeFix": "\u003c!-- Remove autoplay --\u003e\n\u003cvideo controls\u003e\n  \u003c!-- sources --\u003e\n\u003c/video\u003e",
+        "category": "operable",
+        "source": "custom-rule",
+        "confidence": "medium"
+      },
+      {
+        "id": "35145475-5c13-473c-bc44-32e19769ca99",
+        "testId": "R-04",
+        "title": "Duplicate element IDs",
+        "description": "Duplicate id=\"filter\" found 2 times. IDs must be unique for ARIA associations (aria-labelledby, aria-describedby) to work correctly.",
+        "element": "#filter",
+        "pageUrl": "https://www.wikipedia.org",
+        "wcagCriterion": "4.1.2",
+        "wcagName": "Name, Role, Value",
+        "wcagLevel": "A",
+        "severity": "high",
+        "impact": "Assistive technologies cannot determine the purpose of UI components",
+        "recommendation": "Ensure each id value is unique within the page. Use classes for styling and unique IDs for ARIA references.",
+        "category": "robust",
+        "source": "custom-rule",
+        "confidence": "medium"
+      },
+      {
+        "id": "a8b0546d-1659-48d3-a3cd-b52d91011cdd",
+        "testId": "DA-S1-02",
+        "title": "Multiple h1 headings",
+        "description": "Page has 2 h1 headings. Use exactly one h1 per page for clear document structure.",
+        "element": "page-level",
+        "pageUrl": "https://www.wikipedia.org",
+        "wcagCriterion": "1.3.1",
+        "wcagName": "Info and Relationships",
+        "wcagLevel": "A",
+        "severity": "medium",
+        "impact": "Affects users relying on assistive technologies",
+        "recommendation": "Keep only one h1 that describes the page purpose. Convert others to h2 or lower.",
+        "category": "perceivable",
+        "source": "custom-rule",
+        "confidence": "high"
+      },
+      {
+        "id": "ed66597a-e7cd-4eec-a7a8-86a828518df1",
+        "testId": "DA-S2-02",
+        "title": "Hidden element still focusable",
+        "description": "Visually hidden element remains in tab order: \u003cinput type=\"hidden\" name=\"family\" value=\"wikipedia\"\u003e",
+        "element": "page-level",
+        "pageUrl": "https://www.wikipedia.org",
+        "wcagCriterion": "2.4.3",
+        "wcagName": "Focus Order",
+        "wcagLevel": "A",
+        "severity": "medium",
+        "impact": "Affects users relying on assistive technologies",
+        "recommendation": "Add tabindex=\"-1\" or aria-hidden=\"true\" to hidden interactive elements.",
+        "category": "operable",
+        "source": "custom-rule",
+        "confidence": "high"
+      },
+      {
+        "id": "00a2c1ca-bb34-422c-8115-fd68cf751a7d",
+        "testId": "DA-S7-03",
+        "title": "Link opens new window without warning",
+        "description": "Link \"you can support our work with a donation.\" opens in a new tab/window without informing the user.",
+        "element": "page-level",
+        "pageUrl": "https://www.wikipedia.org",
+        "wcagCriterion": "3.2.2",
+        "wcagName": "On Input",
+        "wcagLevel": "A",
+        "severity": "medium",
+        "impact": "Affects users relying on assistive technologies",
+        "recommendation": "Add \"(opens in new tab)\" to the link text or aria-label.",
+        "category": "understandable",
+        "source": "custom-rule",
+        "confidence": "medium"
+      },
+      {
+        "id": "5f731823-6189-401a-9854-7ac0b44a9c56",
+        "testId": "JRN-241",
+        "title": "Missing skip navigation link",
+        "description": "Page does not have a skip-to-main-content link. Keyboard users must tab through all navigation on every page.",
+        "element": "page-level",
+        "pageUrl": "https://www.wikipedia.org",
+        "wcagCriterion": "2.4.1",
+        "wcagName": "Bypass Blocks",
+        "wcagLevel": "A",
+        "severity": "high",
+        "impact": "Detected during user journey testing â affects real user flows",
+        "recommendation": "Add a \"Skip to main content\" link as the first focusable element.",
+        "category": "operable",
+        "source": "journey-test",
+        "confidence": "high"
+      }
+    ],
+    "groupedIssues": [
+      {
+        "issueKey": "P-03::Missing captions for video content",
+        "title": "Missing captions for video content",
+        "testId": "P-03",
+        "wcagCriterion": "1.2.2",
+        "wcagName": "Captions (Prerecorded)",
+        "wcagLevel": "A",
+        "severity": "critical",
+        "category": "perceivable",
+        "description": "Video element is missing captions track. Deaf and hard-of-hearing users cannot access audio content.",
+        "recommendation": "Add a \u003ctrack\u003e element with kind=\"captions\" and a valid .vtt caption file.",
+        "codeFix": "\u003cvideo controls\u003e\n  \u003csource src=\"video.mp4\" type=\"video/mp4\" /\u003e\n  \u003ctrack kind=\"captions\" src=\"captions.vtt\" srclang=\"en\" label=\"English\" default /\u003e\n\u003c/video\u003e",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "e0c6108f-8c9b-4fc4-8ac6-f48c775d04dc",
+            "testId": "P-03",
+            "title": "Missing captions for video content",
+            "description": "Video element is missing captions track. Deaf and hard-of-hearing users cannot access audio content.",
+            "element": "video",
+            "elementHtml": "\u003cvideo id=\"wikipedia25-video\" class=\"wikipedia25-video\" data-idle-light=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-light.webm\" data-idle-dark=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-dark.webm\" data-click-light=\"portal/wikipedia.org/assets/img/wikipedia25-synt",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "1.2.2",
+            "wcagName": "Captions (Prerecorded)",
+            "wcagLevel": "A",
+            "severity": "critical",
+            "impact": "Deaf or hard-of-hearing users cannot access audio content",
+            "recommendation": "Add a \u003ctrack\u003e element with kind=\"captions\" and a valid .vtt caption file.",
+            "codeFix": "\u003cvideo controls\u003e\n  \u003csource src=\"video.mp4\" type=\"video/mp4\" /\u003e\n  \u003ctrack kind=\"captions\" src=\"captions.vtt\" srclang=\"en\" label=\"English\" default /\u003e\n\u003c/video\u003e",
+            "category": "perceivable",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "O-07::Focus visibility suppressed via CSS",
+        "title": "Focus visibility suppressed via CSS",
+        "testId": "O-07",
+        "wcagCriterion": "2.4.7",
+        "wcagName": "Focus Visible",
+        "wcagLevel": "AA",
+        "severity": "critical",
+        "category": "operable",
+        "description": "CSS removes focus outline without providing an alternative focus indicator.",
+        "recommendation": "Never remove focus indicators without providing a visible alternative (e.g., box-shadow, border, or custom outline).",
+        "codeFix": "/* Provide visible focus indicator */\n:focus {\n  outline: 2px solid #3B82F6;\n  outline-offset: 2px;\n}\n\n/* Or use :focus-visible for mouse-click users */\n:focus:not(:focus-visible) {\n  outline: none;\n}\n:focus-visible {\n  outline: 2px solid #3B82F6;\n  outline-offset: 2px;\n}",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "1c9156fc-f5e1-4116-baff-9b43ebbbdce3",
+            "testId": "O-07",
+            "title": "Focus visibility suppressed via CSS",
+            "description": "CSS removes focus outline without providing an alternative focus indicator.",
+            "element": ":focus styles",
+            "elementHtml": ":focus{unicode-bidi:embed;outline:0;color:var(--color-progressive);text-decoration:none}",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "2.4.7",
+            "wcagName": "Focus Visible",
+            "wcagLevel": "AA",
+            "severity": "critical",
+            "impact": "Keyboard users cannot see which element has focus",
+            "recommendation": "Never remove focus indicators without providing a visible alternative (e.g., box-shadow, border, or custom outline).",
+            "codeFix": "/* Provide visible focus indicator */\n:focus {\n  outline: 2px solid #3B82F6;\n  outline-offset: 2px;\n}\n\n/* Or use :focus-visible for mouse-click users */\n:focus:not(:focus-visible) {\n  outline: none;\n}\n:focus-visible {\n  outline: 2px solid #3B82F6;\n  outline-offset: 2px;\n}",
+            "category": "operable",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "R-08::Inaccessible SVG elements",
+        "title": "Inaccessible SVG elements",
+        "testId": "R-08",
+        "wcagCriterion": "1.1.1",
+        "wcagName": "Non-text Content",
+        "wcagLevel": "A",
+        "severity": "high",
+        "category": "robust",
+        "description": "SVG element is missing accessible name. Screen readers cannot describe this graphic.",
+        "recommendation": "Add role=\"img\" and aria-label to the SVG, or add a \u003ctitle\u003e element as the first child. Use aria-hidden=\"true\" for purely decorative SVGs.",
+        "codeFix": "\u003csvg role=\"img\" aria-label=\"Description of graphic\"\u003e\n  \u003ctitle\u003eDescription of graphic\u003c/title\u003e\n  \u003c!-- SVG content --\u003e\n\u003c/svg\u003e",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "13521f2b-d436-48d8-8d21-be14cdc1349b",
+            "testId": "R-08",
+            "title": "Inaccessible SVG elements",
+            "description": "SVG element is missing accessible name. Screen readers cannot describe this graphic.",
+            "element": "svg",
+            "elementHtml": "\u003csvg xmlns=\"http://www.w3.org/2000/svg\"\u003e\u003cfilter id=\"filter\"\u003e\u003cfeComponentTransfer color-interpolation-filters=\"sRGB\"\u003e\u003cfeFuncR type=\"table\" tableValues=\"1 0\" /\u003e\u003cfeFuncG type=\"table\" tableValues=\"1 0\" /\u003e",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "1.1.1",
+            "wcagName": "Non-text Content",
+            "wcagLevel": "A",
+            "severity": "high",
+            "impact": "Screen reader users cannot understand non-text content",
+            "recommendation": "Add role=\"img\" and aria-label to the SVG, or add a \u003ctitle\u003e element as the first child. Use aria-hidden=\"true\" for purely decorative SVGs.",
+            "codeFix": "\u003csvg role=\"img\" aria-label=\"Description of graphic\"\u003e\n  \u003ctitle\u003eDescription of graphic\u003c/title\u003e\n  \u003c!-- SVG content --\u003e\n\u003c/svg\u003e",
+            "category": "robust",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "O-03::Missing skip navigation link",
+        "title": "Missing skip navigation link",
+        "testId": "O-03",
+        "wcagCriterion": "2.4.1",
+        "wcagName": "Bypass Blocks",
+        "wcagLevel": "A",
+        "severity": "high",
+        "category": "operable",
+        "description": "Page is missing a \"Skip to main content\" link. Keyboard users must tab through all navigation elements on every page.",
+        "recommendation": "Add a skip navigation link as the first focusable element in the page.",
+        "codeFix": "\u003c!-- Add as first child of \u003cbody\u003e --\u003e\n\u003ca href=\"#main-content\" class=\"skip-link\"\u003eSkip to main content\u003c/a\u003e\n\n\u003c!-- Style to show on focus --\u003e\n\u003cstyle\u003e\n.skip-link {\n  position: absolute;\n  left: -10000px;\n  top: auto;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n}\n.skip-link:focus {\n  position: fixed;\n  top: 10px;\n  left: 10px;\n  width: auto;\n  height: auto;\n  padding: 12px 24px;\n  background: #1a1a2e;\n  color: white;\n  z-index: 10000;\n  border-radius: 4px;\n}\n\u003c/style\u003e",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "a7d8f521-d52f-42c9-b4d3-8abc04fe8491",
+            "testId": "O-03",
+            "title": "Missing skip navigation link",
+            "description": "Page is missing a \"Skip to main content\" link. Keyboard users must tab through all navigation elements on every page.",
+            "element": "body",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "2.4.1",
+            "wcagName": "Bypass Blocks",
+            "wcagLevel": "A",
+            "severity": "high",
+            "impact": "Keyboard users must tab through all navigation on every page",
+            "recommendation": "Add a skip navigation link as the first focusable element in the page.",
+            "codeFix": "\u003c!-- Add as first child of \u003cbody\u003e --\u003e\n\u003ca href=\"#main-content\" class=\"skip-link\"\u003eSkip to main content\u003c/a\u003e\n\n\u003c!-- Style to show on focus --\u003e\n\u003cstyle\u003e\n.skip-link {\n  position: absolute;\n  left: -10000px;\n  top: auto;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n}\n.skip-link:focus {\n  position: fixed;\n  top: 10px;\n  left: 10px;\n  width: auto;\n  height: auto;\n  padding: 12px 24px;\n  background: #1a1a2e;\n  color: white;\n  z-index: 10000;\n  border-radius: 4px;\n}\n\u003c/style\u003e",
+            "category": "operable",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "O-11::Auto-playing media content",
+        "title": "Auto-playing media content",
+        "testId": "O-11",
+        "wcagCriterion": "2.2.2",
+        "wcagName": "Pause, Stop, Hide",
+        "wcagLevel": "A",
+        "severity": "high",
+        "category": "operable",
+        "description": "Media element auto-plays, which can be disruptive to screen reader users and users with cognitive disabilities.",
+        "recommendation": "Remove the autoplay attribute, or provide a mechanism to pause, stop, or mute the media within 3 seconds.",
+        "codeFix": "\u003c!-- Remove autoplay --\u003e\n\u003cvideo controls\u003e\n  \u003c!-- sources --\u003e\n\u003c/video\u003e",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "d9dd23e5-d7a6-4015-9300-a2571c520fa0",
+            "testId": "O-11",
+            "title": "Auto-playing media content",
+            "description": "Media element auto-plays, which can be disruptive to screen reader users and users with cognitive disabilities.",
+            "element": "video",
+            "elementHtml": "\u003cvideo id=\"wikipedia25-video\" class=\"wikipedia25-video\" data-idle-light=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-light.webm\" data-idle-dark=\"portal/wikipedia.org/assets/img/wikipe",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "2.2.2",
+            "wcagName": "Pause, Stop, Hide",
+            "wcagLevel": "A",
+            "severity": "high",
+            "impact": "Users with cognitive disabilities or vestibular disorders are affected",
+            "recommendation": "Remove the autoplay attribute, or provide a mechanism to pause, stop, or mute the media within 3 seconds.",
+            "codeFix": "\u003c!-- Remove autoplay --\u003e\n\u003cvideo controls\u003e\n  \u003c!-- sources --\u003e\n\u003c/video\u003e",
+            "category": "operable",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "R-04::Duplicate element IDs",
+        "title": "Duplicate element IDs",
+        "testId": "R-04",
+        "wcagCriterion": "4.1.2",
+        "wcagName": "Name, Role, Value",
+        "wcagLevel": "A",
+        "severity": "high",
+        "category": "robust",
+        "description": "Duplicate id=\"filter\" found 2 times. IDs must be unique for ARIA associations (aria-labelledby, aria-describedby) to work correctly.",
+        "recommendation": "Ensure each id value is unique within the page. Use classes for styling and unique IDs for ARIA references.",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "35145475-5c13-473c-bc44-32e19769ca99",
+            "testId": "R-04",
+            "title": "Duplicate element IDs",
+            "description": "Duplicate id=\"filter\" found 2 times. IDs must be unique for ARIA associations (aria-labelledby, aria-describedby) to work correctly.",
+            "element": "#filter",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "4.1.2",
+            "wcagName": "Name, Role, Value",
+            "wcagLevel": "A",
+            "severity": "high",
+            "impact": "Assistive technologies cannot determine the purpose of UI components",
+            "recommendation": "Ensure each id value is unique within the page. Use classes for styling and unique IDs for ARIA references.",
+            "category": "robust",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "JRN-241::Missing skip navigation link",
+        "title": "Missing skip navigation link",
+        "testId": "JRN-241",
+        "wcagCriterion": "2.4.1",
+        "wcagName": "Bypass Blocks",
+        "wcagLevel": "A",
+        "severity": "high",
+        "category": "operable",
+        "description": "Page does not have a skip-to-main-content link. Keyboard users must tab through all navigation on every page.",
+        "recommendation": "Add a \"Skip to main content\" link as the first focusable element.",
+        "confidence": "high",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "5f731823-6189-401a-9854-7ac0b44a9c56",
+            "testId": "JRN-241",
+            "title": "Missing skip navigation link",
+            "description": "Page does not have a skip-to-main-content link. Keyboard users must tab through all navigation on every page.",
+            "element": "page-level",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "2.4.1",
+            "wcagName": "Bypass Blocks",
+            "wcagLevel": "A",
+            "severity": "high",
+            "impact": "Detected during user journey testing â affects real user flows",
+            "recommendation": "Add a \"Skip to main content\" link as the first focusable element.",
+            "category": "operable",
+            "source": "journey-test",
+            "confidence": "high"
+          }
+        ]
+      },
+      {
+        "issueKey": "P-02::Decorative images not properly marked",
+        "title": "Decorative images not properly marked",
+        "testId": "P-02",
+        "wcagCriterion": "1.1.1",
+        "wcagName": "Non-text Content",
+        "wcagLevel": "A",
+        "severity": "medium",
+        "category": "perceivable",
+        "description": "Image with empty alt text should also have role=\"presentation\" or aria-hidden=\"true\" to properly convey decorative intent.",
+        "recommendation": "Add role=\"presentation\" or aria-hidden=\"true\" for decorative images with empty alt text.",
+        "codeFix": "\u003cimg role=\"presentation\" class=\"central-featured-logo\" src=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2.png\" srcset=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2@1.5x.png 1.5x, portal/wikipedia.org/assets/img/Wikipedia-logo-v2@2x.png 2x\" width=\"200\" height=\"183\" alt=\"\"\u003e",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "6e1f01ee-6b67-46b2-b582-a352f3fc29f0",
+            "testId": "P-02",
+            "title": "Decorative images not properly marked",
+            "description": "Image with empty alt text should also have role=\"presentation\" or aria-hidden=\"true\" to properly convey decorative intent.",
+            "element": "img[alt=\"\"]",
+            "elementHtml": "\u003cimg class=\"central-featured-logo\" src=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2.png\" srcset=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2@1.5x.png 1.5x, portal/wikipedia.org/assets/img/",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "1.1.1",
+            "wcagName": "Non-text Content",
+            "wcagLevel": "A",
+            "severity": "medium",
+            "impact": "Screen reader users cannot understand non-text content",
+            "recommendation": "Add role=\"presentation\" or aria-hidden=\"true\" for decorative images with empty alt text.",
+            "codeFix": "\u003cimg role=\"presentation\" class=\"central-featured-logo\" src=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2.png\" srcset=\"portal/wikipedia.org/assets/img/Wikipedia-logo-v2@1.5x.png 1.5x, portal/wikipedia.org/assets/img/Wikipedia-logo-v2@2x.png 2x\" width=\"200\" height=\"183\" alt=\"\"\u003e",
+            "category": "perceivable",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "P-04::Missing audio descriptions for video",
+        "title": "Missing audio descriptions for video",
+        "testId": "P-04",
+        "wcagCriterion": "1.2.5",
+        "wcagName": "Audio Description (Prerecorded)",
+        "wcagLevel": "AA",
+        "severity": "medium",
+        "category": "perceivable",
+        "description": "Video element is missing audio descriptions track for blind users.",
+        "recommendation": "Add a \u003ctrack\u003e element with kind=\"descriptions\" to describe important visual information.",
+        "codeFix": "\u003ctrack kind=\"descriptions\" src=\"descriptions.vtt\" srclang=\"en\" label=\"English\" /\u003e",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "dba218ce-de5c-4063-bb73-68200f41aec1",
+            "testId": "P-04",
+            "title": "Missing audio descriptions for video",
+            "description": "Video element is missing audio descriptions track for blind users.",
+            "element": "video",
+            "elementHtml": "\u003cvideo id=\"wikipedia25-video\" class=\"wikipedia25-video\" data-idle-light=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-light.webm\" data-idle-dark=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-dark.webm\" data-click-light=\"portal/wikipedia.org/assets/img/wikipedia25-synt",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "1.2.5",
+            "wcagName": "Audio Description (Prerecorded)",
+            "wcagLevel": "AA",
+            "severity": "medium",
+            "impact": "Blind users cannot access visual information in videos",
+            "recommendation": "Add a \u003ctrack\u003e element with kind=\"descriptions\" to describe important visual information.",
+            "codeFix": "\u003ctrack kind=\"descriptions\" src=\"descriptions.vtt\" srclang=\"en\" label=\"English\" /\u003e",
+            "category": "perceivable",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "DA-S1-02::Multiple h1 headings",
+        "title": "Multiple h1 headings",
+        "testId": "DA-S1-02",
+        "wcagCriterion": "1.3.1",
+        "wcagName": "Info and Relationships",
+        "wcagLevel": "A",
+        "severity": "medium",
+        "category": "perceivable",
+        "description": "Page has 2 h1 headings. Use exactly one h1 per page for clear document structure.",
+        "recommendation": "Keep only one h1 that describes the page purpose. Convert others to h2 or lower.",
+        "confidence": "high",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "a8b0546d-1659-48d3-a3cd-b52d91011cdd",
+            "testId": "DA-S1-02",
+            "title": "Multiple h1 headings",
+            "description": "Page has 2 h1 headings. Use exactly one h1 per page for clear document structure.",
+            "element": "page-level",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "1.3.1",
+            "wcagName": "Info and Relationships",
+            "wcagLevel": "A",
+            "severity": "medium",
+            "impact": "Affects users relying on assistive technologies",
+            "recommendation": "Keep only one h1 that describes the page purpose. Convert others to h2 or lower.",
+            "category": "perceivable",
+            "source": "custom-rule",
+            "confidence": "high"
+          }
+        ]
+      },
+      {
+        "issueKey": "DA-S2-02::Hidden element still focusable",
+        "title": "Hidden element still focusable",
+        "testId": "DA-S2-02",
+        "wcagCriterion": "2.4.3",
+        "wcagName": "Focus Order",
+        "wcagLevel": "A",
+        "severity": "medium",
+        "category": "operable",
+        "description": "Visually hidden element remains in tab order: \u003cinput type=\"hidden\" name=\"family\" value=\"wikipedia\"\u003e",
+        "recommendation": "Add tabindex=\"-1\" or aria-hidden=\"true\" to hidden interactive elements.",
+        "confidence": "high",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "ed66597a-e7cd-4eec-a7a8-86a828518df1",
+            "testId": "DA-S2-02",
+            "title": "Hidden element still focusable",
+            "description": "Visually hidden element remains in tab order: \u003cinput type=\"hidden\" name=\"family\" value=\"wikipedia\"\u003e",
+            "element": "page-level",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "2.4.3",
+            "wcagName": "Focus Order",
+            "wcagLevel": "A",
+            "severity": "medium",
+            "impact": "Affects users relying on assistive technologies",
+            "recommendation": "Add tabindex=\"-1\" or aria-hidden=\"true\" to hidden interactive elements.",
+            "category": "operable",
+            "source": "custom-rule",
+            "confidence": "high"
+          }
+        ]
+      },
+      {
+        "issueKey": "DA-S7-03::Link opens new window without warning",
+        "title": "Link opens new window without warning",
+        "testId": "DA-S7-03",
+        "wcagCriterion": "3.2.2",
+        "wcagName": "On Input",
+        "wcagLevel": "A",
+        "severity": "medium",
+        "category": "understandable",
+        "description": "Link \"you can support our work with a donation.\" opens in a new tab/window without informing the user.",
+        "recommendation": "Add \"(opens in new tab)\" to the link text or aria-label.",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "00a2c1ca-bb34-422c-8115-fd68cf751a7d",
+            "testId": "DA-S7-03",
+            "title": "Link opens new window without warning",
+            "description": "Link \"you can support our work with a donation.\" opens in a new tab/window without informing the user.",
+            "element": "page-level",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "3.2.2",
+            "wcagName": "On Input",
+            "wcagLevel": "A",
+            "severity": "medium",
+            "impact": "Affects users relying on assistive technologies",
+            "recommendation": "Add \"(opens in new tab)\" to the link text or aria-label.",
+            "category": "understandable",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      }
+    ],
+    "topCritical": [
+      {
+        "issueKey": "P-03::Missing captions for video content",
+        "title": "Missing captions for video content",
+        "testId": "P-03",
+        "wcagCriterion": "1.2.2",
+        "wcagName": "Captions (Prerecorded)",
+        "wcagLevel": "A",
+        "severity": "critical",
+        "category": "perceivable",
+        "description": "Video element is missing captions track. Deaf and hard-of-hearing users cannot access audio content.",
+        "recommendation": "Add a \u003ctrack\u003e element with kind=\"captions\" and a valid .vtt caption file.",
+        "codeFix": "\u003cvideo controls\u003e\n  \u003csource src=\"video.mp4\" type=\"video/mp4\" /\u003e\n  \u003ctrack kind=\"captions\" src=\"captions.vtt\" srclang=\"en\" label=\"English\" default /\u003e\n\u003c/video\u003e",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "e0c6108f-8c9b-4fc4-8ac6-f48c775d04dc",
+            "testId": "P-03",
+            "title": "Missing captions for video content",
+            "description": "Video element is missing captions track. Deaf and hard-of-hearing users cannot access audio content.",
+            "element": "video",
+            "elementHtml": "\u003cvideo id=\"wikipedia25-video\" class=\"wikipedia25-video\" data-idle-light=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-light.webm\" data-idle-dark=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-dark.webm\" data-click-light=\"portal/wikipedia.org/assets/img/wikipedia25-synt",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "1.2.2",
+            "wcagName": "Captions (Prerecorded)",
+            "wcagLevel": "A",
+            "severity": "critical",
+            "impact": "Deaf or hard-of-hearing users cannot access audio content",
+            "recommendation": "Add a \u003ctrack\u003e element with kind=\"captions\" and a valid .vtt caption file.",
+            "codeFix": "\u003cvideo controls\u003e\n  \u003csource src=\"video.mp4\" type=\"video/mp4\" /\u003e\n  \u003ctrack kind=\"captions\" src=\"captions.vtt\" srclang=\"en\" label=\"English\" default /\u003e\n\u003c/video\u003e",
+            "category": "perceivable",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "O-07::Focus visibility suppressed via CSS",
+        "title": "Focus visibility suppressed via CSS",
+        "testId": "O-07",
+        "wcagCriterion": "2.4.7",
+        "wcagName": "Focus Visible",
+        "wcagLevel": "AA",
+        "severity": "critical",
+        "category": "operable",
+        "description": "CSS removes focus outline without providing an alternative focus indicator.",
+        "recommendation": "Never remove focus indicators without providing a visible alternative (e.g., box-shadow, border, or custom outline).",
+        "codeFix": "/* Provide visible focus indicator */\n:focus {\n  outline: 2px solid #3B82F6;\n  outline-offset: 2px;\n}\n\n/* Or use :focus-visible for mouse-click users */\n:focus:not(:focus-visible) {\n  outline: none;\n}\n:focus-visible {\n  outline: 2px solid #3B82F6;\n  outline-offset: 2px;\n}",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "1c9156fc-f5e1-4116-baff-9b43ebbbdce3",
+            "testId": "O-07",
+            "title": "Focus visibility suppressed via CSS",
+            "description": "CSS removes focus outline without providing an alternative focus indicator.",
+            "element": ":focus styles",
+            "elementHtml": ":focus{unicode-bidi:embed;outline:0;color:var(--color-progressive);text-decoration:none}",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "2.4.7",
+            "wcagName": "Focus Visible",
+            "wcagLevel": "AA",
+            "severity": "critical",
+            "impact": "Keyboard users cannot see which element has focus",
+            "recommendation": "Never remove focus indicators without providing a visible alternative (e.g., box-shadow, border, or custom outline).",
+            "codeFix": "/* Provide visible focus indicator */\n:focus {\n  outline: 2px solid #3B82F6;\n  outline-offset: 2px;\n}\n\n/* Or use :focus-visible for mouse-click users */\n:focus:not(:focus-visible) {\n  outline: none;\n}\n:focus-visible {\n  outline: 2px solid #3B82F6;\n  outline-offset: 2px;\n}",
+            "category": "operable",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "R-08::Inaccessible SVG elements",
+        "title": "Inaccessible SVG elements",
+        "testId": "R-08",
+        "wcagCriterion": "1.1.1",
+        "wcagName": "Non-text Content",
+        "wcagLevel": "A",
+        "severity": "high",
+        "category": "robust",
+        "description": "SVG element is missing accessible name. Screen readers cannot describe this graphic.",
+        "recommendation": "Add role=\"img\" and aria-label to the SVG, or add a \u003ctitle\u003e element as the first child. Use aria-hidden=\"true\" for purely decorative SVGs.",
+        "codeFix": "\u003csvg role=\"img\" aria-label=\"Description of graphic\"\u003e\n  \u003ctitle\u003eDescription of graphic\u003c/title\u003e\n  \u003c!-- SVG content --\u003e\n\u003c/svg\u003e",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "13521f2b-d436-48d8-8d21-be14cdc1349b",
+            "testId": "R-08",
+            "title": "Inaccessible SVG elements",
+            "description": "SVG element is missing accessible name. Screen readers cannot describe this graphic.",
+            "element": "svg",
+            "elementHtml": "\u003csvg xmlns=\"http://www.w3.org/2000/svg\"\u003e\u003cfilter id=\"filter\"\u003e\u003cfeComponentTransfer color-interpolation-filters=\"sRGB\"\u003e\u003cfeFuncR type=\"table\" tableValues=\"1 0\" /\u003e\u003cfeFuncG type=\"table\" tableValues=\"1 0\" /\u003e",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "1.1.1",
+            "wcagName": "Non-text Content",
+            "wcagLevel": "A",
+            "severity": "high",
+            "impact": "Screen reader users cannot understand non-text content",
+            "recommendation": "Add role=\"img\" and aria-label to the SVG, or add a \u003ctitle\u003e element as the first child. Use aria-hidden=\"true\" for purely decorative SVGs.",
+            "codeFix": "\u003csvg role=\"img\" aria-label=\"Description of graphic\"\u003e\n  \u003ctitle\u003eDescription of graphic\u003c/title\u003e\n  \u003c!-- SVG content --\u003e\n\u003c/svg\u003e",
+            "category": "robust",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "O-03::Missing skip navigation link",
+        "title": "Missing skip navigation link",
+        "testId": "O-03",
+        "wcagCriterion": "2.4.1",
+        "wcagName": "Bypass Blocks",
+        "wcagLevel": "A",
+        "severity": "high",
+        "category": "operable",
+        "description": "Page is missing a \"Skip to main content\" link. Keyboard users must tab through all navigation elements on every page.",
+        "recommendation": "Add a skip navigation link as the first focusable element in the page.",
+        "codeFix": "\u003c!-- Add as first child of \u003cbody\u003e --\u003e\n\u003ca href=\"#main-content\" class=\"skip-link\"\u003eSkip to main content\u003c/a\u003e\n\n\u003c!-- Style to show on focus --\u003e\n\u003cstyle\u003e\n.skip-link {\n  position: absolute;\n  left: -10000px;\n  top: auto;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n}\n.skip-link:focus {\n  position: fixed;\n  top: 10px;\n  left: 10px;\n  width: auto;\n  height: auto;\n  padding: 12px 24px;\n  background: #1a1a2e;\n  color: white;\n  z-index: 10000;\n  border-radius: 4px;\n}\n\u003c/style\u003e",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "a7d8f521-d52f-42c9-b4d3-8abc04fe8491",
+            "testId": "O-03",
+            "title": "Missing skip navigation link",
+            "description": "Page is missing a \"Skip to main content\" link. Keyboard users must tab through all navigation elements on every page.",
+            "element": "body",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "2.4.1",
+            "wcagName": "Bypass Blocks",
+            "wcagLevel": "A",
+            "severity": "high",
+            "impact": "Keyboard users must tab through all navigation on every page",
+            "recommendation": "Add a skip navigation link as the first focusable element in the page.",
+            "codeFix": "\u003c!-- Add as first child of \u003cbody\u003e --\u003e\n\u003ca href=\"#main-content\" class=\"skip-link\"\u003eSkip to main content\u003c/a\u003e\n\n\u003c!-- Style to show on focus --\u003e\n\u003cstyle\u003e\n.skip-link {\n  position: absolute;\n  left: -10000px;\n  top: auto;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n}\n.skip-link:focus {\n  position: fixed;\n  top: 10px;\n  left: 10px;\n  width: auto;\n  height: auto;\n  padding: 12px 24px;\n  background: #1a1a2e;\n  color: white;\n  z-index: 10000;\n  border-radius: 4px;\n}\n\u003c/style\u003e",
+            "category": "operable",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "O-11::Auto-playing media content",
+        "title": "Auto-playing media content",
+        "testId": "O-11",
+        "wcagCriterion": "2.2.2",
+        "wcagName": "Pause, Stop, Hide",
+        "wcagLevel": "A",
+        "severity": "high",
+        "category": "operable",
+        "description": "Media element auto-plays, which can be disruptive to screen reader users and users with cognitive disabilities.",
+        "recommendation": "Remove the autoplay attribute, or provide a mechanism to pause, stop, or mute the media within 3 seconds.",
+        "codeFix": "\u003c!-- Remove autoplay --\u003e\n\u003cvideo controls\u003e\n  \u003c!-- sources --\u003e\n\u003c/video\u003e",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "d9dd23e5-d7a6-4015-9300-a2571c520fa0",
+            "testId": "O-11",
+            "title": "Auto-playing media content",
+            "description": "Media element auto-plays, which can be disruptive to screen reader users and users with cognitive disabilities.",
+            "element": "video",
+            "elementHtml": "\u003cvideo id=\"wikipedia25-video\" class=\"wikipedia25-video\" data-idle-light=\"portal/wikipedia.org/assets/img/wikipedia25-synthesizer-idle-light.webm\" data-idle-dark=\"portal/wikipedia.org/assets/img/wikipe",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "2.2.2",
+            "wcagName": "Pause, Stop, Hide",
+            "wcagLevel": "A",
+            "severity": "high",
+            "impact": "Users with cognitive disabilities or vestibular disorders are affected",
+            "recommendation": "Remove the autoplay attribute, or provide a mechanism to pause, stop, or mute the media within 3 seconds.",
+            "codeFix": "\u003c!-- Remove autoplay --\u003e\n\u003cvideo controls\u003e\n  \u003c!-- sources --\u003e\n\u003c/video\u003e",
+            "category": "operable",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "R-04::Duplicate element IDs",
+        "title": "Duplicate element IDs",
+        "testId": "R-04",
+        "wcagCriterion": "4.1.2",
+        "wcagName": "Name, Role, Value",
+        "wcagLevel": "A",
+        "severity": "high",
+        "category": "robust",
+        "description": "Duplicate id=\"filter\" found 2 times. IDs must be unique for ARIA associations (aria-labelledby, aria-describedby) to work correctly.",
+        "recommendation": "Ensure each id value is unique within the page. Use classes for styling and unique IDs for ARIA references.",
+        "confidence": "medium",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "35145475-5c13-473c-bc44-32e19769ca99",
+            "testId": "R-04",
+            "title": "Duplicate element IDs",
+            "description": "Duplicate id=\"filter\" found 2 times. IDs must be unique for ARIA associations (aria-labelledby, aria-describedby) to work correctly.",
+            "element": "#filter",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "4.1.2",
+            "wcagName": "Name, Role, Value",
+            "wcagLevel": "A",
+            "severity": "high",
+            "impact": "Assistive technologies cannot determine the purpose of UI components",
+            "recommendation": "Ensure each id value is unique within the page. Use classes for styling and unique IDs for ARIA references.",
+            "category": "robust",
+            "source": "custom-rule",
+            "confidence": "medium"
+          }
+        ]
+      },
+      {
+        "issueKey": "JRN-241::Missing skip navigation link",
+        "title": "Missing skip navigation link",
+        "testId": "JRN-241",
+        "wcagCriterion": "2.4.1",
+        "wcagName": "Bypass Blocks",
+        "wcagLevel": "A",
+        "severity": "high",
+        "category": "operable",
+        "description": "Page does not have a skip-to-main-content link. Keyboard users must tab through all navigation on every page.",
+        "recommendation": "Add a \"Skip to main content\" link as the first focusable element.",
+        "confidence": "high",
+        "occurrenceCount": 1,
+        "affectedPages": ["https://www.wikipedia.org"],
+        "frequency": 100,
+        "instances": [
+          {
+            "id": "5f731823-6189-401a-9854-7ac0b44a9c56",
+            "testId": "JRN-241",
+            "title": "Missing skip navigation link",
+            "description": "Page does not have a skip-to-main-content link. Keyboard users must tab through all navigation on every page.",
+            "element": "page-level",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "2.4.1",
+            "wcagName": "Bypass Blocks",
+            "wcagLevel": "A",
+            "severity": "high",
+            "impact": "Detected during user journey testing â affects real user flows",
+            "recommendation": "Add a \"Skip to main content\" link as the first focusable element.",
+            "category": "operable",
+            "source": "journey-test",
+            "confidence": "high"
+          }
+        ]
+      }
+    ],
+    "wcagMapping": [
+      {
+        "criterion": "1.1.1",
+        "name": "Non-text Content",
+        "level": "A",
+        "issueCount": 2,
+        "status": "fail"
+      },
+      {
+        "criterion": "2.4.1",
+        "name": "Bypass Blocks",
+        "level": "A",
+        "issueCount": 2,
+        "status": "fail"
+      },
+      {
+        "criterion": "1.2.2",
+        "name": "Captions (Prerecorded)",
+        "level": "A",
+        "issueCount": 1,
+        "status": "fail"
+      },
+      {
+        "criterion": "1.2.5",
+        "name": "Audio Description (Prerecorded)",
+        "level": "AA",
+        "issueCount": 1,
+        "status": "fail"
+      },
+      {
+        "criterion": "1.3.1",
+        "name": "Info and Relationships",
+        "level": "A",
+        "issueCount": 1,
+        "status": "fail"
+      },
+      {
+        "criterion": "2.2.2",
+        "name": "Pause, Stop, Hide",
+        "level": "A",
+        "issueCount": 1,
+        "status": "fail"
+      },
+      {
+        "criterion": "2.4.3",
+        "name": "Focus Order",
+        "level": "A",
+        "issueCount": 1,
+        "status": "fail"
+      },
+      {
+        "criterion": "2.4.7",
+        "name": "Focus Visible",
+        "level": "AA",
+        "issueCount": 1,
+        "status": "fail"
+      },
+      {
+        "criterion": "3.2.2",
+        "name": "On Input",
+        "level": "A",
+        "issueCount": 1,
+        "status": "fail"
+      },
+      {
+        "criterion": "4.1.2",
+        "name": "Name, Role, Value",
+        "level": "A",
+        "issueCount": 1,
+        "status": "fail"
+      },
+      {
+        "criterion": "1.2.1",
+        "name": "Audio-only and Video-only (Prerecorded)",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "1.2.3",
+        "name": "Audio Description or Media Alternative (Prerecorded)",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "1.3.2",
+        "name": "Meaningful Sequence",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "1.3.3",
+        "name": "Sensory Characteristics",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "1.4.1",
+        "name": "Use of Color",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "1.4.3",
+        "name": "Contrast (Minimum)",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "1.4.5",
+        "name": "Images of Text",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "1.4.10",
+        "name": "Reflow",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "1.4.11",
+        "name": "Non-text Contrast",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "2.1.1",
+        "name": "Keyboard",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "2.1.2",
+        "name": "No Keyboard Trap",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "2.2.1",
+        "name": "Timing Adjustable",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "2.4.2",
+        "name": "Page Titled",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "2.4.4",
+        "name": "Link Purpose (In Context)",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "2.4.5",
+        "name": "Multiple Ways",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "2.4.8",
+        "name": "Location",
+        "level": "AAA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "2.4.11",
+        "name": "Focus Not Obscured (Minimum)",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "2.5.3",
+        "name": "Label in Name",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "2.5.4",
+        "name": "Motion Actuation",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "2.5.7",
+        "name": "Dragging Movements",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "2.5.8",
+        "name": "Target Size (Minimum)",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "3.1.1",
+        "name": "Language of Page",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "3.1.2",
+        "name": "Language of Parts",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "3.2.1",
+        "name": "On Focus",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "3.2.4",
+        "name": "Consistent Identification",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "3.2.6",
+        "name": "Consistent Help",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "3.3.1",
+        "name": "Error Identification",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "3.3.2",
+        "name": "Labels or Instructions",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "3.3.3",
+        "name": "Error Suggestion",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "3.3.4",
+        "name": "Error Prevention (Legal, Financial, Data)",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "3.3.7",
+        "name": "Redundant Entry",
+        "level": "A",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "3.3.8",
+        "name": "Accessible Authentication (Minimum)",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      },
+      {
+        "criterion": "4.1.3",
+        "name": "Status Messages",
+        "level": "AA",
+        "issueCount": 0,
+        "status": "pass"
+      }
+    ],
+    "remediationPlan": [
+      {
+        "priority": 1,
+        "severity": "critical",
+        "title": "Missing captions for video content",
+        "description": "Add a \u003ctrack\u003e element with kind=\"captions\" and a valid .vtt caption file. (1 instance across 1 page)",
+        "affectedPages": ["https://www.wikipedia.org"],
+        "estimatedEffort": "low",
+        "frequency": 100
+      },
+      {
+        "priority": 2,
+        "severity": "critical",
+        "title": "Focus visibility suppressed via CSS",
+        "description": "Never remove focus indicators without providing a visible alternative (e.g., box-shadow, border, or custom outline). (1 instance across 1 page)",
+        "affectedPages": ["https://www.wikipedia.org"],
+        "estimatedEffort": "low",
+        "frequency": 100
+      },
+      {
+        "priority": 3,
+        "severity": "high",
+        "title": "Inaccessible SVG elements",
+        "description": "Add role=\"img\" and aria-label to the SVG, or add a \u003ctitle\u003e element as the first child. Use aria-hidden=\"true\" for purely decorative SVGs. (1 instance across 1 page)",
+        "affectedPages": ["https://www.wikipedia.org"],
+        "estimatedEffort": "low",
+        "frequency": 100
+      },
+      {
+        "priority": 4,
+        "severity": "high",
+        "title": "Missing skip navigation link",
+        "description": "Add a skip navigation link as the first focusable element in the page. (1 instance across 1 page)",
+        "affectedPages": ["https://www.wikipedia.org"],
+        "estimatedEffort": "low",
+        "frequency": 100
+      },
+      {
+        "priority": 5,
+        "severity": "high",
+        "title": "Auto-playing media content",
+        "description": "Remove the autoplay attribute, or provide a mechanism to pause, stop, or mute the media within 3 seconds. (1 instance across 1 page)",
+        "affectedPages": ["https://www.wikipedia.org"],
+        "estimatedEffort": "low",
+        "frequency": 100
+      },
+      {
+        "priority": 6,
+        "severity": "high",
+        "title": "Duplicate element IDs",
+        "description": "Ensure each id value is unique within the page. Use classes for styling and unique IDs for ARIA references. (1 instance across 1 page)",
+        "affectedPages": ["https://www.wikipedia.org"],
+        "estimatedEffort": "low",
+        "frequency": 100
+      },
+      {
+        "priority": 7,
+        "severity": "high",
+        "title": "Missing skip navigation link",
+        "description": "Add a \"Skip to main content\" link as the first focusable element. (1 instance across 1 page)",
+        "affectedPages": ["https://www.wikipedia.org"],
+        "estimatedEffort": "low",
+        "frequency": 100
+      },
+      {
+        "priority": 8,
+        "severity": "medium",
+        "title": "Decorative images not properly marked",
+        "description": "Add role=\"presentation\" or aria-hidden=\"true\" for decorative images with empty alt text. (1 instance across 1 page)",
+        "affectedPages": ["https://www.wikipedia.org"],
+        "estimatedEffort": "low",
+        "frequency": 100
+      },
+      {
+        "priority": 9,
+        "severity": "medium",
+        "title": "Missing audio descriptions for video",
+        "description": "Add a \u003ctrack\u003e element with kind=\"descriptions\" to describe important visual information. (1 instance across 1 page)",
+        "affectedPages": ["https://www.wikipedia.org"],
+        "estimatedEffort": "low",
+        "frequency": 100
+      },
+      {
+        "priority": 10,
+        "severity": "medium",
+        "title": "Multiple h1 headings",
+        "description": "Keep only one h1 that describes the page purpose. Convert others to h2 or lower. (1 instance across 1 page)",
+        "affectedPages": ["https://www.wikipedia.org"],
+        "estimatedEffort": "low",
+        "frequency": 100
+      },
+      {
+        "priority": 11,
+        "severity": "medium",
+        "title": "Hidden element still focusable",
+        "description": "Add tabindex=\"-1\" or aria-hidden=\"true\" to hidden interactive elements. (1 instance across 1 page)",
+        "affectedPages": ["https://www.wikipedia.org"],
+        "estimatedEffort": "low",
+        "frequency": 100
+      },
+      {
+        "priority": 12,
+        "severity": "medium",
+        "title": "Link opens new window without warning",
+        "description": "Add \"(opens in new tab)\" to the link text or aria-label. (1 instance across 1 page)",
+        "affectedPages": ["https://www.wikipedia.org"],
+        "estimatedEffort": "low",
+        "frequency": 100
+      }
+    ],
+    "pageBreakdown": [
+      {
+        "url": "https://www.wikipedia.org",
+        "title": "Wikipedia",
+        "score": 18,
+        "issueCount": 12,
+        "criticalCount": 2,
+        "highCount": 5,
+        "mediumCount": 5,
+        "lowCount": 0
+      }
+    ],
+    "crawlCoverage": {
+      "totalPagesFound": 1,
+      "pagesAudited": 1,
+      "pagesSkipped": 0,
+      "coveragePercent": 100,
+      "skippedPages": [],
+      "discoveryMethods": {
+        "seed-url": 1,
+        "navigation-menu": 0,
+        "footer-links": 0,
+        "internal-links": 0,
+        "button-links": 0,
+        "sitemap": 0
+      }
+    },
+    "journeyResults": [
+      {
+        "journeyName": "Keyboard Navigation",
+        "description": "Tests keyboard accessibility including skip links, tab navigation, traps, and focus visibility.",
+        "steps": [
+          {
+            "name": "Skip Navigation Link",
+            "action": "Check for skip-to-content link",
+            "passed": false,
+            "issue": "No skip navigation link found"
+          },
+          {
+            "name": "Keyboard Tab Navigation",
+            "action": "Tabbed through 387 focusable elements",
+            "passed": true
+          },
+          {
+            "name": "Focus Indicator Visibility",
+            "action": "Check CSS for focus indicator suppression",
+            "passed": true
+          }
+        ],
+        "passed": false,
+        "issues": [
+          {
+            "id": "5f731823-6189-401a-9854-7ac0b44a9c56",
+            "testId": "JRN-241",
+            "title": "Missing skip navigation link",
+            "description": "Page does not have a skip-to-main-content link. Keyboard users must tab through all navigation on every page.",
+            "element": "page-level",
+            "pageUrl": "https://www.wikipedia.org",
+            "wcagCriterion": "2.4.1",
+            "wcagName": "Bypass Blocks",
+            "wcagLevel": "A",
+            "severity": "high",
+            "impact": "Detected during user journey testing â affects real user flows",
+            "recommendation": "Add a \"Skip to main content\" link as the first focusable element.",
+            "category": "operable",
+            "source": "journey-test",
+            "confidence": "high"
+          }
+        ]
+      },
+      {
+        "journeyName": "Focus Management",
+        "description": "Tests focus management in dialogs, dynamic content, and live regions.",
+        "steps": [
+          {
+            "name": "Dialog/Modal Focus Management",
+            "action": "Found 1 dialog(s)",
+            "passed": true
+          },
+          {
+            "name": "Live Region Detection",
+            "action": "Found 0 live region(s)",
+            "passed": true
+          }
+        ],
+        "passed": true,
+        "issues": []
+      },
+      {
+        "journeyName": "Form Interaction",
+        "description": "Tests form accessibility including labels, grouping, autocomplete, and error handling.",
+        "steps": [
+          {
+            "name": "Form Label Associations",
+            "action": "Checked 1 form(s)",
+            "passed": true
+          }
+        ],
+        "passed": true,
+        "issues": []
+      },
+      {
+        "journeyName": "Error State Handling",
+        "description": "Tests how the application communicates errors to assistive technology users.",
+        "steps": [
+          {
+            "name": "Error State Handling",
+            "action": "Check error identification patterns",
+            "passed": false,
+            "issue": "No error handling patterns detected (no aria-invalid, no error containers)"
+          }
+        ],
+        "passed": false,
+        "issues": []
+      }
+    ],
+    "generatedAt": "2026-04-09T06:17:23.293Z"
+  },
+  "crawlCoverage": {
+    "totalPagesFound": 1,
+    "pagesAudited": 1,
+    "pagesSkipped": 0,
+    "coveragePercent": 100,
+    "skippedPages": [],
+    "discoveryMethods": {
+      "seed-url": 1,
+      "navigation-menu": 0,
+      "footer-links": 0,
+      "internal-links": 0,
+      "button-links": 0,
+      "sitemap": 0
+    }
+  },
+  "startedAt": "2026-04-09T06:17:02.751Z",
+  "completedAt": "2026-04-09T06:17:23.293Z"
+}

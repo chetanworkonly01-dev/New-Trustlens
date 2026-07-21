@@ -1,0 +1,1 @@
+﻿lib/engines/pdf-analyzer.ts(14,50): error TS2339: Property 'default' does not exist on type 'typeof import("E:/Antigravity/Accessablity audit/accessibility-audit/node_modules/pdf-parse/dist/pdf-parse/esm/index")'.
