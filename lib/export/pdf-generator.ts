@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 // import { svg2pdf } from "svg2pdf.js";
 import autoTable from "jspdf-autotable";
-import { AuditResult, AccessibilityIssue } from "../types/audit";
+import { AuditResult, AccessibilityIssue, GroupedIssue } from "../types/audit";
 import type { DarkPatternFinding } from "../types/darkpattern";
 import type { RecommendationItem } from "../types/performance";
 
@@ -101,7 +101,9 @@ function compLabel(l: string): string {
     )[l] || l
   );
 }
-function deriveTeam(issue: AccessibilityIssue): string {
+type IssueLike = Pick<AccessibilityIssue, 'wcagCriterion' | 'severity' | 'category'> & { source?: string; occurrenceCount?: number };
+
+function deriveTeam(issue: IssueLike): string {
   const c = issue.wcagCriterion;
   if (["1.1.1", "1.2.1", "1.2.2", "1.2.5"].includes(c)) return "Content";
   if (["1.4.3", "1.4.11", "1.3.3"].includes(c)) return "Designer";
@@ -112,7 +114,9 @@ function deriveTeam(issue: AccessibilityIssue): string {
   if (issue.source === "journey-test") return "QA";
   return "Frontend Dev";
 }
-function deriveEffort(issue: AccessibilityIssue): string {
+function deriveEffort(issue: IssueLike): string {
+  // For grouped issues with many instances, bump effort estimate
+  if ((issue.occurrenceCount ?? 1) > 10) return "1 Sprint";
   return (
     (
       {
@@ -279,6 +283,88 @@ const MGMT_STATUS_COLOR: Record<string, [number, number, number]> = {
   resolved: [0, 186, 140],
 };
 
+function getPerfActionSteps(type: string, ri: any): string[] {
+  const t = type.toLowerCase().replace(/-/g, " ");
+  const url: string = (ri.url || ri.resource || "").toLowerCase();
+  const isImage = url.match(/\.(png|jpg|jpeg|webp|gif|svg|avif)/);
+  const isJS = url.match(/\.(js|mjs|ts)/);
+  const isCSS = url.match(/\.css/);
+  const isCDN = url.match(/cdn|static|assets/);
+
+  if (t.includes("render block") || t.includes("render-block") || t.includes("blocking")) {
+    return [
+      "Move <script> tags to bottom of <body> or add `defer` / `async` attribute to non-critical scripts.",
+      "Inline critical CSS required for above-the-fold content; load remaining stylesheets asynchronously using `media='print'` flip pattern.",
+      "Use `<link rel='preload'>` for fonts and hero images to eliminate render-blocking fetch delays.",
+      "Audit third-party tag manager / analytics scripts — defer or load via web worker (e.g. Partytown).",
+    ];
+  }
+  if (t.includes("large image") || (isImage && (t.includes("size") || t.includes("unoptimized")))) {
+    return [
+      "Convert images to modern formats: WebP (80% smaller than PNG) or AVIF for hero/product images.",
+      "Implement responsive `srcset` + `sizes` attributes so mobile devices download appropriately sized images.",
+      "Enable lazy loading (`loading='lazy'`) for all below-the-fold images.",
+      "Set explicit `width` and `height` attributes to prevent Cumulative Layout Shift (CLS).",
+      "Use a CDN with automatic image optimisation (Cloudflare Images, Imgix, or Next.js Image component).",
+    ];
+  }
+  if (t.includes("large js") || t.includes("javascript") || isJS) {
+    return [
+      "Enable code splitting: split vendor bundles from application code (Webpack `SplitChunksPlugin` or Vite `manualChunks`).",
+      "Tree-shake unused exports — audit with `webpack-bundle-analyzer` or `rollup-plugin-visualizer`.",
+      "Replace heavy libraries with lighter alternatives (e.g. date-fns instead of moment.js, ~95% smaller).",
+      "Lazy-load below-the-fold features using dynamic `import()` to defer non-critical JS.",
+      "Enable Brotli/gzip compression at the CDN or server layer for all JS assets.",
+    ];
+  }
+  if (t.includes("large css") || isCSS) {
+    return [
+      "Remove unused CSS using PurgeCSS or built-in tree-shaking in Tailwind CSS.",
+      "Split CSS by route and load only the styles needed for the current page (CSS Modules or scoped styles).",
+      "Minify CSS in the build pipeline (cssnano or Lightning CSS).",
+      "Inline critical above-the-fold CSS in <head>; defer full stylesheet load.",
+    ];
+  }
+  if (t.includes("slow") || t.includes("ttfb") || t.includes("server")) {
+    return [
+      "Enable HTTP/2 or HTTP/3 at the server/CDN layer to allow multiplexed asset delivery.",
+      "Set aggressive cache headers (`Cache-Control: public, max-age=31536000, immutable`) for versioned static assets.",
+      "Investigate server-side bottlenecks: database query times, cold starts, or missing connection pooling.",
+      "Deploy static assets and API responses to a CDN edge node geographically close to your users.",
+      "Enable server-side caching (Redis / Varnish) for high-traffic, low-change API endpoints.",
+    ];
+  }
+  if (t.includes("no cache") || t.includes("cache")) {
+    return [
+      "Add `Cache-Control: public, max-age=86400` (or longer for versioned assets) to static resource responses.",
+      "Use content-hash file names (e.g. `main.a3f9b2.js`) so assets can be cached indefinitely and invalidated on deploy.",
+      "Configure `ETag` / `Last-Modified` headers for API responses to allow conditional GET requests.",
+      "Review CDN configuration — ensure the origin sets correct Vary headers so the CDN caches per content-type.",
+    ];
+  }
+  if (t.includes("redirect")) {
+    return [
+      "Update all internal links and asset references to point directly to the final URL, eliminating redirect chains.",
+      "Audit 301/302 chains with a crawl tool (Screaming Frog or Sitebulb) and collapse multi-hop redirects to one hop maximum.",
+      "Ensure HTTPS is the canonical origin everywhere — remove any HTTP → HTTPS hops from asset loading paths.",
+    ];
+  }
+  if (t.includes("third party") || t.includes("third-party")) {
+    return [
+      "Audit all third-party scripts — remove any that are unused or duplicated (multiple analytics providers, old A/B test tools).",
+      "Self-host critical third-party assets (fonts, icons) to eliminate DNS lookup and TLS handshake costs.",
+      "Facade pattern: replace embedded widgets (chat, video, map) with a static placeholder that loads the real widget on user interaction.",
+      "Load third-party scripts with `async` or through a tag manager configured for deferred firing.",
+    ];
+  }
+  // Generic fallback
+  return [
+    "Profile the resource using Chrome DevTools Network tab to confirm actual size and load time in production.",
+    "Enable compression (Brotli preferred, gzip fallback) for all text-based assets on the server.",
+    "Review with your frontend team: identify whether this resource is critical-path or can be deferred/removed.",
+  ];
+}
+
 function drawManagementResponse(
   doc: jsPDF,
   y: number,
@@ -288,48 +374,53 @@ function drawManagementResponse(
   ctxTitle: string,
 ): number {
   const mr = getManagementResponse(host);
-  const status = mr?.status || "planned";
   const owner = mr?.owner;
   const target = mr?.target;
   const notes = mr?.notes;
+  const hasData = !!(owner || target || notes);
 
-  // 1. Precise Header & Box Dimensions
   const x = 20;
-  const w = pw - 40; // Spans completely between left and right margins
-  const headerHeight = 8; // Explicit height matching the thick blue banner row
+  const w = pw - 40;
 
-  // Estimate inner dynamic heights for data parameters
-  // const metaH = owner || target ? 6 : 0;
-  // const notesH = notes
-  //   ? doc.splitTextToSize(String(notes), w - 16).length * 4 + 4
-  //   : 0;
+  if (!hasData) {
+    // Lightweight placeholder — a thin bordered box for the client to complete after review
+    const boxH = 12;
+    if (y + boxH > ph - 18) {
+      doc.addPage("a4", "landscape");
+      y = 18;
+    }
+    doc.setDrawColor(...K.lightGrey);
+    doc.setLineWidth(0.2);
+    doc.setFillColor(250, 250, 252);
+    doc.rect(x, y, w, boxH, "FD");
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...K.midGrey);
+    doc.text("Management Response — to be completed by team owner", x + 5, y + 5);
+    doc.text("Owner: ________________________   Target Date: ________________   Status: ________________", x + 5, y + 9.5);
+    return y + boxH + 6;
+  }
 
-  // Enforce a respectable minimum inner content height if fields happen to be empty
+  // Full response block — only shown when the client has entered data
+  const headerHeight = 8;
   const contentHeight = 10;
   const totalBlockHeight = headerHeight + 5;
 
-  // 2. Boundary / Page Flow Control Check
   if (y + totalBlockHeight > ph - 18) {
     doc.addPage("a4", "landscape");
     y = 18;
   }
 
-  // Determine active brand color mapping based on asset status state
-
-  // 3. Draw Header Layer (Top Filled Banner)
   doc.setFillColor(...K.navy);
   doc.rect(x, y, w, headerHeight, "F");
 
-  // 4. Draw Header Row Text ("Response Management")
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.setTextColor(255, 255, 255); // Crisp high-contrast white text layer
+  doc.setTextColor(255, 255, 255);
   doc.text("Management Response", x + 5, y + 6.5);
 
-  // 5. Populate Core Content Area Elements (Inside Inner Container Box)
   let cy = y + headerHeight + 6;
 
-  // Render Data Row Meta Properties: Owner & Targeted Timeline
   if (owner || target) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
@@ -352,21 +443,17 @@ function drawManagementResponse(
     cy += 6;
   }
 
-  // Render Detailed Observations Notes Paragraph String
   if (notes) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(...K.darkGrey);
-
     const lines = doc.splitTextToSize(String(notes), w - 12);
     doc.text(lines, x + 6, cy);
   }
 
-  // 6. Enclosing Grid Boundary Lines (Draw afterward to keep edges clean)
-  doc.setDrawColor(...K.midGrey); // Solid sharp dark border outline definition
+  doc.setDrawColor(...K.midGrey);
   doc.setLineWidth(0.25);
 
-  // Upper frame surrounding the solid color banner row
   doc.rect(x, y, w, headerHeight, "S");
   // Lower frame box encompassing the dynamic description content data
   doc.rect(x, y + headerHeight, w, contentHeight, "S");
@@ -423,6 +510,10 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
   const report = audit.report!;
   const score = audit.score;
   const issues = audit.issues;
+  // Use grouped violations for issue tables — one row per unique violation, not per DOM element
+  const groupedIssues: GroupedIssue[] = report.groupedIssues?.length
+    ? report.groupedIssues
+    : [];
   const config = audit.config;
   const testedLevel = report.testedLevel || "AA";
   const standard = config.standard || "WCAG 2.2";
@@ -485,10 +576,10 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       : isPerf
         ? "Target"
         : "Article";
-  const col3V = (iss: AccessibilityIssue) =>
+  const col3V = (iss: IssueLike & { wcagCriterion: string }) =>
     isA11y ? iss.wcagCriterion : (iss as any).ruleId || "—";
-  const col4V = (iss: AccessibilityIssue) =>
-    isA11y ? iss.wcagLevel : (iss as any).regulation?.[0] || "—";
+  const col4V = (iss: IssueLike & { wcagCriterion: string; wcagLevel?: string }) =>
+    isA11y ? (iss as any).wcagLevel || "—" : (iss as any).regulation?.[0] || "—";
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
@@ -823,7 +914,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       );
   } else if (isA11y) {
     summaryParas = [
-      `This KPMG ${reportTitle} evaluated ${projectName} against ${standard} Level ${testedLevel}. The overall score is ${score.overall}/100 (${compLabel(score.complianceLevel)}). ${score.totalIssues} issues were identified across ${audit.pages.length} page(s).`,
+      `This KPMG ${reportTitle} evaluated ${projectName} against ${standard} Level ${testedLevel}. The overall score is ${score.overall}/100 (${compLabel(score.complianceLevel)}). ${score.uniqueIssues} unique violations identified (${score.totalIssues} total instances) across ${audit.pages.length} page(s).`,
     ];
   } else {
     summaryParas = [
@@ -878,9 +969,11 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       []) as Array<{ severity: string }>;
     const _pvF = ((audit as any).pillarResults?.privacy?.findings ??
       []) as Array<{ severity: string }>;
-    for (const f of [...issues, ..._dpF, ..._pvF] as Array<{
-      severity: string;
-    }>) {
+    // Accessibility: count per UNIQUE violation (grouped), not per DOM element instance
+    for (const g of groupedIssues) {
+      if (g.severity in aggBySev) aggBySev[g.severity]++;
+    }
+    for (const f of [..._dpF, ..._pvF] as Array<{ severity: string }>) {
       if (f.severity in aggBySev) aggBySev[f.severity]++;
     }
   }
@@ -1093,7 +1186,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     doc.setFontSize(9);
     doc.setTextColor(...K.darkGrey);
     doc.text(
-      "Quick-reference table of all issues identified. See Section 3 for full details.",
+      `Quick-reference table of ${groupedIssues.length} unique violation${groupedIssues.length !== 1 ? "s" : ""} identified (${issues.length} total instances). See Section 3 for full details.`,
       20,
       y,
     );
@@ -1102,14 +1195,15 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     autoTable(doc, {
       startY: y,
       head: [
-        ["#", "Issue Title", col3H, col4H, "Severity", "Team Owner", "Effort"],
+        ["#", "Issue Title", col3H, col4H, "Severity", "Instances", "Team Owner", "Effort"],
       ],
-      body: issues.map((iss, idx) => [
+      body: groupedIssues.map((iss, idx) => [
         `#${String(idx + 1).padStart(3, "0")}`,
         iss.title,
         col3V(iss),
         col4V(iss),
         iss.severity.toUpperCase(),
+        iss.occurrenceCount > 1 ? `×${iss.occurrenceCount}` : "1",
         deriveTeam(iss),
         deriveEffort(iss),
       ]),
@@ -1128,13 +1222,14 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       },
       alternateRowStyles: { fillColor: K.offWhite },
       columnStyles: {
-        0: { cellWidth: 25, fontStyle: "bold", halign: "center" },
-        1: { cellWidth: 100 },
-        2: { cellWidth: 25, halign: "center" },
-        3: { cellWidth: 25, halign: "center" },
-        4: { cellWidth: 30, halign: "center" },
-        5: { cellWidth: 28 },
-        6: { cellWidth: 20, halign: "center" },
+        0: { cellWidth: 18, fontStyle: "bold", halign: "center" },
+        1: { cellWidth: 90 },
+        2: { cellWidth: 22, halign: "center" },
+        3: { cellWidth: 18, halign: "center" },
+        4: { cellWidth: 25, halign: "center" },
+        5: { cellWidth: 18, halign: "center" },
+        6: { cellWidth: 25 },
+        7: { cellWidth: 18, halign: "center" },
       },
       didParseCell: (data) => {
         if (data.section === "body" && data.column.index === 4) {
@@ -1147,6 +1242,10 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         }
         if (data.section === "body" && data.column.index === 3) {
           data.cell.styles.textColor = K.lightBlue;
+          data.cell.styles.fontStyle = "bold";
+        }
+        if (data.section === "body" && data.column.index === 5) {
+          data.cell.styles.textColor = K.navy;
           data.cell.styles.fontStyle = "bold";
         }
       },
@@ -1166,7 +1265,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       y,
     );
 
-    issues.forEach((issue, idx) => {
+    groupedIssues.forEach((issue, idx) => {
       const issueId = `#${String(idx + 1).padStart(3, "0")}`;
       const team = deriveTeam(issue);
       const effort = deriveEffort(issue);
@@ -1186,7 +1285,20 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         ? `${issue.wcagCriterion} — ${issue.wcagName} (${issue.wcagLevel})`
         : `${(issue as any).ruleId || issue.wcagCriterion || "—"}`;
       doc.text(ruleText, 22 + doc.getTextWidth(label), y);
+      // Instance count badge (top-right of WCAG criterion line)
+      if (issue.occurrenceCount > 1) {
+        const badgeText = `${issue.occurrenceCount} instances`;
+        const bx = pw - 20 - doc.getTextWidth(badgeText) - 4;
+        doc.setFillColor(...K.navy);
+        doc.roundedRect(bx - 2, y - 5, doc.getTextWidth(badgeText) + 6, 7, 1, 1, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        doc.setTextColor(...K.white);
+        doc.text(badgeText, bx + 1, y);
+      }
       y += 10;
+
+
 
       // Issue header bar
       doc.setFillColor(...sevBg(issue.severity));
@@ -1354,15 +1466,6 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.line(20, y, pw - 20, y);
       y += 8;
 
-      // ── Management Response (injected inline per issue) ──
-      y = drawManagementResponse(
-        doc,
-        y,
-        issue,
-        pw,
-        ph,
-        `${issueId} ${issue.title}`,
-      );
       drawPageBorder(doc, pw, ph);
     });
 
@@ -1382,20 +1485,21 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     );
     y += 8;
 
-    const compFn = (i: AccessibilityIssue) => {
-      const t = (i.title + " " + i.element).toLowerCase();
+    const compFn = (i: GroupedIssue) => {
+      const t = i.title.toLowerCase();
       if (t.includes("button") || t.includes("btn")) return "Buttons";
       if (t.includes("form") || t.includes("input") || t.includes("select"))
         return "Forms";
       if (t.includes("nav") || t.includes("link")) return "Navigation";
       if (t.includes("img") || t.includes("alt")) return "Images";
       if (t.includes("heading")) return "Headings";
-      if (t.includes("color") || t.includes("contrast")) return "Colour";
+      if (t.includes("color") || t.includes("colour") || t.includes("contrast")) return "Colour";
       if (t.includes("focus") || t.includes("keyboard")) return "Focus/KB";
+      if (t.includes("touch") || t.includes("target")) return "Touch Targets";
       return "General";
     };
-    const byComp: Record<string, AccessibilityIssue[]> = {};
-    issues.forEach((i) => {
+    const byComp: Record<string, GroupedIssue[]> = {};
+    groupedIssues.forEach((i) => {
       const c = compFn(i);
       if (!byComp[c]) byComp[c] = [];
       byComp[c].push(i);
@@ -1575,25 +1679,25 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         label: "Critical Blockers — Fix This Sprint",
         color: K.critical,
         bg: K.criticalBg,
-        items: issues.filter((i) => i.severity === "critical"),
+        items: groupedIssues.filter((i) => i.severity === "critical"),
       },
       {
         label: "High Priority — Next Sprint",
         color: K.high,
         bg: K.highBg,
-        items: issues.filter((i) => i.severity === "high"),
+        items: groupedIssues.filter((i) => i.severity === "high"),
       },
       {
         label: "Medium Priority — This Quarter",
         color: K.medium,
         bg: K.mediumBg,
-        items: issues.filter((i) => i.severity === "medium"),
+        items: groupedIssues.filter((i) => i.severity === "medium"),
       },
       {
         label: "Quick Wins — Fix Today (< 30 min each)",
         color: K.teal,
         bg: K.passBg,
-        items: issues.filter((i) => i.severity === "low"),
+        items: groupedIssues.filter((i) => i.severity === "low"),
       },
     ];
 
@@ -1670,7 +1774,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     );
     y += 8;
 
-    const getAcceptance = (iss: AccessibilityIssue): string => {
+    const getAcceptance = (iss: { wcagCriterion: string }): string => {
       const c = iss.wcagCriterion;
       if (c === "2.1.1" || c === "2.1.2")
         return "1. Keyboard nav works fully\n2. No keyboard trap detected";
@@ -1686,9 +1790,9 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     autoTable(doc, {
       startY: y,
       head: [["#", "Issue", "Severity", "Done When — Acceptance Criteria"]],
-      body: issues.map((iss, idx) => [
+      body: groupedIssues.map((iss, idx) => [
         `#${String(idx + 1).padStart(3, "0")}`,
-        iss.title,
+        iss.occurrenceCount > 1 ? `${iss.title} (×${iss.occurrenceCount})` : iss.title,
         iss.severity.toUpperCase(),
         getAcceptance(iss),
       ]),
@@ -2137,234 +2241,263 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     );
 
     dpDeduped.forEach((f, idx) => {
-      if (y > ph - 80) {
+      if (y > ph - 100) {
         doc.addPage("a4", "landscape");
         y = 18;
       }
 
       const purple: [number, number, number] = [106, 40, 155];
+      const purpleLight: [number, number, number] = [237, 225, 250];
+      const tealDark: [number, number, number] = [0, 91, 130];
+      const colW = (pw - 44) / 2;   // half-width for two-column layout
+      const cardX = 20;
+      const cardW = pw - 40;
 
-      // CCPA sub-header
-      if (f.brignullPattern) {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(10);
-        doc.setTextColor(...purple);
-        doc.text(`CCPA #${f.brignullNumber}: ${f.brignullPattern}`, 20, y - 5);
-        y += 6;
-      }
+      // ── CARD HEADER: CCPA Categorization (left) | Status + Closure Date (right) ──
+      doc.setFillColor(...purple);
+      doc.roundedRect(cardX, y, cardW, 12, 2, 2, "F");
 
-      // Finding header
+      // Left: CCPA categorization label
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(220, 180, 255);
+      doc.text("CCPA CATEGORIZATION", cardX + 4, y + 4.5);
+      const ccpaLabel = f.brignullPattern
+        ? `#${f.brignullNumber} — ${f.brignullPattern}`
+        : f.category.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...K.white);
+      doc.text(ccpaLabel, cardX + 4, y + 10);
+
+      // Right: Status + Tentative Closure Date
+      const statusX = cardX + cardW - 70;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.5);
+      doc.setTextColor(220, 180, 255);
+      doc.text("STATUS", statusX, y + 4.5);
+      doc.text("TENTATIVE CLOSURE DATE", statusX + 30, y + 4.5);
+      doc.setFontSize(8.5);
+      doc.setTextColor(...K.white);
+      doc.text("Open", statusX, y + 10);
+      doc.text("TBD", statusX + 30, y + 10);
+      y += 14;
+
+      // Finding title bar (severity colored)
       doc.setFillColor(...sevBg(f.severity));
-      doc.roundedRect(20, y - 3, pw - 40, 13, 2, 2, "F");
+      doc.rect(cardX, y, cardW, 11, "F");
       doc.setDrawColor(...sevColor(f.severity));
-      doc.setLineWidth(0.5);
-      doc.line(20, y - 3, 20, y + 10);
+      doc.setLineWidth(0.8);
+      doc.line(cardX, y, cardX, y + 11);
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
+      doc.setFontSize(9.5);
       doc.setTextColor(...sevColor(f.severity));
-      const instanceTag =
-        f._instanceCount > 1 ? `  [×${f._instanceCount} instances]` : "";
+      const instanceTag = f._instanceCount > 1 ? `  ×${f._instanceCount} instances` : "";
       doc.text(
-        `#${String(idx + 1).padStart(3, "0")}  ${f.title}${instanceTag}`,
-        24,
-        y + 5,
+        `${String(idx + 1).padStart(2, "0")}.  ${f.title}${instanceTag}`,
+        cardX + 5, y + 7,
       );
-      y += 16;
 
-      // Meta line 1
-      doc.setFontSize(8);
+      // Severity badge right-aligned
+      doc.setFillColor(...sevColor(f.severity));
+      doc.roundedRect(cardX + cardW - 28, y + 2, 24, 7, 1, 1, "F");
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(...K.navy);
-      doc.text("Severity: ", 24, y);
-      doc.setTextColor(...sevColor(f.severity));
-      doc.text(f.severity.toUpperCase(), 44, y);
+      doc.setFontSize(6.5);
+      doc.setTextColor(...K.white);
+      doc.text(f.severity.toUpperCase(), cardX + cardW - 16, y + 7, { align: "center" });
+      y += 14;
 
-      doc.setTextColor(...K.midGrey);
-      doc.text("|", 62, y);
-      doc.setTextColor(...K.navy);
-      doc.text("Rule: ", 68, y);
-      doc.setTextColor(...K.lightBlue);
-      const ruleIdText = f.ruleId || "—";
-      doc.text(ruleIdText, 80, y);
-      let currentX = 80 + doc.getTextWidth(ruleIdText) + 4;
-      y += 5;
+      // ── TWO-COLUMN BODY ──
+      // Prepare text content for height measurement
+      const obsText = f.userImpact || f.description || "";
+      const recText = f.recommendation || f.developerFix || "";
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      const obsLines = doc.splitTextToSize(obsText.substring(0, 400), colW - 8);
+      const recLines = doc.splitTextToSize(recText.substring(0, 400), colW - 8);
+      const bodyH = Math.max(obsLines.length, recLines.length) * 3.8 + 14;
 
-      // Meta line 2
-      doc.setTextColor(...K.navy);
-      doc.text("DSA Article: ", 24, y);
-      doc.setTextColor(...K.lightBlue);
-      doc.text(f.dsaArticle || "—", 50, y);
-      if (f.fixPriority) {
-        doc.setTextColor(...K.midGrey);
-        doc.text("|", 82, y);
-        doc.setTextColor(...K.navy);
-        doc.text("Priority: ", 88, y);
-        doc.setTextColor(
-          f.fixPriority === "P0" ? K.critical[0] : K.high[0],
-          f.fixPriority === "P0" ? K.critical[1] : K.high[1],
-          f.fixPriority === "P0" ? K.critical[2] : K.high[2],
-        );
-        doc.text(f.fixPriority, 104, y);
-      }
-      if (f.estimatedEffort) {
-        doc.setTextColor(...K.midGrey);
-        doc.text("|", 116, y);
-        doc.setTextColor(...K.navy);
-        doc.text(`Effort: ${f.estimatedEffort}`, 122, y);
-      }
-      y += 8;
-
-      // Description
-      if (y > ph - 40) {
+      if (y + bodyH > ph - 30) {
         doc.addPage("a4", "landscape");
         y = 18;
       }
+
+      // Left column: Observation
+      doc.setFillColor(248, 248, 252);
+      doc.roundedRect(cardX, y, colW - 2, bodyH, 1, 1, "F");
+      doc.setDrawColor(...K.lightGrey);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(cardX, y, colW - 2, bodyH, 1, 1, "S");
+
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.setTextColor(...K.nearBlack);
-      doc.text("User Impact", 24, y);
-      y += 4;
-      doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
-      doc.setTextColor(...K.darkGrey);
-      const impactLines = doc.splitTextToSize(
-        f.userImpact || f.description,
-        pw - 48,
-      );
-      doc.text(impactLines, 24, y);
-      y += impactLines.length * 3.5 + 3;
+      doc.setTextColor(...purple);
+      doc.text("OBSERVATION", cardX + 4, y + 6);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...K.nearBlack);
+      doc.text(obsLines, cardX + 4, y + 12);
 
-      // Developer fix — IMPORTANT: set Courier font BEFORE splitTextToSize so
-      // jsPDF calculates character widths correctly for that font, preventing overflow.
-      if (f.developerFix && !isA11y) {
-        if (y > ph - 35) {
-          doc.addPage("a4", "landscape");
-          y = 18;
-        }
+      // Right column: Recommendation
+      const recX = cardX + colW + 2;
+      doc.setFillColor(245, 252, 248);
+      doc.roundedRect(recX, y, colW - 2, bodyH, 1, 1, "F");
+      doc.setDrawColor(...K.lightGrey);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(recX, y, colW - 2, bodyH, 1, 1, "S");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(0, 110, 60);
+      doc.text("RECOMMENDATION", recX + 4, y + 6);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...K.nearBlack);
+      doc.text(recLines, recX + 4, y + 12);
+      y += bodyH + 4;
+
+      // Meta row: Rule | DSA Article | Priority | Effort
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...K.navy);
+      doc.text("Rule: ", cardX + 4, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...K.lightBlue);
+      doc.text(f.ruleId || "—", cardX + 14, y);
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...K.navy);
+      doc.text("DSA Art: ", cardX + 56, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...K.lightBlue);
+      doc.text(f.dsaArticle || "—", cardX + 74, y);
+
+      if (f.fixPriority) {
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.setTextColor(...K.nearBlack);
-        doc.text("Developer Fix", 24, y);
-        y += 4;
-        // Set target font first so splitTextToSize uses correct char widths
-        doc.setFont("courier", "normal");
-        doc.setFontSize(7);
-        const fixLines = doc.splitTextToSize(
-          f.developerFix.substring(0, 300),
-          pw - 56,
-        );
-        const fh = fixLines.length * 3.8 + 6;
-        doc.setFillColor(1, 11, 26);
-        doc.setDrawColor(...K.teal);
-        doc.setLineWidth(0.5);
-        doc.roundedRect(24, y - 1, pw - 48, fh, 2, 2, "FD");
-        doc.setTextColor(134, 239, 172);
-        doc.text(fixLines, 28, y + 4);
-        y += fh + 4;
+        doc.setTextColor(...K.navy);
+        doc.text("Priority: ", cardX + 105, y);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...sevColor(f.fixPriority === "P0" ? "critical" : "high"));
+        doc.text(f.fixPriority, cardX + 122, y);
       }
-
-      // Legal summary
-      if (f.legalSummary) {
-        if (y > ph - 30) {
-          doc.addPage("a4", "landscape");
-          y = 18;
-        }
+      if (f.estimatedEffort) {
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.setTextColor(180, 30, 30);
-        doc.text("Legal / Regulatory Exposure", 24, y);
-        y += 4;
+        doc.setTextColor(...K.navy);
+        doc.text("Effort: ", cardX + 148, y);
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
         doc.setTextColor(...K.darkGrey);
-        const legalLines = doc.splitTextToSize(
-          f.legalSummary.substring(0, 300),
-          pw - 48,
-        );
-        doc.text(legalLines, 24, y);
-        y += legalLines.length * 3.5 + 3;
+        doc.text(f.estimatedEffort, cardX + 163, y);
+      }
+      y += 8;
+
+      // ── REGULATORY REFERENCE BOXES ──
+      const regBoxW = (cardW - 4) / 2;
+      const indiaText = `India DPDP Act / BIS Guidelines: Dark patterns that manipulate user consent or obscure choices violate the Digital Personal Data Protection Act, 2023. Organisations must ensure transparent, unambiguous interfaces to obtain valid user consent.`;
+      const europeText = `Europe DSA / GDPR / UCPD: Article ${f.dsaArticle || "25"} of the Digital Services Act prohibits deceptive user-interface design. GDPR Art. 7 requires freely given, unambiguous consent. UCPD bans misleading commercial practices in consumer-facing interfaces.`;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      const indiaLines = doc.splitTextToSize(indiaText, regBoxW - 10);
+      const europeLines = doc.splitTextToSize(europeText, regBoxW - 10);
+      const regBoxH = Math.max(indiaLines.length, europeLines.length) * 3.3 + 14;
+
+      if (y + regBoxH + 10 > ph - 20) {
+        doc.addPage("a4", "landscape");
+        y = 18;
       }
 
-      // Evidence screenshot — capped at 55mm height to prevent full-page DOM dumps
-      // from filling the entire card. Border frame makes it look intentional.
+      // India box (left)
+      doc.setFillColor(255, 248, 240);
+      doc.setDrawColor(200, 100, 0);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(cardX, y, regBoxW, regBoxH, 2, 2, "FD");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(180, 80, 0);
+      doc.text("INDIA — DPDP ACT / BIS GUIDELINES", cardX + 4, y + 6);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(...K.nearBlack);
+      doc.text(indiaLines, cardX + 4, y + 11);
+
+      // Europe box (right)
+      const euX = cardX + regBoxW + 4;
+      doc.setFillColor(240, 245, 255);
+      doc.setDrawColor(30, 60, 160);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(euX, y, regBoxW, regBoxH, 2, 2, "FD");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(30, 60, 160);
+      doc.text("EUROPE — DSA / GDPR / UCPD", euX + 4, y + 6);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(...K.nearBlack);
+      doc.text(europeLines, euX + 4, y + 11);
+      y += regBoxH + 4;
+
+      // ── VISUAL EVIDENCE CAPTURE ──
       if ((f.evidence as any)?.screenshotDataUrl) {
         const imgData: string = (f.evidence as any).screenshotDataUrl;
-        const maxImgH = 55;
-        const imgW = pw - 44;
-        // Maintain aspect ratio but cap height
-        const imgH = Math.min(Math.round(imgW * 0.5), maxImgH);
+        const maxImgH = 50;
+        const imgW = cardW - 4;
+        const imgH = Math.min(Math.round(imgW * 0.45), maxImgH);
+
         if (y + imgH + 18 > ph - 20) {
           doc.addPage("a4", "landscape");
           y = 18;
         }
 
-        // Label row — bold title left, italic URL right
+        // Evidence header bar
+        doc.setFillColor(...tealDark);
+        doc.roundedRect(cardX, y, cardW, 8, 1, 1, "F");
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(8);
-        doc.setTextColor(...K.nearBlack);
-        doc.text("Evidence — Element Pinpoint", 24, y);
-        doc.setFont("helvetica", "italic");
-        doc.setFontSize(7);
-        doc.setTextColor(...K.midGrey);
-        const urlLabel = (f.pageUrl || "")
-          .replace(/^https?:\/\//, "")
-          .substring(0, 60);
-        doc.text(urlLabel, pw - 20, y, { align: "right" });
-        y += 4;
-
-        // Outer frame + image
-        const frameX = 22;
-        const frameY = y;
-        const frameW = pw - 44;
-        const frameH = imgH + 2;
-        doc.setFillColor(...K.offWhite);
-        doc.setDrawColor(232, 0, 45); // red border to match the in-page highlight
-        doc.setLineWidth(0.6);
-        doc.roundedRect(frameX, frameY, frameW, frameH, 0, 0, "FD");
-        try {
-          doc.addImage(  
-            imgData,
-            "JPEG",
-            frameX + 1,
-            frameY + 1,
-            frameW - 2,       
-            imgH,
-            undefined,
-            "MEDIUM",
-          );
-        } catch (_) {
-          /* skip if image data is invalid */
-        }
-
-        // Legend
+        doc.setFontSize(7.5);
+        doc.setTextColor(...K.white);
+        doc.text("VISUAL EVIDENCE CAPTURE", cardX + 4, y + 5.5);
+        const urlLabel = (f.pageUrl || "").replace(/^https?:\/\//, "").substring(0, 70);
         doc.setFont("helvetica", "italic");
         doc.setFontSize(6.5);
+        doc.text(urlLabel, cardX + cardW - 4, y + 5.5, { align: "right" });
+        y += 10;
+
+        // Image frame
+        const frameX = cardX + 2;
+        const frameW = cardW - 4;
+        doc.setFillColor(...K.offWhite);
+        doc.setDrawColor(232, 0, 45);
+        doc.setLineWidth(0.6);
+        doc.roundedRect(frameX, y, frameW, imgH + 2, 0, 0, "FD");
+        try {
+          doc.addImage(imgData, "JPEG", frameX + 1, y + 1, frameW - 2, imgH, undefined, "MEDIUM");
+        } catch (_) { /* skip invalid image */ }
+
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(6);
         doc.setTextColor(...K.midGrey);
         doc.text(
-          "Screenshot cropped to detected element  |  Red border marks exact dark pattern location  |  TrustLens audit engine",
-          24,
-          y + imgH + 5,
+          "Red border marks exact dark pattern element  |  Screenshot captured by TrustLens audit engine",
+          cardX + 4, y + imgH + 6,
         );
-        y += imgH + 11;
+        y += imgH + 10;
       }
 
-      // Separator
-      y += 2;
-      doc.setDrawColor(...K.lightGrey);
-      doc.setLineWidth(0.2);
-      doc.line(20, y, pw - 20, y);
-      y += 8;
-
-      // ── Management Response (injected inline per dark pattern finding) ──
-      y = drawManagementResponse(
-        doc,
-        y,
-        f,
-        pw,
-        ph,
-        `#${String(idx + 1).padStart(3, "0")} ${f.title}`,
+      // ── ANNEXURE REFERENCE FOOTER ──
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...purple);
+      doc.text(
+        "Please refer to the Annexure for supporting evidence and full element details.",
+        cardX + 4, y,
       );
+      y += 5;
+
+      // Card separator
+      doc.setDrawColor(...K.lightGrey);
+      doc.setLineWidth(0.3);
+      doc.line(cardX, y, cardX + cardW, y);
+      y += 10;
     });
   } else if (isDP) {
     // DP pillar selected but no findings
@@ -2539,12 +2672,19 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
           const recText = (ri.recommendation || "").substring(0, 120);
           const pageShort = (ri.pageTitle || ri.pageUrl || "").substring(0, 50);
 
-          // Measure card height
+          // Measure card height (header + description + fix + action steps)
           doc.setFont("helvetica", "normal");
           doc.setFontSize(8);
           const descLines = doc.splitTextToSize(descText, pw - 62);
           const recLines = doc.splitTextToSize(`Fix: ${recText}`, pw - 62);
-          const cardH = 9 + descLines.length * 3.5 + recLines.length * 3.5 + 10;
+          const actionStepsPreview = getPerfActionSteps(ri.type || "", ri);
+          doc.setFontSize(7);
+          const actionLinesCount = actionStepsPreview.reduce((n, s) => {
+            return n + doc.splitTextToSize(`• ${s}`, pw - 62).length;
+          }, 0);
+          doc.setFontSize(8);
+          const actionBlockH = actionStepsPreview.length > 0 ? 7 + actionLinesCount * 3.3 : 0;
+          const cardH = 9 + descLines.length * 3.5 + recLines.length * 3.5 + actionBlockH + 10;
 
           if (y + cardH > ph - 18) {
             doc.addPage("a4", "landscape");
@@ -2594,18 +2734,27 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
           doc.setFontSize(7.5);
           doc.setTextColor(0, 110, 81);
           doc.text(recLines, 28, cy);
+          cy += recLines.length * 3.5 + 3;
+
+          // Detailed client-facing action steps by issue type
+          const actionSteps = getPerfActionSteps(ri.type || "", ri);
+          if (actionSteps.length > 0) {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(7.5);
+            doc.setTextColor(0, 87, 168);
+            doc.text("Recommended Actions:", 28, cy);
+            cy += 4;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7);
+            doc.setTextColor(...K.darkGrey);
+            for (const step of actionSteps) {
+              const stepLines = doc.splitTextToSize(`• ${step}`, pw - 62);
+              doc.text(stepLines, 30, cy);
+              cy += stepLines.length * 3.3;
+            }
+          }
 
           y += cardH + 4;
-
-          // ── Management Response (injected inline per performance resource issue) ──
-          y = drawManagementResponse(
-            doc,
-            y,
-            ri,
-            pw,
-            ph,
-            `${typeLabel} — ${pageShort}`,
-          );
         }
 
         if (sortedIssues.length > 40) {

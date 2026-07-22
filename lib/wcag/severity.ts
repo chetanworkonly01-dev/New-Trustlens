@@ -1,14 +1,14 @@
 export type Severity = 'critical' | 'high' | 'medium' | 'low';
 
 export const SEVERITY_WEIGHTS: Record<Severity, number> = {
-  critical: 10,
-  high: 5,
-  medium: 2,
-  low: 0.5
+  critical: 7,   // reduced from 10 — 9 unique criticals should give ~35-45 not ~77
+  high: 3.5,     // reduced from 5
+  medium: 1.5,   // reduced from 2
+  low: 0.4
 };
 
 export const LEVEL_MULTIPLIERS: Record<string, number> = {
-  'A': 1.5,
+  'A': 1.3,   // reduced from 1.5 — Level A still penalised more but not 50% more
   'AA': 1.0,
   'AAA': 0.5
 };

@@ -139,10 +139,27 @@ export interface AxeScanResult {
   applicabilityHints: PageApplicabilityHints;
 }
 
+/**
+ * Build the axe-core tag set for exactly the selected WCAG levels.
+ * Each level maps to its own set of axe tags — no forced inheritance.
+ * The orchestrator applies a final wcagLevel filter after all engines run,
+ * so this controls what axe scans while the filter controls what's reported.
+ */
+function buildAxeTags(wcagLevels: ('A' | 'AA' | 'AAA')[]): string[] {
+  const tags: string[] = [];
+  if (wcagLevels.includes('A'))   tags.push('wcag2a',   'wcag21a',   'wcag22a');
+  if (wcagLevels.includes('AA'))  tags.push('wcag2aa',  'wcag21aa',  'wcag22aa');
+  if (wcagLevels.includes('AAA')) tags.push('wcag2aaa', 'wcag21aaa', 'wcag22aaa');
+  if (tags.length === 0) tags.push('wcag2a', 'wcag21a', 'wcag22a'); // safety fallback
+  tags.push('best-practice');
+  return tags;
+}
+
 export async function scanWithAxe(
   context: BrowserContext,
   pageData: PageData,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
+  wcagLevels: ('A' | 'AA' | 'AAA')[] = ['A', 'AA']
 ): Promise<AxeScanResult> {
   const issues: AccessibilityIssue[] = [];
   const inapplicableCriteria: string[] = [];
@@ -178,7 +195,7 @@ export async function scanWithAxe(
     });
 
     const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
+      .withTags(buildAxeTags(wcagLevels))
       .analyze();
 
     // ── VIOLATIONS → Issues

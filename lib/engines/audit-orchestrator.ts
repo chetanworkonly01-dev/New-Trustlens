@@ -477,7 +477,7 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
 
         // axe-core + custom rules — using new return type
         try {
-          const axeResult = await scanWithAxe(crawlResult.context, pg);
+          const axeResult = await scanWithAxe(crawlResult.context, pg, undefined, wcagLevels);
           allIssues.push(...axeResult.issues);
 
           // Merge N/A and pass data
@@ -495,7 +495,11 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
             mergedApplicabilityHints.hasAnimation = true;
 
           const customIssues = await runCustomRules(pg);
-          allIssues.push(...customIssues);
+          // Deduplicate: drop custom rules whose WCAG criterion is already covered by axe-core
+          // on this page. axe-core is DOM-based and higher confidence for shared criteria.
+          const axeCriteriaOnPage = new Set(axeResult.issues.map(i => i.wcagCriterion));
+          const deduplicatedCustom = customIssues.filter(ci => !axeCriteriaOnPage.has(ci.wcagCriterion));
+          allIssues.push(...deduplicatedCustom);
         } catch (err) {
           console.error(`Scanner error for ${pg.url}:`, err);
         }
@@ -1120,7 +1124,12 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
       if (!issue.confidence) issue.confidence = assignConfidence(issue);
     }
 
-    const deduped = deduplicateIssues(allIssues);
+    // ── Level filter: keep only issues whose WCAG level was selected by the auditor ──
+    // This is the single authoritative filter — axe tags and custom-rule dedup
+    // are best-effort; this guarantees the final issue list matches the config.
+    const dedupedRaw = deduplicateIssues(allIssues);
+    const wcagLevelSet = new Set(wcagLevels);
+    const deduped = dedupedRaw.filter(i => wcagLevelSet.has(i.wcagLevel));
 
     // Store collected N/A criteria (exclude any that ended up having violations)
     const failedCriteria = new Set(deduped.map((i) => i.wcagCriterion));
@@ -1153,6 +1162,7 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
       {
         overall: audit.score.overall,
         totalIssues: audit.score.totalIssues,
+        uniqueIssues: audit.score.uniqueIssues,
         issueBySeverity: audit.score.issueBySeverity,
       },
       darkPatternResult,

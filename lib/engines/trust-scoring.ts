@@ -11,6 +11,7 @@ import type { PrivacyResult } from '../types/privacy';
 interface AccessibilityScoreData {
   overall: number;
   totalIssues: number;
+  uniqueIssues: number;
   issueBySeverity: Record<string, number>;
 }
 
@@ -39,7 +40,7 @@ export function calculateTrustScore(
       pillar: 'accessibility',
       score: accessibilityScore.overall,
       weight: normalizedWeights.accessibility || 0,
-      totalFindings: accessibilityScore.totalIssues,
+      totalFindings: accessibilityScore.uniqueIssues,
       findingsBySeverity: accessibilityScore.issueBySeverity,
       status: getStatus(accessibilityScore.overall),
     };

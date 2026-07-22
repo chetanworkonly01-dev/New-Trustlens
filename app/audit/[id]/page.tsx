@@ -913,18 +913,18 @@ export default function AuditResultPage() {
         className="container"
         style={{ paddingTop: 80, textAlign: "center" }}
       >
-        <div className="spinner" style={{ margin: "0 auto" }} />
+        <div className="spinner" style={{ margin: "0 auto 20px" }} />
+        <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>
+          Starting audit…
+        </p>
       </div>
     );
 
   // ===== IN-PROGRESS VIEW =====
   if (data.status !== "complete" && data.status !== "error") {
     const testedLevels = data.config?.wcagLevels || ["A", "AA"];
-    const levelLabel = testedLevels.includes("AAA")
-      ? "AAA"
-      : testedLevels.includes("AA")
-        ? "AA"
-        : "A";
+    // Show exactly what was selected, e.g. "A + AA" or "AA" or "AAA"
+    const levelLabel = testedLevels.join(" + ");
     return (
       <div
         className="container"
@@ -1452,12 +1452,8 @@ export default function AuditResultPage() {
 
   // ===== COMPLETE RESULTS =====
   const testedLevel =
+    data.config?.wcagLevels?.join(" + ") ||
     data.report?.testedLevel ||
-    (data.config?.wcagLevels?.includes("AAA")
-      ? "AAA"
-      : data.config?.wcagLevels?.includes("AA")
-        ? "AA"
-        : "A") ||
     "AA";
   const standard = data.config?.standard || "WCAG 2.2";
 
@@ -2145,6 +2141,17 @@ export default function AuditResultPage() {
               <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>
                 /100
               </span>
+              <span style={{
+                fontSize: 11,
+                fontWeight: 600,
+                marginLeft: 8,
+                padding: "2px 7px",
+                borderRadius: 4,
+                background: data.trustScore.overall >= 90 ? "rgba(0,186,140,0.12)" : data.trustScore.overall >= 75 ? "rgba(0,145,218,0.12)" : data.trustScore.overall >= 50 ? "rgba(240,171,0,0.12)" : "rgba(232,0,45,0.10)",
+                color: data.trustScore.overall >= 90 ? "#00BA8C" : data.trustScore.overall >= 75 ? "#0091DA" : data.trustScore.overall >= 50 ? "#B07D00" : "#E8002D",
+              }}>
+                {data.trustScore.overall >= 90 ? "Grade A" : data.trustScore.overall >= 75 ? "Grade B" : data.trustScore.overall >= 50 ? "Grade C" : data.trustScore.overall >= 25 ? "Grade D" : "Grade F"}
+              </span>
             </span>
           </div>
           {/* Smart trust score context note — Gap 3 */}
@@ -2245,7 +2252,7 @@ export default function AuditResultPage() {
                         marginTop: 4,
                       }}
                     >
-                      {ps.totalFindings} finding
+                      {ps.totalFindings} unique violation
                       {ps.totalFindings !== 1 ? "s" : ""}
                     </div>
                   )}
@@ -3415,11 +3422,6 @@ export default function AuditResultPage() {
                       >
                         {g.confidence} confidence
                       </span> */}
-                      {g.frequency > 50 && (
-                        <span className="badge badge-high">
-                          Widespread {g.frequency}%
-                        </span>
-                      )}
                     </div>
                   </div>
                 ))}

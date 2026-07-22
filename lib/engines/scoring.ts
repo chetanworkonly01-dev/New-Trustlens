@@ -16,20 +16,8 @@ export function calculateScore(issues: AccessibilityIssue[], pageCount?: number)
     };
   }
 
-  const issueBySeverity = { critical: 0, high: 0, medium: 0, low: 0 };
-  const issueByLevel = { A: 0, AA: 0, AAA: 0 };
-  const categoryIssues: Record<string, AccessibilityIssue[]> = {
-    perceivable: [], operable: [], understandable: [], robust: [], pdf: []
-  };
-
-  for (const issue of issues) {
-    issueBySeverity[issue.severity]++;
-    issueByLevel[issue.wcagLevel]++;
-    categoryIssues[issue.category]?.push(issue);
-  }
-
   // === DETERMINISTIC GROUPING ===
-  // Sort issues before grouping so the same set of issues always produces the same groups.
+  // Group first so scoring and counts are per unique violation, not per DOM element.
   const sortedIssues = [...issues].sort((a, b) => {
     const k1 = `${a.testId}::${a.title}::${normalizeSelector(a.element)}::${a.pageUrl}`;
     const k2 = `${b.testId}::${b.title}::${normalizeSelector(b.element)}::${b.pageUrl}`;
@@ -38,18 +26,37 @@ export function calculateScore(issues: AccessibilityIssue[], pageCount?: number)
 
   const grouped = groupIssues(sortedIssues, pageCount || 1);
 
-  // === ADVANCED SCORING ===
-  let totalDeduction = 0;
+  // Severity and level counts are per UNIQUE violation (one per group), not per instance.
+  // "Touch target broken on 20 elements" is 1 high-severity violation, not 20.
+  const issueBySeverity = { critical: 0, high: 0, medium: 0, low: 0 };
+  const issueByLevel = { A: 0, AA: 0, AAA: 0 };
+  const categoryIssues: Record<string, GroupedIssue[]> = {
+    perceivable: [], operable: [], understandable: [], robust: [], pdf: []
+  };
 
-  // 1. Base deduction per issue (sorted for determinism)
-  for (const issue of sortedIssues) {
-    const sevWeight = SEVERITY_WEIGHTS[issue.severity];
-    const levelMult = LEVEL_MULTIPLIERS[issue.wcagLevel] || 1;
-    const confMult = issue.confidence === 'high' ? 1.0 : issue.confidence === 'medium' ? 0.7 : 0.4;
-    totalDeduction += sevWeight * levelMult * confMult;
+  for (const group of grouped) {
+    issueBySeverity[group.severity]++;
+    issueByLevel[group.wcagLevel]++;
+    categoryIssues[group.category]?.push(group);
   }
 
-  // 2. Frequency penalty: issues appearing across many pages are penalized more
+  // === INSTANCE-AWARE SCORING ===
+  // Each unique violation deducts once. A logarithmic instance multiplier
+  // adds a small extra penalty when many elements are affected, but prevents
+  // 20 touch-target elements from deducting 20x what 1 element would.
+  // multiplier range: 1.0 (1 instance) → ~2.0 (100+ instances)
+  let totalDeduction = 0;
+
+  for (const group of grouped) {
+    const sevWeight = SEVERITY_WEIGHTS[group.severity];
+    const levelMult = LEVEL_MULTIPLIERS[group.wcagLevel] || 1;
+    const confMult = group.confidence === 'high' ? 1.0 : group.confidence === 'medium' ? 0.7 : 0.4;
+    // Log-scale instance multiplier: ln(count+1)/ln(2), capped at 2.0
+    const instanceMult = Math.min(1.5, Math.log(group.occurrenceCount + 1) / Math.log(2));
+    totalDeduction += sevWeight * levelMult * confMult * instanceMult;
+  }
+
+  // Frequency penalty: violations appearing across many pages of a multi-page site
   if (pageCount && pageCount > 1) {
     for (const group of grouped) {
       if (group.frequency > 50) {
@@ -59,35 +66,29 @@ export function calculateScore(issues: AccessibilityIssue[], pageCount?: number)
     }
   }
 
-  // 3. Critical issue heavy penalty
+  // Critical violation penalty (per unique critical violation, not per instance)
   if (issueBySeverity.critical > 3) {
     totalDeduction += (issueBySeverity.critical - 3) * 5;
   }
 
-  // 4. Journey test bonus
+  // Journey test bonus
   const journeyIssues = issues.filter(i => i.source === 'journey-test');
   const journeyTestCount = new Set(journeyIssues.map(i => i.testId)).size;
   const journeyScore = journeyTestCount > 0 ? Math.max(0, 100 - journeyTestCount * 15) : undefined;
 
   // Cap deduction with logarithmic diminishing returns.
-  // This prevents scores from collapsing to 0 for heavy sites while still
-  // penalizing heavily. Examples:
-  //   totalDeduction  50 → capped  50 → score 50
-  //   totalDeduction 100 → capped  65 → score 35
-  //   totalDeduction 500 → capped  85 → score 15
-  //   totalDeduction 1000→ capped  91 → score  9
+  // deduction  50 → score 50  |  100 → score 35  |  200 → score 20
   let cappedDeduction: number;
   if (totalDeduction <= 50) {
     cappedDeduction = totalDeduction;
   } else {
-    // Logarithmic curve: fast climb then slows, never exceeds ~95
     const excess = totalDeduction - 50;
     cappedDeduction = 50 + 45 * (1 - Math.exp(-excess / 200));
   }
 
   const overall = Math.max(0, Math.round(100 - cappedDeduction));
 
-  // Category scores
+  // Category scores based on grouped violations in each category
   const categoryScores = {
     perceivable:     calcCategoryScore(categoryIssues.perceivable),
     operable:        calcCategoryScore(categoryIssues.operable),
@@ -96,7 +97,7 @@ export function calculateScore(issues: AccessibilityIssue[], pageCount?: number)
     pdf:             categoryIssues.pdf.length > 0 ? calcCategoryScore(categoryIssues.pdf) : 100
   };
 
-  // Compliance level — based on what was tested
+  // Compliance level
   let complianceLevel: AuditScore['complianceLevel'];
   if (overall >= 90 && issueBySeverity.critical === 0) {
     complianceLevel = 'aaa-compliant';
@@ -123,12 +124,13 @@ export function calculateScore(issues: AccessibilityIssue[], pageCount?: number)
   };
 }
 
-function calcCategoryScore(issues: AccessibilityIssue[]): number {
-  if (issues.length === 0) return 100;
+function calcCategoryScore(groups: GroupedIssue[]): number {
+  if (groups.length === 0) return 100;
   let deduction = 0;
-  for (const issue of issues) {
-    const confMult = issue.confidence === 'high' ? 1.0 : issue.confidence === 'medium' ? 0.7 : 0.4;
-    deduction += SEVERITY_WEIGHTS[issue.severity] * (LEVEL_MULTIPLIERS[issue.wcagLevel] || 1) * confMult;
+  for (const group of groups) {
+    const confMult = group.confidence === 'high' ? 1.0 : group.confidence === 'medium' ? 0.7 : 0.4;
+    const instanceMult = Math.min(1.5, Math.log(group.occurrenceCount + 1) / Math.log(2));
+    deduction += SEVERITY_WEIGHTS[group.severity] * (LEVEL_MULTIPLIERS[group.wcagLevel] || 1) * confMult * instanceMult;
   }
   const capped = deduction > 40 ? 40 + (deduction - 40) * 0.2 : deduction;
   return Math.max(0, Math.round(100 - capped));

@@ -2190,7 +2190,7 @@ export default function AuditPage() {
     setPerfParsing(false);
   };
 
-  // WCAG
+  // WCAG — independent level selection (auditor can pick any combination)
   const [wcagLevelA, setWcagLevelA] = useState(true);
   const [wcagLevelAA, setWcagLevelAA] = useState(true);
   const [wcagLevelAAA, setWcagLevelAAA] = useState(false);
@@ -2211,12 +2211,12 @@ export default function AuditPage() {
     return p;
   };
 
-  const getSelectedLevels = () => {
+  const getSelectedLevels = (): ("A" | "AA" | "AAA")[] => {
     const levels: ("A" | "AA" | "AAA")[] = [];
     if (wcagLevelA) levels.push("A");
     if (wcagLevelAA) levels.push("AA");
     if (wcagLevelAAA) levels.push("AAA");
-    return levels.length > 0 ? levels : (["A", "AA"] as ("A" | "AA" | "AAA")[]);
+    return levels.length > 0 ? levels : ["A", "AA"];
   };
 
   const getConformanceLabel = () => {
@@ -2930,40 +2930,48 @@ export default function AuditPage() {
             </div>
             <div className="input-group">
               <label className="input-label">Conformance Level</label>
-              <div className="wcag-level-selector" style={{ paddingTop: 2 }}>
-                <label
-                  className={`wcag-level-option ${wcagLevelA ? "selected-a" : ""}`}
-                  title="WCAG Level A"
-                >
-                  <input
-                    type="checkbox"
-                    checked={wcagLevelA}
-                    onChange={(e) => setWcagLevelA(e.target.checked)}
-                  />{" "}
-                  Level A
-                </label>
-                <label
-                  className={`wcag-level-option ${wcagLevelAA ? "selected-aa" : ""}`}
-                  title="WCAG Level AA"
-                >
-                  <input
-                    type="checkbox"
-                    checked={wcagLevelAA}
-                    onChange={(e) => setWcagLevelAA(e.target.checked)}
-                  />{" "}
-                  Level AA
-                </label>
-                <label
-                  className={`wcag-level-option ${wcagLevelAAA ? "selected-aaa" : ""}`}
-                  title="WCAG Level AAA"
-                >
-                  <input
-                    type="checkbox"
-                    checked={wcagLevelAAA}
-                    onChange={(e) => setWcagLevelAAA(e.target.checked)}
-                  />{" "}
-                  Level AAA
-                </label>
+              <div className="wcag-level-selector" style={{ paddingTop: 2, display: "flex", gap: 8 }}>
+                {([
+                  { key: "A", label: "Level A", checked: wcagLevelA, set: setWcagLevelA, desc: "Baseline" },
+                  { key: "AA", label: "Level AA", checked: wcagLevelAA, set: setWcagLevelAA, desc: "Standard" },
+                  { key: "AAA", label: "Level AAA", checked: wcagLevelAAA, set: setWcagLevelAAA, desc: "Enhanced" },
+                ] as const).map(({ key, label, checked, set, desc }) => (
+                  <label
+                    key={key}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 2,
+                      padding: "8px 18px",
+                      borderRadius: 8,
+                      border: checked ? "2px solid #0057a8" : "2px solid #c0c0c0",
+                      background: checked ? "#0057a8" : "transparent",
+                      color: checked ? "#fff" : "inherit",
+                      cursor: "pointer",
+                      userSelect: "none",
+                      fontWeight: 600,
+                      fontSize: 13,
+                      minWidth: 80,
+                      textAlign: "center",
+                      transition: "background 0.15s, border-color 0.15s, color 0.15s",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => set(e.target.checked)}
+                      style={{ display: "none" }}
+                    />
+                    {label}
+                    <span style={{ fontSize: 10, fontWeight: 400, opacity: checked ? 0.85 : 0.5 }}>{desc}</span>
+                  </label>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 6 }}>
+                {getSelectedLevels().length === 0
+                  ? "Select at least one level."
+                  : `Audit will check WCAG criteria at: ${getSelectedLevels().join(", ")}. Only issues at these levels will be reported.`}
               </div>
             </div>
           </div>
