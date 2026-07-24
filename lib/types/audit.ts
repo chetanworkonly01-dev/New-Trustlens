@@ -201,8 +201,33 @@ export interface AccessibilityIssue {
   managementResponse?: ManagementResponseBlock;
 }
 
+/**
+ * Transparent per-tier deduction breakdown returned with every score.
+ * Lets auditors, clients, and design managers see exactly why the score is N.
+ *
+ * Each severity tier has an explicit cap so a single category cannot dominate:
+ *   Critical barriers  → max -45 pts   (6+ critical issues hit this ceiling)
+ *   High issues        → max -20 pts
+ *   Moderate issues    → max -15 pts
+ *   Low issues         → max  -8 pts
+ */
+export interface ScoreBreakdown {
+  critical: { count: number; rawDeduction: number; deduction: number; cap: number };
+  high:     { count: number; rawDeduction: number; deduction: number; cap: number };
+  medium:   { count: number; rawDeduction: number; deduction: number; cap: number };
+  low:      { count: number; rawDeduction: number; deduction: number; cap: number };
+  /** Small extra penalty when the same issue appears across many DOM elements */
+  instancePenalty: number;
+  /** Extra penalty for issues that appear across >50 % of pages in a multi-page audit */
+  frequencyPenalty: number;
+  /** Sum of all deductions (before the 100-cap floor) */
+  totalDeduction: number;
+}
+
 export interface AuditScore {
   overall: number;
+  /** Letter grade: A 90-100 · B 75-89 · C 50-74 · D 25-49 · F 0-24. Optional for backward compat with stored results. */
+  grade?: 'A' | 'B' | 'C' | 'D' | 'F';
   categoryScores: {
     perceivable: number;
     operable: number;
@@ -228,6 +253,8 @@ export interface AuditScore {
   testsRun: number;
   testsPassed: number;
   testsFailed: number;
+  /** Full deduction breakdown — present on every completed audit */
+  scoreBreakdown?: ScoreBreakdown;
 }
 
 // ===== CRAWL COVERAGE =====

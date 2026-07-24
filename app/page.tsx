@@ -1035,7 +1035,7 @@ export default function HomePage() {
                 step: "01",
                 icon: "⚙️",
                 title: "Configure Your Audit",
-                desc: "Enter your URL, PDF, screenshot or video. Select one or more audit pillars — Accessibility, Dark Patterns, Performance, Privacy. Set crawl depth, WCAG level and network conditions.",
+                desc: "Enter your URL, PDF, screenshot or video. Select one or more audit pillars — Accessibility, Dark Patterns, Performance, Privacy. Set WCAG level and network conditions.",
               },
               {
                 step: "02",
@@ -1091,7 +1091,7 @@ export default function HomePage() {
                 step: "01",
                 icon: "⚙️",
                 title: "Configure Your Audit",
-                desc: "Enter your URL, PDF, screenshot or video. Select one or more audit pillars — Accessibility, Dark Patterns, Performance. Set crawl depth, WCAG level and network conditions.",
+                desc: "Enter your URL, PDF, screenshot or video. Select one or more audit pillars — Accessibility, Dark Patterns, Performance. Set WCAG level and network conditions.",
               },
               {
                 step: "02",

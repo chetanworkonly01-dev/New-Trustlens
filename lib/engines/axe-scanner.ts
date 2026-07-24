@@ -33,7 +33,9 @@ const AXE_WCAG_TAG_MAP: Record<string, { criterion: string; name: string; level:
   'wcag134': { criterion: '1.3.4', name: 'Orientation', level: 'AA' },
   'wcag135': { criterion: '1.3.5', name: 'Identify Input Purpose', level: 'AA' },
   'wcag141': { criterion: '1.4.1', name: 'Use of Color', level: 'A' },
+  'wcag142': { criterion: '1.4.2', name: 'Audio Control', level: 'A' },
   'wcag143': { criterion: '1.4.3', name: 'Contrast (Minimum)', level: 'AA' },
+  'wcag144': { criterion: '1.4.4', name: 'Resize Text', level: 'AA' },
   'wcag145': { criterion: '1.4.5', name: 'Images of Text', level: 'AA' },
   'wcag1410': { criterion: '1.4.10', name: 'Reflow', level: 'AA' },
   'wcag1411': { criterion: '1.4.11', name: 'Non-text Contrast', level: 'AA' },
@@ -71,6 +73,20 @@ const AXE_WCAG_TAG_MAP: Record<string, { criterion: string; name: string; level:
   'wcag412': { criterion: '4.1.2', name: 'Name, Role, Value', level: 'A' },
   'wcag413': { criterion: '4.1.3', name: 'Status Messages', level: 'AA' },
 };
+
+// Some axe rules return a per-node impact lower than the rule-level impact.
+// For rules where the real-world barrier justifies a higher minimum, enforce a floor here.
+// Key: axe rule id → minimum severity we will ever assign it.
+const RULE_SEVERITY_FLOOR: Record<string, 'critical' | 'high' | 'medium' | 'low'> = {
+  'meta-viewport': 'high', // user-scalable=no blocks mobile zoom entirely for low-vision users
+};
+
+function applyRuleSeverityFloor(ruleId: string, detected: 'critical' | 'high' | 'medium' | 'low'): 'critical' | 'high' | 'medium' | 'low' {
+  const floor = RULE_SEVERITY_FLOOR[ruleId];
+  if (!floor) return detected;
+  const order: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+  return order[detected] <= order[floor] ? detected : floor;
+}
 
 function mapAxeTagsToWcag(tags: string[]): { criterion: string; name: string; level: 'A' | 'AA' | 'AAA' } | null {
   for (const tag of tags) {
@@ -203,7 +219,7 @@ export async function scanWithAxe(
       const wcagMapping = mapAxeTagsToWcag(violation.tags);
       if (!wcagMapping) continue;
 
-      const severity = getSeverityFromAxeImpact(violation.impact);
+      const severity = applyRuleSeverityFloor(violation.id, getSeverityFromAxeImpact(violation.impact));
 
       for (const node of violation.nodes) {
         issues.push({

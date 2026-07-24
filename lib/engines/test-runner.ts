@@ -30,7 +30,7 @@ export const TEST_CASES: TestCase[] = [
     wcagName: "Focus Visible",
     wcagLevel: "AA",
     category: "operable",
-    severity: "critical",
+    severity: "high",
     description: "Check if focused elements have visible focus indicators",
     browserInteraction: true,
   },
@@ -574,7 +574,7 @@ async function testImageAltText(page: Page, url: string): Promise<TestResult> {
           img.html,
         ),
       );
-    } else if (img.alt !== null && !img.isDecorative) {
+    } else if (img.alt && !img.isDecorative) {
       const isGeneric = badPatterns.some((p) => p.test(img.alt!));
       if (isGeneric) {
         elementsFailed++;

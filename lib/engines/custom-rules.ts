@@ -285,7 +285,7 @@ const customRules: CustomRule[] = [
     wcagCriterion: '1.4.10',
     wcagName: 'Reflow',
     wcagLevel: 'AA',
-    severity: 'medium',
+    severity: 'high',
     category: 'perceivable',
     check: (html) => {
       const results: CustomRuleResult[] = [];
@@ -486,7 +486,7 @@ const customRules: CustomRule[] = [
     wcagCriterion: '2.4.7',
     wcagName: 'Focus Visible',
     wcagLevel: 'AA',
-    severity: 'critical',
+    severity: 'high',
     category: 'operable',
     check: (html) => {
       const results: CustomRuleResult[] = [];

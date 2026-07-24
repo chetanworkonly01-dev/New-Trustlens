@@ -922,22 +922,88 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     ];
   }
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...K.darkGrey);
-  for (const para of summaryParas) {
-    if (y > ph - 40) {
+  // ── EXECUTIVE SUMMARY: KPI METRIC TILES ──
+  {
+    const exCritCount = groupedIssues.filter((g) => g.severity === "critical").length;
+    const tiles = perfOnly && perfResultCover
+      ? [
+          { label: "PERFORMANCE SCORE", value: `${perfResultCover.overallScore ?? 0}`, sub: "out of 100", col: K.navy as [number, number, number] },
+          { label: "GRADE", value: perfGradeStr(perfResultCover.overallScore ?? 0).charAt(0), sub: perfGradeStr(perfResultCover.overallScore ?? 0).split("—")[1]?.trim() ?? "", col: [0, 91, 130] as [number, number, number] },
+          { label: "RESOURCE ISSUES", value: `${perfResultCover.totalResourceIssues ?? 0}`, sub: "Identified", col: [180, 90, 0] as [number, number, number] },
+          { label: "P0 CRITICAL", value: `${(perfResultCover.recommendations || []).filter((r: any) => r.priority === "P0").length}`, sub: "Immediate Action", col: [200, 35, 35] as [number, number, number] },
+          { label: "PAGES AUDITED", value: `${perfResultCover.pages?.length ?? audit.pages.length}`, sub: "Evaluated", col: [0, 100, 90] as [number, number, number] },
+        ]
+      : [
+          { label: "OVERALL SCORE", value: `${score.overall ?? 0}`, sub: "out of 100", col: K.navy as [number, number, number] },
+          { label: "GRADE", value: `${(score as any).grade ?? "—"}`, sub: compLabel(score.complianceLevel), col: [0, 91, 130] as [number, number, number] },
+          { label: "UNIQUE VIOLATIONS", value: `${score.uniqueIssues ?? groupedIssues.length}`, sub: "Distinct Issues", col: [180, 90, 0] as [number, number, number] },
+          { label: "CRITICAL ISSUES", value: `${exCritCount}`, sub: "Need Immediate Fix", col: [200, 35, 35] as [number, number, number] },
+          { label: "PAGES AUDITED", value: `${audit.pages.length}`, sub: "Evaluated", col: [0, 100, 90] as [number, number, number] },
+        ];
+
+    if (y + 34 > ph - 40) {
       doc.addPage("a4", "landscape");
       y = 18;
     }
-    // Handle inline \n within a paragraph (e.g. vitals list)
-    const lines = para.split("\n");
-    for (const line of lines) {
-      const wrapped = doc.splitTextToSize(safeText(line), pw - 40);
-      doc.text(wrapped, 20, y);
-      y += wrapped.length * 4;
+
+    const tileGap = 2;
+    const tileW = (pw - 40 - tileGap * 4) / 5;
+    const tileH = 28;
+    let tx = 20;
+    for (const tile of tiles) {
+      doc.setFillColor(...tile.col);
+      doc.roundedRect(tx, y, tileW, tileH, 2, 2, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.5);
+      doc.setTextColor(200, 220, 255);
+      doc.text(tile.label, tx + tileW / 2, y + 5.5, { align: "center" });
+      doc.setFontSize(22);
+      doc.setTextColor(...K.white);
+      doc.text(tile.value, tx + tileW / 2, y + 18, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(190, 210, 240);
+      doc.text(tile.sub, tx + tileW / 2, y + 25, { align: "center" });
+      tx += tileW + tileGap;
     }
-    y += 4; // paragraph gap
+    y += tileH + 6;
+
+    // Critical alert bar
+    if (!perfOnly && exCritCount > 0) {
+      doc.setFillColor(200, 35, 35);
+      doc.roundedRect(20, y, pw - 40, 9, 1, 1, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(...K.white);
+      doc.text(
+        `CRITICAL ALERT: ${exCritCount} critical violation${exCritCount !== 1 ? "s" : ""} require immediate remediation before next release.`,
+        pw / 2, y + 6.5, { align: "center" },
+      );
+      y += 13;
+    }
+
+    // Summary context text
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...K.darkGrey);
+    if (summaryParas.length > 0) {
+      const firstPara = safeText(summaryParas[0]);
+      const wrapped = doc.splitTextToSize(firstPara, pw - 40);
+      doc.text(wrapped, 20, y);
+      y += wrapped.length * 4 + 4;
+    }
+    for (let pi = 1; pi < Math.min(summaryParas.length, 4); pi++) {
+      if (y > ph - 50) break;
+      for (const ln of summaryParas[pi].split("\n")) {
+        const wrapped2 = doc.splitTextToSize(safeText(ln), pw - 40);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(...K.darkGrey);
+        doc.text(wrapped2, 20, y);
+        y += wrapped2.length * 4;
+      }
+      y += 3;
+    }
   }
 
   // Severity breakdown table
@@ -1270,200 +1336,213 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       const team = deriveTeam(issue);
       const effort = deriveEffort(issue);
 
-      if (y > ph - 80) {
+      const navyLight: [number, number, number] = [220, 230, 250];
+      const colW = (pw - 44) / 2;
+      const cardX = 20;
+      const cardW = pw - 40;
+
+      if (y > ph - 60) {
         doc.addPage("a4", "landscape");
         y = 18;
       }
 
+      // ── CARD HEADER: WCAG CRITERION (left) | STATUS + CLOSURE DATE (right) ──
+      doc.setFillColor(...K.navy);
+      doc.roundedRect(cardX, y, cardW, 12, 2, 2, "F");
+
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.setTextColor(...K.navy);
-      const label = isA11y ? "WCAG Criterion:" : "Rule:";
-      doc.text(label, 20, y);
-      doc.setTextColor(...K.lightBlue);
-      const ruleText = isA11y
-        ? `${issue.wcagCriterion} — ${issue.wcagName} (${issue.wcagLevel})`
-        : `${(issue as any).ruleId || issue.wcagCriterion || "—"}`;
-      doc.text(ruleText, 22 + doc.getTextWidth(label), y);
-      // Instance count badge (top-right of WCAG criterion line)
+      doc.setFontSize(7);
+      doc.setTextColor(...navyLight);
+      doc.text(isA11y ? "WCAG CRITERION" : "RULE REFERENCE", cardX + 4, y + 4.5);
+
+      const criterionLabel = isA11y
+        ? `${issue.wcagCriterion} -- ${issue.wcagName} (Level ${issue.wcagLevel})`
+        : `${(issue as any).ruleId || issue.wcagCriterion || "--"}`;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...K.white);
+      doc.text(criterionLabel.substring(0, 60), cardX + 4, y + 10);
+
+      // Instance badge
       if (issue.occurrenceCount > 1) {
         const badgeText = `${issue.occurrenceCount} instances`;
-        const bx = pw - 20 - doc.getTextWidth(badgeText) - 4;
-        doc.setFillColor(...K.navy);
-        doc.roundedRect(bx - 2, y - 5, doc.getTextWidth(badgeText) + 6, 7, 1, 1, "F");
+        const bBw = doc.getTextWidth(badgeText) + 6;
+        const bBx = cardX + cardW - 75 - bBw;
+        doc.setFillColor(240, 180, 30);
+        doc.roundedRect(bBx, y + 3, bBw, 6, 1, 1, "F");
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(7);
-        doc.setTextColor(...K.white);
-        doc.text(badgeText, bx + 1, y);
+        doc.setFontSize(6.5);
+        doc.setTextColor(...K.nearBlack);
+        doc.text(badgeText, bBx + 3, y + 7.5);
       }
-      y += 10;
 
+      // Status + closure date (right)
+      const statusX = cardX + cardW - 68;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...navyLight);
+      doc.text("STATUS", statusX, y + 4.5);
+      doc.text("TENTATIVE CLOSURE DATE", statusX + 28, y + 4.5);
+      doc.setFontSize(8.5);
+      doc.setTextColor(...K.white);
+      doc.text("Open", statusX, y + 10);
+      doc.text("TBD", statusX + 28, y + 10);
+      y += 14;
 
-
-      // Issue header bar
+      // ── FINDING TITLE BAR ──
       doc.setFillColor(...sevBg(issue.severity));
-      doc.roundedRect(20, y - 3, pw - 40, 13, 2, 2, "F");
+      doc.rect(cardX, y, cardW, 11, "F");
       doc.setDrawColor(...sevColor(issue.severity));
-      doc.setLineWidth(0.4);
-      doc.line(20, y - 3, 20, y + 10);
-
+      doc.setLineWidth(0.8);
+      doc.line(cardX, y, cardX, y + 11);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
+      doc.setFontSize(9.5);
       doc.setTextColor(...sevColor(issue.severity));
-      doc.text(`${issueId} ${issue.title}`, 24, y + 5);
-      y += 16;
-      y += 10;
-
-      // Meta line 1: WCAG/Rule
-      // doc.setFontSize(8);
-      // doc.setFont("helvetica", "bold");
-      // doc.setTextColor(...K.navy);
-      // doc.text(isA11y ? "WCAG Criterion:" : "Rule:", 24, y);
-
-      // Meta line 2: Severity, Team, Effort, Page
-      doc.setFontSize(8);
+      doc.text(`${issueId}  ${issue.title}`, cardX + 5, y + 7);
+      doc.setFillColor(...sevColor(issue.severity));
+      doc.roundedRect(cardX + cardW - 28, y + 2, 24, 7, 1, 1, "F");
       doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...K.white);
+      doc.text(issue.severity.toUpperCase(), cardX + cardW - 16, y + 7, { align: "center" });
+      y += 14;
 
-      // --- Item 1: Severity ---
-      doc.setTextColor(...K.navy);
-      doc.text("Severity: ", 24, y);
-      const severityText = issue.severity.toUpperCase();
-      doc.setTextColor(...sevColor(issue.severity));
-      doc.text(severityText, 44, y);
-      let currentX = 44 + doc.getTextWidth(severityText) + 6;
-
-      // --- Separator ---
-      doc.setTextColor(...K.midGrey);
-      doc.text("|", currentX, y);
-      currentX += 4;
-
-      // --- Item 2: Team Owner ---
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...K.nearBlack);
-      doc.text("Team Owner: ", currentX, y);
-      currentX += doc.getTextWidth("Team Owner: ");
-      doc.setTextColor(...K.nearBlack);
-      doc.text(team, currentX, y);
-      currentX += doc.getTextWidth(team) + 6;
-
-      // --- Separator ---
-      doc.setTextColor(...K.midGrey);
-      doc.text("|", currentX, y);
-      currentX += 4;
-
-      // --- Item 3: Effort ---
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...K.nearBlack);
-      doc.text("Effort: ", currentX, y);
-      currentX += doc.getTextWidth("Effort: ");
+      // ── TWO-COLUMN BODY ──
+      const obsText = issue.description || "";
+      const recText = issue.recommendation ? String(issue.recommendation).trim() : "";
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(...K.nearBlack);
-      doc.text(effort, currentX, y);
-      y += 8;
+      doc.setFontSize(7.5);
+      const obsLines = doc.splitTextToSize(obsText.substring(0, 400), colW - 8);
+      const recLines = doc.splitTextToSize(recText.substring(0, 400), colW - 8);
+      const bodyH = Math.max(obsLines.length, recLines.length) * 3.8 + 14;
 
-      // Description
-      if (y > ph - 40) {
+      if (y + bodyH > ph - 30) {
         doc.addPage("a4", "landscape");
         y = 18;
       }
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.setTextColor(...K.nearBlack);
-      doc.text("Description", 24, y);
-      y += 4;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(...K.darkGrey);
-      const descLines = doc.splitTextToSize(issue.description, pw - 48);
-      doc.text(descLines, 24, y);
-      y += descLines.length * 3.5 + 3;
 
-      // Current vs Expected
-      if (y > ph - 40) {
-        doc.addPage("a4", "landscape");
-        y = 18;
-      }
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.setTextColor(...K.nearBlack);
-      doc.text("Current Behaviour", 24, y);
-      y += 4;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      const currLines = doc.splitTextToSize(
-        issue.description.substring(0, 150),
-        pw - 48,
-      );
-      doc.text(currLines, 24, y);
-      y += currLines.length * 3.5 + 3;
-
-      // Recommendations
-
-      const rawRecommendation = issue.recommendation
-        ? String(issue.recommendation).trim()
-        : "";
-      const recLines = rawRecommendation
-        ? doc.splitTextToSize(rawRecommendation, pw - 48)
-        : [];
-      if (recLines.length > 0) {
-        // Define layout block metrics matching your full-width setup
-        const leftMargin = 20;
-        const rightMargin = 20;
-        const blockWidth = pw - leftMargin - rightMargin;
-        const blockHeight = 6;
-        const blockY = y - 4.5; // Centers the heading text vertically
-
-        // Draw full-width colored header block strip
-        doc.setFillColor(...K.navy);
-        doc.rect(leftMargin, blockY, blockWidth, blockHeight, "F");
-
-        // Overlay Header Text
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.setTextColor(...K.white);
-        doc.text("Recommendation", 24, y);
-
-        // Advance coordinate space down from header block to text body baseline
-        y += 7;
-
-        // Output Description Lines Paragraph
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(...K.nearBlack);
-        doc.text(recLines, 24, y);
-
-        // Advance vertical tracker past paragraph content with a trailing spacer
-        y += recLines.length * 3.5 + 4;
-      }
-      // Code fix (before → after)
-      if (issue.codeFix) {
-        if (y > ph - 40) {
-          doc.addPage("a4", "landscape");
-          y = 18;
-        }
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(...K.nearBlack);
-        doc.text("Code Fix", 24, y);
-        y += 4;
-        const codeLines = doc.splitTextToSize(issue.codeFix, pw - 52);
-        const codeH = codeLines.length * 3.5 + 5;
-        doc.setFillColor(...K.offWhite);
-        doc.setDrawColor(...K.navy);
-        doc.setLineWidth(0.5);
-        // doc.roundedRect(24, y - 1, pw - 48, codeH, 2, 2, "FD");
-        doc.setFont("courier", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(...K.nearBlack);
-        doc.text(codeLines, 28, y + 3);
-        y += codeH + 3;
-      }
-
-      // Separator
-      y += 3;
+      doc.setFillColor(248, 248, 252);
+      doc.roundedRect(cardX, y, colW - 2, bodyH, 1, 1, "F");
       doc.setDrawColor(...K.lightGrey);
       doc.setLineWidth(0.2);
-      doc.line(20, y, pw - 20, y);
+      doc.roundedRect(cardX, y, colW - 2, bodyH, 1, 1, "S");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(...K.navy);
+      doc.text("OBSERVATION", cardX + 4, y + 6);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...K.nearBlack);
+      doc.text(obsLines, cardX + 4, y + 12);
+
+      const recColX = cardX + colW + 2;
+      doc.setFillColor(245, 252, 248);
+      doc.roundedRect(recColX, y, colW - 2, bodyH, 1, 1, "F");
+      doc.setDrawColor(...K.lightGrey);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(recColX, y, colW - 2, bodyH, 1, 1, "S");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(0, 110, 60);
+      doc.text("RECOMMENDATION", recColX + 4, y + 6);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...K.nearBlack);
+      doc.text(recLines, recColX + 4, y + 12);
+      y += bodyH + 4;
+
+      // ── META ROW ──
+      if (y > ph - 30) {
+        doc.addPage("a4", "landscape");
+        y = 18;
+      }
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...K.navy);
+      doc.text(isA11y ? "WCAG: " : "Rule: ", cardX + 4, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...K.lightBlue);
+      const metaRef = isA11y
+        ? `${issue.wcagCriterion} ${issue.wcagName} (${issue.wcagLevel})`
+        : `${(issue as any).ruleId || "--"}`;
+      doc.text(metaRef.substring(0, 32), cardX + (isA11y ? 17 : 13), y);
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...K.navy);
+      doc.text("Severity: ", cardX + 96, y);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...sevColor(issue.severity));
+      doc.text(issue.severity.toUpperCase(), cardX + 114, y);
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...K.navy);
+      doc.text("Team: ", cardX + 145, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...K.darkGrey);
+      doc.text(team, cardX + 158, y);
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...K.navy);
+      doc.text("Effort: ", cardX + 200, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...K.darkGrey);
+      doc.text(effort, cardX + 214, y);
+      y += 8;
+
+      // ── REFERENCE BOXES ──
+      if (y > ph - 35) {
+        doc.addPage("a4", "landscape");
+        y = 18;
+      }
+      const refBoxW = (cardW - 4) / 2;
+      const wcagRefText = isA11y
+        ? `WCAG 2.2 SC ${issue.wcagCriterion} (${issue.wcagName}, Level ${issue.wcagLevel}): ${issue.description ? issue.description.substring(0, 200) : "Conformance required as specified."}`
+        : `Rule: ${(issue as any).ruleId || "--"}. ${issue.description ? issue.description.substring(0, 220) : ""}`;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      const wcagRefLines = doc.splitTextToSize(wcagRefText, refBoxW - 10);
+      const refBoxH = Math.max(wcagRefLines.length, 2) * 3.3 + 14;
+
+      doc.setFillColor(240, 245, 255);
+      doc.setDrawColor(30, 60, 160);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(cardX, y, refBoxW, refBoxH, 2, 2, "FD");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(30, 60, 160);
+      doc.text(isA11y ? "WCAG 2.2 GUIDELINE REFERENCE" : "RULE REFERENCE", cardX + 4, y + 6);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(...K.nearBlack);
+      doc.text(wcagRefLines, cardX + 4, y + 11);
+
+      const fixX = cardX + refBoxW + 4;
+      if (issue.codeFix) {
+        doc.setFont("courier", "normal");
+        doc.setFontSize(7);
+        const codeLines = doc.splitTextToSize(issue.codeFix, refBoxW - 12);
+        const fixH = Math.max(refBoxH, codeLines.length * 3.3 + 14);
+        doc.setFillColor(26, 38, 56);
+        doc.setDrawColor(...K.navy);
+        doc.setLineWidth(0.4);
+        doc.roundedRect(fixX, y, refBoxW, fixH, 2, 2, "FD");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.5);
+        doc.setTextColor(0, 200, 150);
+        doc.text("CODE FIX", fixX + 4, y + 6);
+        doc.setFont("courier", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(220, 230, 250);
+        doc.text(codeLines, fixX + 4, y + 11);
+        y += fixH + 4;
+      } else {
+        y += refBoxH + 4;
+      }
+
+      // ── CARD SEPARATOR ──
+      doc.setDrawColor(...K.lightGrey);
+      doc.setLineWidth(0.3);
+      doc.line(cardX, y, cardX + cardW, y);
       y += 8;
 
       drawPageBorder(doc, pw, ph);
@@ -2663,98 +2742,169 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
 
         for (const ri of sortedIssues.slice(0, 40)) {
           const sev = ri.severity || "low";
-          const col = sevColor(sev);
-          const bg = sevBg(sev);
           const typeLabel = (ri.type || "issue")
             .replace(/-/g, " ")
             .replace(/\b\w/g, (c: string) => c.toUpperCase());
-          const descText = (ri.description || "").substring(0, 120);
-          const recText = (ri.recommendation || "").substring(0, 120);
+          const descText = (ri.description || "").substring(0, 300);
+          const recText = (ri.recommendation || "").substring(0, 300);
           const pageShort = (ri.pageTitle || ri.pageUrl || "").substring(0, 50);
 
-          // Measure card height (header + description + fix + action steps)
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(8);
-          const descLines = doc.splitTextToSize(descText, pw - 62);
-          const recLines = doc.splitTextToSize(`Fix: ${recText}`, pw - 62);
-          const actionStepsPreview = getPerfActionSteps(ri.type || "", ri);
-          doc.setFontSize(7);
-          const actionLinesCount = actionStepsPreview.reduce((n, s) => {
-            return n + doc.splitTextToSize(`• ${s}`, pw - 62).length;
-          }, 0);
-          doc.setFontSize(8);
-          const actionBlockH = actionStepsPreview.length > 0 ? 7 + actionLinesCount * 3.3 : 0;
-          const cardH = 9 + descLines.length * 3.5 + recLines.length * 3.5 + actionBlockH + 10;
+          const tealDark: [number, number, number] = [0, 91, 130];
+          const tealLight: [number, number, number] = [210, 235, 245];
+          const perfColW = (pw - 44) / 2;
+          const cardX = 20;
+          const cardW = pw - 40;
 
-          if (y + cardH > ph - 18) {
+          if (y > ph - 60) {
             doc.addPage("a4", "landscape");
             y = 18;
           }
 
-          // Card background + severity left border
-          doc.setFillColor(...K.offWhite);
-          doc.roundedRect(20, y, pw - 40, cardH, 2, 2, "F");
-          doc.setFillColor(...col);
-          doc.roundedRect(20, y, 4, cardH, 1, 1, "F");
-          doc.setDrawColor(...K.lightGrey);
-          doc.setLineWidth(0.2);
-          doc.roundedRect(20, y, pw - 40, cardH, 2, 2, "S");
-
-          // Severity badge
-          doc.setFillColor(...col);
-          doc.roundedRect(28, y + 3, 18, 5.5, 1, 1, "F");
+          // ── CARD HEADER: PERFORMANCE CATEGORY (left) | STATUS + CLOSURE DATE (right) ──
+          doc.setFillColor(...tealDark);
+          doc.roundedRect(cardX, y, cardW, 12, 2, 2, "F");
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(6);
-          doc.setTextColor(...K.white);
-          doc.text(sev.toUpperCase(), 37, y + 7, { align: "center" });
-
-          // Issue type label
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(8.5);
-          doc.setTextColor(...K.navy);
-          doc.text(typeLabel, 50, y + 7);
-
-          // Page label (right-aligned)
-          doc.setFont("helvetica", "italic");
           doc.setFontSize(7);
-          doc.setTextColor(...K.midGrey);
-          doc.text(pageShort, pw - 22, y + 7, { align: "right" });
+          doc.setTextColor(...tealLight);
+          doc.text("PERFORMANCE CATEGORY", cardX + 4, y + 4.5);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9);
+          doc.setTextColor(...K.white);
+          doc.text(typeLabel.substring(0, 55), cardX + 4, y + 10);
 
-          let cy = y + 12;
+          const perfStatusX = cardX + cardW - 68;
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(6.5);
+          doc.setTextColor(...tealLight);
+          doc.text("STATUS", perfStatusX, y + 4.5);
+          doc.text("TENTATIVE CLOSURE DATE", perfStatusX + 28, y + 4.5);
+          doc.setFontSize(8.5);
+          doc.setTextColor(...K.white);
+          doc.text("Open", perfStatusX, y + 10);
+          doc.text("TBD", perfStatusX + 28, y + 10);
+          y += 14;
 
-          // Description
+          // ── FINDING TITLE BAR ──
+          doc.setFillColor(...sevBg(sev));
+          doc.rect(cardX, y, cardW, 11, "F");
+          doc.setDrawColor(...sevColor(sev));
+          doc.setLineWidth(0.8);
+          doc.line(cardX, y, cardX, y + 11);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9.5);
+          doc.setTextColor(...sevColor(sev));
+          doc.text((ri.url || ri.description || typeLabel).substring(0, 70), cardX + 5, y + 7);
+          doc.setFillColor(...sevColor(sev));
+          doc.roundedRect(cardX + cardW - 28, y + 2, 24, 7, 1, 1, "F");
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(6.5);
+          doc.setTextColor(...K.white);
+          doc.text(sev.toUpperCase(), cardX + cardW - 16, y + 7, { align: "center" });
+          y += 14;
+
+          // ── TWO-COLUMN BODY ──
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(8);
-          doc.setTextColor(...K.nearBlack);
-          doc.text(descLines, 28, cy);
-          cy += descLines.length * 3.5 + 2;
-
-          // Recommendation
-          doc.setFont("helvetica", "italic");
           doc.setFontSize(7.5);
-          doc.setTextColor(0, 110, 81);
-          doc.text(recLines, 28, cy);
-          cy += recLines.length * 3.5 + 3;
+          const perfObsLines = doc.splitTextToSize(descText, perfColW - 8);
+          const perfRecLines = doc.splitTextToSize(recText, perfColW - 8);
+          const perfBodyH = Math.max(perfObsLines.length, perfRecLines.length) * 3.8 + 14;
 
-          // Detailed client-facing action steps by issue type
-          const actionSteps = getPerfActionSteps(ri.type || "", ri);
-          if (actionSteps.length > 0) {
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(7.5);
-            doc.setTextColor(0, 87, 168);
-            doc.text("Recommended Actions:", 28, cy);
-            cy += 4;
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(7);
-            doc.setTextColor(...K.darkGrey);
-            for (const step of actionSteps) {
-              const stepLines = doc.splitTextToSize(`• ${step}`, pw - 62);
-              doc.text(stepLines, 30, cy);
-              cy += stepLines.length * 3.3;
-            }
+          if (y + perfBodyH > ph - 30) {
+            doc.addPage("a4", "landscape");
+            y = 18;
           }
 
-          y += cardH + 4;
+          doc.setFillColor(248, 250, 252);
+          doc.roundedRect(cardX, y, perfColW - 2, perfBodyH, 1, 1, "F");
+          doc.setDrawColor(...K.lightGrey);
+          doc.setLineWidth(0.2);
+          doc.roundedRect(cardX, y, perfColW - 2, perfBodyH, 1, 1, "S");
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(8);
+          doc.setTextColor(...tealDark);
+          doc.text("OBSERVATION", cardX + 4, y + 6);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7.5);
+          doc.setTextColor(...K.nearBlack);
+          doc.text(perfObsLines, cardX + 4, y + 12);
+
+          const perfRecColX = cardX + perfColW + 2;
+          doc.setFillColor(245, 252, 248);
+          doc.roundedRect(perfRecColX, y, perfColW - 2, perfBodyH, 1, 1, "F");
+          doc.setDrawColor(...K.lightGrey);
+          doc.setLineWidth(0.2);
+          doc.roundedRect(perfRecColX, y, perfColW - 2, perfBodyH, 1, 1, "S");
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(8);
+          doc.setTextColor(0, 110, 60);
+          doc.text("RECOMMENDED FIX", perfRecColX + 4, y + 6);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7.5);
+          doc.setTextColor(...K.nearBlack);
+          doc.text(perfRecLines, perfRecColX + 4, y + 12);
+          y += perfBodyH + 4;
+
+          // ── META ROW ──
+          if (y > ph - 30) {
+            doc.addPage("a4", "landscape");
+            y = 18;
+          }
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(7.5);
+          doc.setTextColor(...K.navy);
+          doc.text("Type: ", cardX + 4, y);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(...K.lightBlue);
+          doc.text(typeLabel.substring(0, 30), cardX + 14, y);
+
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...K.navy);
+          doc.text("Severity: ", cardX + 96, y);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...sevColor(sev));
+          doc.text(sev.toUpperCase(), cardX + 114, y);
+
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...K.navy);
+          doc.text("Page: ", cardX + 145, y);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(...K.darkGrey);
+          doc.text(pageShort, cardX + 157, y);
+          y += 8;
+
+          // ── RECOMMENDED ACTIONS BOX ──
+          if (y > ph - 30) {
+            doc.addPage("a4", "landscape");
+            y = 18;
+          }
+          const actionSteps = getPerfActionSteps(ri.type || "", ri);
+          if (actionSteps.length > 0) {
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7);
+            const actionLines: string[] = actionSteps.reduce((acc: string[], s) => {
+              return [...acc, ...doc.splitTextToSize(`• ${s}`, cardW - 14)];
+            }, []);
+            const actBoxH = actionLines.length * 3.3 + 14;
+            doc.setFillColor(240, 248, 255);
+            doc.setDrawColor(...tealDark);
+            doc.setLineWidth(0.4);
+            doc.roundedRect(cardX, y, cardW, actBoxH, 2, 2, "FD");
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(7.5);
+            doc.setTextColor(...tealDark);
+            doc.text("RECOMMENDED ACTIONS", cardX + 4, y + 6);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7);
+            doc.setTextColor(...K.nearBlack);
+            doc.text(actionLines, cardX + 4, y + 11);
+            y += actBoxH + 4;
+          }
+
+          // ── CARD SEPARATOR ──
+          doc.setDrawColor(...K.lightGrey);
+          doc.setLineWidth(0.3);
+          doc.line(cardX, y, cardX + cardW, y);
+          y += 6;
         }
 
         if (sortedIssues.length > 40) {

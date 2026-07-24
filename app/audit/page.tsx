@@ -2107,7 +2107,7 @@ export default function AuditPage() {
     "website",
   );
   const [url, setUrl] = useState("");
-  const [crawlDepth, setCrawlDepth] = useState(2);
+
   const [maxPages, setMaxPages] = useState(5);
   const [includeAI, setIncludeAI] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -2286,7 +2286,6 @@ export default function AuditPage() {
     try {
       const body: Record<string, unknown> = {
         url,
-        crawlDepth,
         maxPages: effectiveMaxPages,
         includeAI,
         wcagLevels: levels,
@@ -3123,7 +3122,7 @@ export default function AuditPage() {
                     icon: "🌐",
                     label: "General Site Audit",
                     desc: "Crawl & audit the full site automatically",
-                    tags: ["URL + crawl depth", "Max pages", "Auto-discover"],
+                    tags: ["URL entry", "Max pages", "Auto-discover"],
                     rec: false,
                   },
                   {
@@ -3247,24 +3246,10 @@ export default function AuditPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gridTemplateColumns: "1fr 1fr",
                   gap: 10,
                 }}
               >
-                <div className="input-group">
-                  <label className="input-label">Crawl Depth</label>
-                  <select
-                    className="input-field"
-                    value={crawlDepth}
-                    onChange={(e) => setCrawlDepth(+e.target.value)}
-                  >
-                    {[1, 2, 3, 4, 5].map((v) => (
-                      <option key={v} value={v}>
-                        {v} level{v > 1 ? "s" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 <div className="input-group">
                   <label className="input-label">Max Pages</label>
                   <select

@@ -1,16 +1,33 @@
 export type Severity = 'critical' | 'high' | 'medium' | 'low';
 
 export const SEVERITY_WEIGHTS: Record<Severity, number> = {
-  critical: 7,   // reduced from 10 — 9 unique criticals should give ~35-45 not ~77
-  high: 3.5,     // reduced from 5
-  medium: 1.5,   // reduced from 2
+  critical: 8,   // each unique critical issue deducts 8 pts (cap: 45)
+  high: 3.5,
+  medium: 1.5,
   low: 0.4
 };
 
+/**
+ * Maximum total deduction per severity tier.
+ * Prevents a single category from consuming all 100 points and ensures
+ * the score remains interpretable regardless of how many issues exist.
+ *
+ *   Critical: 6 issues to hit cap  (6 × 8 = 48 > 45)
+ *   High:     6 issues to hit cap  (6 × 3.5 = 21 > 20)
+ *   Medium:  10 issues to hit cap
+ *   Low:     20 issues to hit cap
+ */
+export const SEVERITY_CAPS: Record<Severity, number> = {
+  critical: 45,
+  high: 20,
+  medium: 15,
+  low: 8
+};
+
 export const LEVEL_MULTIPLIERS: Record<string, number> = {
-  'A': 1.3,   // reduced from 1.5 — Level A still penalised more but not 50% more
+  'A': 1.2,   // Level A criteria are more fundamental — slightly higher penalty
   'AA': 1.0,
-  'AAA': 0.5
+  'AAA': 0.6  // AAA is aspirational, penalised lightly
 };
 
 export const SEVERITY_COLORS: Record<Severity, string> = {
