@@ -36,7 +36,7 @@ interface PredefinedJourneyTemplate {
   label: string;
   description: string;
   checksFocus: string;
-  primaryPillar: "accessibility" | "darkpatterns" | "performance";
+  primaryPillar?: "accessibility" | "darkpatterns" | "performance";
   secondaryPillars: string[];
   ccpaPatterns: string[];
   effortAsymmetry?: {
@@ -303,7 +303,7 @@ const PREDEFINED_JOURNEYS: PredefinedJourneyTemplate[] = [
     label: "Consent & Cookie Flow",
     description: "Cookie consent and settings for trustlens compliance",
     checksFocus: "Pre-ticked consent boxes, reject button hiding, consent wall",
-    primaryPillar: "",
+    primaryPillar: "darkpatterns",
     secondaryPillars: ["darkpatterns"],
     ccpaPatterns: [
       "Interface Interference",
@@ -469,7 +469,7 @@ const PREDEFINED_JOURNEYS: PredefinedJourneyTemplate[] = [
     label: "Profile & Data Settings",
     description: "Settings and data management for detection",
     checksFocus: " hard-to-find opt-outs, data sharing defaults",
-    primaryPillar: "",
+    primaryPillar: "accessibility",
     secondaryPillars: ["darkpatterns", "accessibility"],
     ccpaPatterns: [
       // "Privacy Zuckering",
@@ -1228,7 +1228,7 @@ const PREDEFINED_JOURNEYS: PredefinedJourneyTemplate[] = [
       "Medical records and prescription access — data wall, forced app install, friction",
     checksFocus:
       "Health record access walls, forced app installation, data portability friction",
-    primaryPillar: "",
+    primaryPillar: "accessibility",
     secondaryPillars: ["darkpatterns", "accessibility"],
     ccpaPatterns: [
       "Roach Motel",
@@ -1522,7 +1522,7 @@ const PREDEFINED_JOURNEYS: PredefinedJourneyTemplate[] = [
     label: "App  Settings",
     description: "Wellness / lifestyle app  settings, hard-to-find opt-outs",
     checksFocus: " health data sharing defaults, notification opt-out friction",
-    primaryPillar: "",
+    primaryPillar: "darkpatterns",
     secondaryPillars: ["darkpatterns", "accessibility"],
     ccpaPatterns: [
       // "Privacy Zuckering",
@@ -2056,9 +2056,9 @@ const PREDEFINED_JOURNEYS: PredefinedJourneyTemplate[] = [
     description:
       "Kids profiles and parental controls —  of minors, default sharing, age verification",
     checksFocus: " Data collection defaults for kids profiles, age-gate bypass",
-    primaryPillar: "",
+    primaryPillar: "accessibility",
     secondaryPillars: ["darkpatterns", "accessibility"],
-    ccpaPatterns: [, "Trick Questions", "Interface Interference"],
+    ccpaPatterns: ["Trick Questions", "Interface Interference"],
     regulationFocus: [
       "COPPA (US)",
       "Article 8 (Child Data)",
@@ -2560,7 +2560,7 @@ export default function AuditPage() {
                 padding: "20px 20px",
                 borderRadius: "var(--radius-md)",
                 border: `2px solid ${p.checked ? "var(--kpmg-dynamic)" : "var(--border)"}`,
-                background: "transparent",
+                background: p.checked ? `rgba(0, 51, 141, 0.1)` : "transparent",
                 cursor: "pointer",
                 transition: "var(--transition)",
                 textAlign: "center",
@@ -2625,9 +2625,7 @@ export default function AuditPage() {
               padding: "20px 20px",
               borderRadius: "var(--radius-md)",
               border: `2px solid ${pillarPerf ? "var(--kpmg-dynamic)" : "var(--border)"}`,
-              // background: pillarPerf
-              //   ? "color-mix(in srgb, var(--pillar-perf) 10%, transparent)"
-              //   : "transparent",
+              background: pillarPerf ? `rgba(0, 51, 141, 0.1)` : "transparent",
               cursor: "pointer",
               transition: "var(--transition)",
               textAlign: "center",
@@ -2732,7 +2730,7 @@ export default function AuditPage() {
           style={{
             marginBottom: 20,
             padding: "18px 20px",
-            borderTop: "3px solid var(--pillar-perf)",
+            // borderTop: "3px solid var(--pillar-perf)",
           }}
         >
           <div
@@ -2793,12 +2791,8 @@ export default function AuditPage() {
                     padding: "6px 12px",
                     borderRadius: 99,
                     border: `1.5px solid ${active ? "var(--kpmg-dynamic)" : "var(--border)"}`,
-                    // background: active
-                    //   ? "color-mix(in srgb, var(--pillar-perf) 15%, transparent)"
-                    //   : "var(--bg-secondary)",
-                    color: active
-                      ? "var(--kpmg-dynamic)"
-                      : "var(--kpmg-dynamic)",
+                    background: `var(--border)`,
+                    color: "var(--kpmg-dynamic)",
                     fontSize: 12,
                     fontWeight: active ? 700 : 400,
                     cursor: "pointer",
@@ -2861,7 +2855,7 @@ export default function AuditPage() {
                 borderRadius: "var(--radius-md)",
                 border: "1px solid var(--border)",
                 background: "var(--bg-secondary)",
-                color: "var(--text-primary)",
+                color: "var(--textarea-text)",
                 fontFamily: "inherit",
                 boxSizing: "border-box",
               }}
@@ -2929,12 +2923,35 @@ export default function AuditPage() {
             </div>
             <div className="input-group">
               <label className="input-label">Conformance Level</label>
-              <div className="wcag-level-selector" style={{ paddingTop: 2, display: "flex", gap: 8 }}>
-                {([
-                  { key: "A", label: "Level A", checked: wcagLevelA, set: setWcagLevelA, desc: "Baseline" },
-                  { key: "AA", label: "Level AA", checked: wcagLevelAA, set: setWcagLevelAA, desc: "Standard" },
-                  { key: "AAA", label: "Level AAA", checked: wcagLevelAAA, set: setWcagLevelAAA, desc: "Enhanced" },
-                ] as const).map(({ key, label, checked, set, desc }) => (
+              <div
+                className="wcag-level-selector"
+                style={{ paddingTop: 2, display: "flex", gap: 8 }}
+              >
+                {(
+                  [
+                    {
+                      key: "A",
+                      label: "Level A",
+                      checked: wcagLevelA,
+                      set: setWcagLevelA,
+                      desc: "Baseline",
+                    },
+                    {
+                      key: "AA",
+                      label: "Level AA",
+                      checked: wcagLevelAA,
+                      set: setWcagLevelAA,
+                      desc: "Standard",
+                    },
+                    {
+                      key: "AAA",
+                      label: "Level AAA",
+                      checked: wcagLevelAAA,
+                      set: setWcagLevelAAA,
+                      desc: "Enhanced",
+                    },
+                  ] as const
+                ).map(({ key, label, checked, set, desc }) => (
                   <label
                     key={key}
                     style={{
@@ -2944,7 +2961,9 @@ export default function AuditPage() {
                       gap: 2,
                       padding: "8px 18px",
                       borderRadius: 8,
-                      border: checked ? "2px solid #0057a8" : "2px solid #c0c0c0",
+                      border: checked
+                        ? "2px solid #0057a8"
+                        : "2px solid #c0c0c0",
                       background: checked ? "#0057a8" : "transparent",
                       color: checked ? "#fff" : "inherit",
                       cursor: "pointer",
@@ -2953,7 +2972,8 @@ export default function AuditPage() {
                       fontSize: 13,
                       minWidth: 80,
                       textAlign: "center",
-                      transition: "background 0.15s, border-color 0.15s, color 0.15s",
+                      transition:
+                        "background 0.15s, border-color 0.15s, color 0.15s",
                     }}
                   >
                     <input
@@ -2963,11 +2983,25 @@ export default function AuditPage() {
                       style={{ display: "none" }}
                     />
                     {label}
-                    <span style={{ fontSize: 10, fontWeight: 400, opacity: checked ? 0.85 : 0.5 }}>{desc}</span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 400,
+                        opacity: checked ? 0.85 : 0.5,
+                      }}
+                    >
+                      {desc}
+                    </span>
                   </label>
                 ))}
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 6 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-secondary)",
+                  marginTop: 6,
+                }}
+              >
                 {getSelectedLevels().length === 0
                   ? "Select at least one level."
                   : `Audit will check WCAG criteria at: ${getSelectedLevels().join(", ")}. Only issues at these levels will be reported.`}
@@ -2999,41 +3033,36 @@ export default function AuditPage() {
       )}
 
       {/* ── Media Type Tabs ── */}
-      <div className="tabs" style={{ marginBottom: 20, gap: 60 }}>
+      <div
+        className="tabs"
+        style={{
+          marginBottom: 20,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-around",
+          // gap: 60,
+        }}
+      >
         <button
+          style={{ width: "360px" }}
           className={`tab ${tab === "website" ? "active" : ""}`}
           onClick={() => setTab("website")}
         >
           Website / Portal
         </button>
         <button
+          style={{ width: "360px" }}
           className={`tab ${tab === "pdf" ? "active" : ""}`}
           onClick={() => setTab("pdf")}
         >
           PDF Document
         </button>
-        <button
+        {/* <button
           className={`tab ${tab === "image" ? "active" : ""}`}
           onClick={() => setTab("image")}
           style={{ position: "relative" }}
         >
           Screenshot / Image
-          {/* <span
-            style={{display: "inline-flex", alignItems: "center", 
-              marginLeft: 5,
-              fontSize: 8,
-              padding: "1px 5px",
-              borderRadius: 99,
-              background: "rgba(205,171,254,0.15)",
-              color: "var(--accent-purple)",
-              border: "1px solid rgba(205,171,254,0.3)",
-              fontWeight: 700,
-              verticalAlign: "middle",
-              // fontFamily: "Geist Mono, monospace",
-            }}
-          >
-             AI Vision 
-          </span> */}
         </button>
         <button
           className={`tab ${tab === "video" ? "active" : ""}`}
@@ -3041,23 +3070,7 @@ export default function AuditPage() {
           style={{ position: "relative" }}
         >
           Video Recording
-          {/* <span
-            style={{display: "inline-flex", alignItems: "center", 
-              marginLeft: 5,
-              fontSize: 8,
-              padding: "1px 5px",
-              borderRadius: 99,
-              background: "rgba(254,113,65,0.12)",
-              color: "var(--accent-primary)",
-              border: "1px solid rgba(254,113,65,0.3)",
-              fontWeight: 700,
-              verticalAlign: "middle",
-              fontFamily: "Geist Mono, monospace",
-            }}
-          >
-             AI Vision 
-          </span> */}
-        </button>
+        </button> */}
       </div>
 
       {/* Error */}
@@ -3167,10 +3180,7 @@ export default function AuditPage() {
                     padding: "8px 18px",
                     borderRadius: "var(--radius-md)",
                     border: `2px solid ${scopeMode === m.id ? "var(--kpmg-dynamic)" : "var(--border)"}`,
-                    // background:
-                    //   scopeMode === m.id
-                    //     ? "rgba(254,113,65,0.06)"
-                    //     : "transparent",
+                    background: "var(--bg-glass)",
                     cursor: "pointer",
                     transition: "var(--transition)",
                     position: "relative",
@@ -3282,7 +3292,7 @@ export default function AuditPage() {
                       style={{
                         width: 16,
                         height: 16,
-                        accentColor: "var(--accent-primary)",
+                        accentColor: "var(--kpmg-dynamic)",
                       }}
                     />
                     <span
@@ -3514,8 +3524,9 @@ export default function AuditPage() {
                       accessibility: "♿",
                       performance: "⚡",
                     };
-                    const pillarColor =
-                      pillarColors[j.primaryPillar] || "var(--accent-primary)";
+                    const pillarColor = j.primaryPillar
+                      ? pillarColors[j.primaryPillar]
+                      : "var(--accent-primary)";
                     const isSelected = selectedJourney === j.id;
                     return (
                       <button
@@ -3874,9 +3885,9 @@ export default function AuditPage() {
                       accessibility: "var(--pillar-a11y)",
                       performance: "var(--pillar-perf)",
                     };
-                    const pillarColor =
-                      pillarColors[selectedTemplate.primaryPillar] ||
-                      "var(--accent-primary)";
+                    const pillarColor = selectedTemplate.primaryPillar
+                      ? pillarColors[selectedTemplate.primaryPillar]
+                      : "var(--accent-primary)";
                     return (
                       <div
                         style={{
@@ -4332,7 +4343,7 @@ export default function AuditPage() {
                                   alignItems: "start",
                                   padding: "8px 10px",
                                   borderRadius: "var(--radius-md)",
-                                  background: "var(--bg-secondary)",
+                                  background: "var(--bg-card)",
                                   border: "1px solid var(--border)",
                                 }}
                               >
@@ -4383,7 +4394,7 @@ export default function AuditPage() {
                                       fontSize: 11,
                                       padding: "6px 10px",
                                       color: "var(--offshade-text)",
-                                      // background: `${pillarColor}04`,
+                                      background: `var(--bg-card)`,
                                       borderColor: `var(--offshade-text)`,
                                     }}
                                   />
@@ -4858,7 +4869,7 @@ export default function AuditPage() {
       )}
 
       {/* ── IMAGE TAB ── */}
-      {tab === "image" && (
+      {/* {tab === "image" && (
         <div className="glass-card animate-fade-in">
           <div
             style={{
@@ -4875,11 +4886,11 @@ export default function AuditPage() {
                 marginBottom: 6,
               }}
             >
-              {/* <span style={{ fontSize: 18 }}>📸</span> */}
+              <span style={{ fontSize: 18 }}>📸</span>
               <span style={{ fontWeight: 700, fontSize: 14 }}>
                 Screenshot / Image Audit
               </span>
-              {/* <span className="dp-ai-vision-badge">GPT-4o Vision</span> */}
+              <span className="dp-ai-vision-badge">GPT-4o Vision</span>
             </div>
             <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
               Upload a screenshot or UI image. GPT-4o will analyse it across
@@ -4940,53 +4951,9 @@ export default function AuditPage() {
               </div>
             )}
           </div>
-          {/* <div
-            style={{
-              margin: "14px 0",
-              padding: "10px 14px",
-              borderRadius: 8,
-              background: "rgba(205,171,254,0.06)",
-              border: "1px solid rgba(205,171,254,0.2)",
-              fontSize: 12,
-            }}
-          >
-            <div
-              style={{
-                fontWeight: 700,
-                color: "var(--accent-purple)",
-                marginBottom: 4,
-              }}
-            >
-              What Vision AI checks per pillar:
-            </div>
-            <div style={{ color: "var(--text-secondary)", lineHeight: 1.7 }}>
-              <span style={{ color: "var(--pillar-a11y)", fontWeight: 600 }}>
-                ♿ A11Y:
-              </span>{" "}
-              Contrast, focus indicators, label visibility, text size, heading
-              hierarchy
-              <br />
-              <span style={{ color: "var(--pillar-dp)", fontWeight: 600 }}>
-                🕵️ Dark Patterns:
-              </span>{" "}
-              Consent asymmetry, urgency cues, confirmshaming, disguised CTAs,
-              visual manipulation
-              <br />
-              <span style={{ color: "var(--pillar-perf)", fontWeight: 600 }}>
-                ⚡ Performance:
-              </span>{" "}
-              Loading states, layout shifts, image density, font rendering
-              <br />
-              <span style={{ color: "var(--pillar-priv)", fontWeight: 600 }}>
-                🔒 Privacy:
-              </span>{" "}
-              Consent banner quality, reject option, privacy policy link
-              visibility
-            </div>
-          </div> */}
           <button
             className="btn btn-primary btn-lg"
-            style={{ width: "100%" }}
+            style={{ width: "100%", marginTop: 16 }}
             onClick={startImageAudit}
             disabled={loading || !imageFile}
           >
@@ -5004,10 +4971,10 @@ export default function AuditPage() {
             )}
           </button>
         </div>
-      )}
+      )} */}
 
       {/* ── VIDEO TAB ── */}
-      {tab === "video" && (
+      {/* {tab === "video" && (
         <div className="glass-card animate-fade-in">
           <div
             style={{
@@ -5024,24 +4991,10 @@ export default function AuditPage() {
                 marginBottom: 6,
               }}
             >
-              {/* <span style={{ fontSize: 18 }}>🎥</span> */}
+              
               <span style={{ fontWeight: 700, fontSize: 14 }}>
                 Video Recording Audit
               </span>
-              {/* <span
-                style={{display: "inline-flex", alignItems: "center", 
-                  fontSize: 9,
-                  padding: "2px 8px",
-                  borderRadius: 99,
-                  background: "rgba(254,113,65,0.12)",
-                  color: "var(--accent-primary)",
-                  border: "1px solid rgba(254,113,65,0.3)",
-                  fontWeight: 700,
-                   fontFamily: "Geist Mono, monospace",
-                }}
-              >
-                Frame Sampling
-              </span> */}
             </div>
             <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
               Upload a screen recording. 8 frames are extracted in your browser
@@ -5103,42 +5056,7 @@ export default function AuditPage() {
               </div>
             )}
           </div>
-          {/* <div
-            style={{
-              margin: "14px 0",
-              padding: "10px 14px",
-              borderRadius: 8,
-              background: "rgba(254,113,65,0.05)",
-              border: "1px solid rgba(254,113,65,0.2)",
-              fontSize: 12,
-            }}
-          >
-            <div
-              style={{
-                fontWeight: 700,
-                color: "var(--accent-primary)",
-                marginBottom: 6,
-              }}
-            >
-              🎬 How video analysis works:
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 6,
-                color: "var(--text-secondary)",
-                lineHeight: 1.6,
-              }}
-            >
-              <div>✦ 8 frames extracted evenly from video duration</div>
-              <div>✦ Frame extraction happens in your browser (Canvas API)</div>
-              <div>✦ Each frame analysed by GPT-4o per selected pillar</div>
-              <div>✦ Duplicate findings automatically deduplicated</div>
-              <div>✦ Results same as a standard audit report</div>
-              <div>✦ No video data stored — frames only</div>
-            </div>
-          </div> */}
+
           {videoProcessing && (
             <div
               style={{
@@ -5163,7 +5081,7 @@ export default function AuditPage() {
           )}
           <button
             className="btn btn-primary btn-lg"
-            style={{ width: "100%" }}
+            style={{ width: "100%", marginTop: 14 }}
             onClick={startVideoAudit}
             disabled={loading || !videoFile}
           >
@@ -5181,7 +5099,7 @@ export default function AuditPage() {
             )}
           </button>
         </div>
-      )}
+      )} */}
     </div>
   );
 }

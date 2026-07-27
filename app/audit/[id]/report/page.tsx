@@ -2202,11 +2202,11 @@ export default function FinalReportPage() {
         { id: "executive", label: "Executive Summary" },
         ...(isA11y
           ? [
-              { id: "backlog", label: "Issue Backlog" },
+              // { id: "backlog", label: "Issue Backlog" },
               { id: "components", label: "Components" },
               { id: "remediation", label: "Remediation Guide" },
               { id: "priority", label: "Priority Matrix" },
-              { id: "acceptance", label: "Acceptance / QA" },
+              // { id: "acceptance", label: "Acceptance / QA" },
             ]
           : []),
         ...(isDP ? [{ id: "dark-patterns", label: "Dark Patterns" }] : []),
@@ -6170,11 +6170,11 @@ export default function FinalReportPage() {
                   color: "#00BA8C",
                   // bg: "rgba(0,186,140,0.05)",
                 },
-              ].map(({ label, desc, emoji, items, color, bg, border }) => (
+              ].map(({ label, desc, emoji, items, color, border }) => (
                 <div
                   key={label}
                   style={{
-                    background: bg,
+                    // background: bg,
                     border: `1px solid var(--dynamic-border)`,
                     // borderRadius: "var(--radius-md)",
                     padding: 18,

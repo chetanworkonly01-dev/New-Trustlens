@@ -988,7 +988,7 @@ export default function AuditResultPage() {
                 fontWeight: 300,
                 color: "var(--accent-primary)",
                 letterSpacing: "-0.02em",
-                fontFamily: "Geist Mono, monospace",
+                // fontFamily: "Geist Mono, monospace",
               }}
             >
               {data.progress}%
@@ -1018,12 +1018,12 @@ export default function AuditResultPage() {
                     borderRadius: 99,
                     fontSize: 11,
                     fontWeight: 700,
-                    background: `${m.color}18`,
-                    color: m.color,
-                    border: `1px solid ${m.color}40`,
+                    // background: `${m.color}18`,
+                    color: "var(--offshade-text)",
+                    // border: `1px solid ${m.color}40`,
                   }}
                 >
-                  {/* {m.icon}  */}
+                 
                   {m.label}
                 </span>
               );
@@ -1104,9 +1104,9 @@ export default function AuditResultPage() {
                     <div
                       style={{
                         fontSize: 8,
-                        color: "var(--text-secondary)",
+                        color: "var(--offshade-text)",
                         marginTop: 2,
-                        fontFamily: "Geist Mono, monospace",
+                        // fontFamily: "Geist Mono, monospace",
                         lineHeight: 1.3,
                         maxWidth: 120,
                         overflow: "hidden",
@@ -1454,9 +1454,7 @@ export default function AuditResultPage() {
 
   // ===== COMPLETE RESULTS =====
   const testedLevel =
-    data.config?.wcagLevels?.join(" + ") ||
-    data.report?.testedLevel ||
-    "AA";
+    data.config?.wcagLevels?.join(" + ") || data.report?.testedLevel || "AA";
   const standard = data.config?.standard || "WCAG 2.2";
 
   const filteredIssues = data.issues.filter(
@@ -2143,16 +2141,40 @@ export default function AuditResultPage() {
               <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>
                 /100
               </span>
-              <span style={{
-                fontSize: 11,
-                fontWeight: 600,
-                marginLeft: 8,
-                padding: "2px 7px",
-                borderRadius: 4,
-                background: data.trustScore.overall >= 90 ? "rgba(0,186,140,0.12)" : data.trustScore.overall >= 75 ? "rgba(0,145,218,0.12)" : data.trustScore.overall >= 50 ? "rgba(240,171,0,0.12)" : "rgba(232,0,45,0.10)",
-                color: data.trustScore.overall >= 90 ? "#00BA8C" : data.trustScore.overall >= 75 ? "#0091DA" : data.trustScore.overall >= 50 ? "#B07D00" : "#E8002D",
-              }}>
-                {data.trustScore.overall >= 90 ? "Grade A" : data.trustScore.overall >= 75 ? "Grade B" : data.trustScore.overall >= 50 ? "Grade C" : data.trustScore.overall >= 25 ? "Grade D" : "Grade F"}
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  marginLeft: 8,
+                  padding: "2px 7px",
+                  borderRadius: 4,
+                  background:
+                    data.trustScore.overall >= 90
+                      ? "rgba(0,186,140,0.12)"
+                      : data.trustScore.overall >= 75
+                        ? "rgba(0,145,218,0.12)"
+                        : data.trustScore.overall >= 50
+                          ? "rgba(240,171,0,0.12)"
+                          : "rgba(232,0,45,0.10)",
+                  color:
+                    data.trustScore.overall >= 90
+                      ? "#00BA8C"
+                      : data.trustScore.overall >= 75
+                        ? "#0091DA"
+                        : data.trustScore.overall >= 50
+                          ? "#B07D00"
+                          : "#E8002D",
+                }}
+              >
+                {data.trustScore.overall >= 90
+                  ? "Grade A"
+                  : data.trustScore.overall >= 75
+                    ? "Grade B"
+                    : data.trustScore.overall >= 50
+                      ? "Grade C"
+                      : data.trustScore.overall >= 25
+                        ? "Grade D"
+                        : "Grade F"}
               </span>
             </span>
           </div>
