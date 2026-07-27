@@ -365,6 +365,7 @@ async function testKeyboardNavigation(context: BrowserContext, url: string): Pro
       const tabSequence: string[] = [];
       let trapDetected = false;
       let trapElement = '';
+      let trapSelector = '';
 
       // Get all focusable elements
       const focusable = document.querySelectorAll(
@@ -384,6 +385,10 @@ async function testKeyboardNavigation(context: BrowserContext, url: string): Pro
         if (val > 0) {
           trapDetected = true;
           trapElement = el.outerHTML.substring(0, 100);
+          const id = el.getAttribute('id');
+          const cls = el.getAttribute('class');
+          const tag = el.tagName.toLowerCase();
+          trapSelector = id ? `#${id}` : (cls ? `${tag}.${cls.trim().split(/\s+/)[0]}` : tag);
         }
       });
 
@@ -391,7 +396,8 @@ async function testKeyboardNavigation(context: BrowserContext, url: string): Pro
         focusableCount: focusableElements.length,
         focusableElements: focusableElements.slice(0, 20),
         trapDetected,
-        trapElement
+        trapElement,
+        trapSelector
       };
     });
 
@@ -409,6 +415,8 @@ async function testKeyboardNavigation(context: BrowserContext, url: string): Pro
         wcagCriterion: '2.1.2', wcagName: 'No Keyboard Trap',
         severity: 'critical', category: 'operable',
         recommendation: 'Remove positive tabindex values. Use tabindex="0" or natural DOM order.',
+        element: tabResult.trapSelector,
+        elementHtml: tabResult.trapElement,
       }));
     }
 
@@ -485,36 +493,43 @@ async function testFocusManagement(context: BrowserContext, url: string): Promis
     // Check for modals/dialogs that might steal focus
     const dialogCheck = await page.evaluate(() => {
       const dialogs = document.querySelectorAll('[role="dialog"], [role="alertdialog"], dialog, .modal');
-      const issues: string[] = [];
+      const details: { message: string; selector: string; html: string }[] = [];
 
-      dialogs.forEach(dialog => {
+      dialogs.forEach((dialog, idx) => {
+        const id = dialog.getAttribute('id');
+        const cls = dialog.getAttribute('class');
+        const selector = id ? `#${id}` : (cls ? `.${cls.trim().split(/\s+/)[0]}` : `[role="dialog"]:nth-of-type(${idx + 1})`);
+        const html = dialog.outerHTML.substring(0, 150);
+
         if (!dialog.getAttribute('aria-label') && !dialog.getAttribute('aria-labelledby')) {
-          issues.push('Dialog missing aria-label or aria-labelledby');
+          details.push({ message: 'Dialog missing aria-label or aria-labelledby', selector, html });
         }
         // Check for focus trap within dialog
         const focusable = dialog.querySelectorAll('a[href], button, input, select, textarea, [tabindex]');
         if (focusable.length === 0) {
-          issues.push('Dialog has no focusable elements');
+          details.push({ message: 'Dialog has no focusable elements', selector, html });
         }
       });
 
-      return { dialogCount: dialogs.length, issues };
+      return { dialogCount: dialogs.length, details };
     });
 
     steps.push({
       name: 'Dialog/Modal Focus Management',
       action: `Found ${dialogCheck.dialogCount} dialog(s)`,
-      passed: dialogCheck.issues.length === 0,
-      issue: dialogCheck.issues.length > 0 ? dialogCheck.issues.join('; ') : undefined
+      passed: dialogCheck.details.length === 0,
+      issue: dialogCheck.details.length > 0 ? dialogCheck.details.map(d => d.message).join('; ') : undefined
     });
 
-    for (const dialogIssue of dialogCheck.issues) {
+    for (const d of dialogCheck.details) {
       issues.push(createJourneyIssue(url, {
         title: 'Dialog accessibility issue',
-        description: dialogIssue,
+        description: d.message,
         wcagCriterion: '2.4.3', wcagName: 'Focus Order',
         severity: 'high', category: 'operable',
         recommendation: 'Ensure dialogs have proper ARIA labels, trap focus within them, and return focus to the trigger element on close.',
+        element: d.selector,
+        elementHtml: d.html,
       }));
     }
 
@@ -559,18 +574,28 @@ async function testFormInteraction(context: BrowserContext, url: string): Promis
 
     const formAnalysis = await page.evaluate(() => {
       const forms = document.querySelectorAll('form');
+      const buildSelector = (el: Element): string => {
+        const id = el.getAttribute('id');
+        if (id) return `#${id}`;
+        const name = el.getAttribute('name');
+        const tag = el.tagName.toLowerCase();
+        if (name) return `${tag}[name="${name}"]`;
+        const cls = el.getAttribute('class');
+        if (cls) return `${tag}.${cls.trim().split(/\s+/)[0]}`;
+        return tag;
+      };
       const results: {
         formCount: number;
-        inputsWithoutLabels: string[];
-        inputsWithoutAutocomplete: string[];
-        missingFieldsets: boolean;
+        inputsWithoutLabels: { selector: string; html: string; label: string }[];
+        inputsWithoutAutocomplete: { selector: string; html: string; name: string }[];
+        missingFieldsetForms: { selector: string; html: string }[];
         requiredWithoutAria: string[];
         submitButtonsWithoutText: string[];
       } = {
         formCount: forms.length,
         inputsWithoutLabels: [],
         inputsWithoutAutocomplete: [],
-        missingFieldsets: false,
+        missingFieldsetForms: [],
         requiredWithoutAria: [],
         submitButtonsWithoutText: [],
       };
@@ -582,7 +607,10 @@ async function testFormInteraction(context: BrowserContext, url: string): Promis
 
         // Check for fieldset/legend on radio/checkbox groups
         if ((radioGroups.length > 1 || checkboxGroups.length > 1) && !form.querySelector('fieldset')) {
-          results.missingFieldsets = true;
+          results.missingFieldsetForms.push({
+            selector: buildSelector(form),
+            html: form.outerHTML.substring(0, 150),
+          });
         }
 
         inputs.forEach(input => {
@@ -595,14 +623,22 @@ async function testFormInteraction(context: BrowserContext, url: string): Promis
           const hasLabel = el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') ||
             (id && document.querySelector(`label[for="${id}"]`));
           if (!hasLabel) {
-            results.inputsWithoutLabels.push(`${el.tagName.toLowerCase()}[type="${type}"]`);
+            results.inputsWithoutLabels.push({
+              selector: buildSelector(el),
+              html: el.outerHTML.substring(0, 150),
+              label: `${el.tagName.toLowerCase()}[type="${type}"]`,
+            });
           }
 
           // Check autocomplete for common fields
           const name = (el.name || '').toLowerCase();
           if (['email', 'password', 'name', 'phone', 'tel', 'address', 'zip', 'postal'].some(k => name.includes(k))) {
             if (!el.getAttribute('autocomplete')) {
-              results.inputsWithoutAutocomplete.push(name);
+              results.inputsWithoutAutocomplete.push({
+                selector: buildSelector(el),
+                html: el.outerHTML.substring(0, 150),
+                name,
+              });
             }
           }
 
@@ -635,15 +671,17 @@ async function testFormInteraction(context: BrowserContext, url: string): Promis
     if (!labelsOk) {
       issues.push(createJourneyIssue(url, {
         title: 'Form inputs missing label associations',
-        description: `${formAnalysis.inputsWithoutLabels.length} form inputs lack proper label associations: ${formAnalysis.inputsWithoutLabels.join(', ')}`,
+        description: `${formAnalysis.inputsWithoutLabels.length} form inputs lack proper label associations: ${formAnalysis.inputsWithoutLabels.map(f => f.label).join(', ')}`,
         wcagCriterion: '3.3.2', wcagName: 'Labels or Instructions',
         severity: 'critical', category: 'understandable',
         recommendation: 'Associate every form input with a <label> element or use aria-label/aria-labelledby.',
+        element: formAnalysis.inputsWithoutLabels[0]?.selector,
+        elementHtml: formAnalysis.inputsWithoutLabels.map(f => f.html).join('\n'),
       }));
     }
 
     // Step: Fieldsets
-    if (formAnalysis.missingFieldsets) {
+    if (formAnalysis.missingFieldsetForms.length > 0) {
       steps.push({
         name: 'Form Group Structure',
         action: 'Check radio/checkbox grouping',
@@ -656,6 +694,8 @@ async function testFormInteraction(context: BrowserContext, url: string): Promis
         wcagCriterion: '1.3.1', wcagName: 'Info and Relationships',
         severity: 'high', category: 'perceivable',
         recommendation: 'Wrap related radio buttons/checkboxes in <fieldset> with a descriptive <legend>.',
+        element: formAnalysis.missingFieldsetForms[0]?.selector,
+        elementHtml: formAnalysis.missingFieldsetForms[0]?.html,
       }));
     }
 
@@ -669,10 +709,12 @@ async function testFormInteraction(context: BrowserContext, url: string): Promis
       });
       issues.push(createJourneyIssue(url, {
         title: 'Missing autocomplete attributes on common fields',
-        description: `Fields (${formAnalysis.inputsWithoutAutocomplete.join(', ')}) should have autocomplete attributes for assistive technology.`,
+        description: `Fields (${formAnalysis.inputsWithoutAutocomplete.map(f => f.name).join(', ')}) should have autocomplete attributes for assistive technology.`,
         wcagCriterion: '1.3.5', wcagName: 'Identify Input Purpose',
         severity: 'medium', category: 'perceivable',
         recommendation: 'Add autocomplete attributes (e.g., autocomplete="email", autocomplete="current-password").',
+        element: formAnalysis.inputsWithoutAutocomplete[0]?.selector,
+        elementHtml: formAnalysis.inputsWithoutAutocomplete.map(f => f.html).join('\n'),
       }));
     }
 
@@ -708,9 +750,15 @@ async function testNavigationFlow(context: BrowserContext, pages: PageData[]): P
       const focusState = await page.evaluate(() => {
         const activeEl = document.activeElement;
         const isBodyOrNull = !activeEl || activeEl === document.body || activeEl === document.documentElement;
+        const id = activeEl?.getAttribute('id');
+        const cls = activeEl?.getAttribute('class');
+        const tag = activeEl?.tagName.toLowerCase() || 'body';
+        const selector = id ? `#${id}` : (cls ? `${tag}.${cls.trim().split(/\s+/)[0]}` : tag);
         return {
           focusOnBody: isBodyOrNull,
-          activeElement: activeEl?.tagName || 'none'
+          activeElement: activeEl?.tagName || 'none',
+          selector,
+          html: activeEl ? activeEl.outerHTML.substring(0, 150) : '',
         };
       });
 
@@ -728,6 +776,8 @@ async function testNavigationFlow(context: BrowserContext, pages: PageData[]): P
           wcagCriterion: '2.4.3', wcagName: 'Focus Order',
           severity: 'medium', category: 'operable',
           recommendation: 'Ensure focus is managed appropriately after navigation. For SPAs, programmatically set focus to the main heading or content area.',
+          element: focusState.selector,
+          elementHtml: focusState.html,
         }));
       }
     }
@@ -766,12 +816,22 @@ async function testErrorStates(context: BrowserContext, url: string): Promise<Jo
         hasAriaInvalid: false,
         hasAriaDescribedby: false,
         hasErrorRole: false,
+        errorSelector: '',
+        errorHtml: '',
       };
 
       // Check for error containers
       const errorElements = document.querySelectorAll('.error, .error-message, [role="alert"], .invalid-feedback, .form-error, .field-error');
       results.hasErrorContainer = errorElements.length > 0;
       results.hasErrorRole = !!document.querySelector('[role="alert"]');
+      if (errorElements.length > 0) {
+        const first = errorElements[0];
+        const id = first.getAttribute('id');
+        const cls = first.getAttribute('class');
+        const tag = first.tagName.toLowerCase();
+        results.errorSelector = id ? `#${id}` : (cls ? `${tag}.${cls.trim().split(/\s+/)[0]}` : tag);
+        results.errorHtml = first.outerHTML.substring(0, 150);
+      }
 
       forms.forEach(form => {
         const inputs = form.querySelectorAll('input, select, textarea');
@@ -801,6 +861,8 @@ async function testErrorStates(context: BrowserContext, url: string): Promise<Jo
         wcagCriterion: '4.1.3', wcagName: 'Status Messages',
         severity: 'high', category: 'robust',
         recommendation: 'Add role="alert" or aria-live="assertive" to error message containers.',
+        element: errorHandling.errorSelector,
+        elementHtml: errorHandling.errorHtml,
       }));
     }
 
@@ -826,13 +888,17 @@ function createJourneyIssue(pageUrl: string, opts: {
   severity: 'critical' | 'high' | 'medium' | 'low';
   category: AccessibilityIssue['category'];
   recommendation: string; codeFix?: string;
+  /** Real CSS selector to the element that triggered this issue, when one could be resolved */
+  element?: string;
+  elementHtml?: string;
 }): AccessibilityIssue {
   return {
     id: uuidv4(),
     testId: `JRN-${opts.wcagCriterion.replace(/\./g, '')}`,
     title: opts.title,
     description: opts.description,
-    element: 'page-level',
+    element: opts.element || 'body',
+    elementHtml: opts.elementHtml,
     pageUrl,
     wcagCriterion: opts.wcagCriterion,
     wcagName: opts.wcagName,

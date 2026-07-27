@@ -926,12 +926,17 @@ export async function runDarkPatternAudit(
     );
   }
 
-  // Deduplicate: remove findings with identical ruleId + pageUrl + evidence summary
-  // (prevents social-pressure and misdirection rules from inflating counts when same
-  // text element is matched multiple times across scan phases)
+  // Deduplicate: remove findings that are true re-detections of the SAME element
+  // (same ruleId + pageUrl + element selector, or — when no selector is available —
+  // same evidence summary) across overlapping scan phases. Keying on `element` first
+  // (rather than evidence summary alone) prevents genuinely different elements that
+  // happen to share generic/templated evidence text from being incorrectly collapsed
+  // into a single finding, which would otherwise destroy that instance's own
+  // page/selector/screenshot location data.
   const seen = new Set<string>();
   const dedupedFindings = findings.filter((f) => {
-    const key = `${f.ruleId}::${f.pageUrl}::${(f.evidence?.summary || "").slice(0, 120)}`;
+    const elementKey = f.element || (f.evidence?.summary || "").slice(0, 120);
+    const key = `${f.ruleId}::${f.pageUrl}::${elementKey}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -3779,6 +3784,22 @@ const CATEGORY_AUDIENCE_FALLBACK: Record<
   },
 };
 
+/** Derives a real CSS selector (id > first class > tag name) from a captured outerHTML snippet. */
+function deriveSelectorFromHtml(html?: string): string {
+  if (!html) return "";
+  const tagMatch = html.match(/^<([a-zA-Z0-9]+)/);
+  if (!tagMatch) return "";
+  const tagName = tagMatch[1].toLowerCase();
+  const idMatch = html.match(/\bid\s*=\s*["']([^"']+)["']/i);
+  if (idMatch) return `#${idMatch[1]}`;
+  const classMatch = html.match(/\bclass\s*=\s*["']([^"']+)["']/i);
+  if (classMatch) {
+    const firstClass = classMatch[1].trim().split(/\s+/)[0];
+    if (firstClass) return `${tagName}.${firstClass}`;
+  }
+  return tagName;
+}
+
 function makeFinding(
   ruleId: string,
   pageUrl: string,
@@ -3828,7 +3849,7 @@ function makeFinding(
     principle: rule.principle,
     title: rule.title,
     description: rule.description,
-    element: "",
+    element: deriveSelectorFromHtml(elementHtml),
     elementHtml: elementHtml || undefined,
     pageUrl,
     severity: rule.severity,

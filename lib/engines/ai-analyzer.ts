@@ -156,14 +156,14 @@ Return at most 8 issues not already in the existing list. Return {"issues": []} 
       description: ai.description
         + (ai.whatISee ? ` [Observed: ${ai.whatISee}]` : '')
         + (ai.uxCategory ? ` [UX: ${ai.uxCategory}]` : ''),
-      element: ai.element,
+      element: ai.element || 'body',
       pageUrl: input.pageUrl,
       wcagCriterion: ai.wcagCriterion || 'general',
       wcagName: ai.wcagName || 'AI-Detected Issue',
       wcagLevel: getLevel(ai.wcagCriterion),
       severity: ai.severity || 'medium',
       impact: `AI-detected: affects users relying on assistive technologies`,
-      recommendation: ai.recommendation,
+      recommendation: ai.recommendation || 'Review this issue against the relevant WCAG success criterion and apply an appropriate fix.',
       codeFix: ai.codeFix,
       category: getCat(ai.wcagCriterion),
       source: 'ai-analysis' as const,

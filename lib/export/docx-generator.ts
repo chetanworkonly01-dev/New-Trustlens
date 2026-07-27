@@ -19,9 +19,11 @@ import {
   LevelFormat,
   INumberingOptions,
   ImageRun,
+  TableLayoutType,
 } from "docx";
 import { AuditResult, AccessibilityIssue } from "../types/audit";
 import type { DarkPatternFinding } from "../types/darkpattern";
+import { getReportDisplayInfo, formatPageCount } from "./report-helpers";
 
 // ── KPMG Brand Palette ────────────────────────────────────────
 const K = {
@@ -82,6 +84,94 @@ function compLabel(l: string) {
       "aaa-compliant": "WCAG AAA Compliant",
     }[l] || l
   );
+}
+
+/** Heuristic: does this "element" value look like a real CSS selector, or a prose fallback label? */
+function looksLikeSelectorDocx(s: string): boolean {
+  if (!s) return false;
+  if (s.includes("/")) return false; // e.g. "timeout/redirect"
+  const withoutCombinators = s.replace(/\s*>\s*/g, ">");
+  if (/\s/.test(withoutCombinators)) return false;
+  return true;
+}
+
+/** Mirrors the DevTools command generator used on the live report page's IssueCard. */
+function buildDevToolsCommand(iss: AccessibilityIssue): string | null {
+  if (iss.xpath) return `$x('${iss.xpath.replace(/'/g, "\\'")}')[0]`;
+  if (looksLikeSelectorDocx(iss.element)) {
+    return `document.querySelector('${iss.element.replace(/'/g, "\\'")}')`;
+  }
+  return null;
+}
+
+/** Reads pixel dimensions from a PNG (IHDR chunk) or JPEG (SOFx marker) buffer, or null if unreadable. */
+function getImageDimensions(
+  buf: Buffer,
+  format: "png" | "jpg",
+): { width: number; height: number } | null {
+  try {
+    if (format === "png") {
+      if (buf.length < 24 || buf[0] !== 0x89 || buf[1] !== 0x50) return null;
+      return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+    }
+    // JPEG: scan markers for the first SOFx (start-of-frame) segment
+    if (buf.length < 4 || buf[0] !== 0xff || buf[1] !== 0xd8) return null;
+    let offset = 2;
+    while (offset + 4 <= buf.length) {
+      if (buf[offset] !== 0xff) {
+        offset++;
+        continue;
+      }
+      const marker = buf[offset + 1];
+      if (marker === 0xd8 || marker === 0xd9) {
+        offset += 2;
+        continue;
+      }
+      if (marker >= 0xd0 && marker <= 0xd7) {
+        offset += 2;
+        continue;
+      }
+      const segLen = buf.readUInt16BE(offset + 2);
+      const isSof =
+        marker >= 0xc0 &&
+        marker <= 0xcf &&
+        marker !== 0xc4 &&
+        marker !== 0xc8 &&
+        marker !== 0xcc;
+      if (isSof) {
+        if (offset + 9 > buf.length) return null;
+        return {
+          height: buf.readUInt16BE(offset + 5),
+          width: buf.readUInt16BE(offset + 7),
+        };
+      }
+      offset += 2 + segLen;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fits image dimensions into a maxW×maxH box while preserving aspect ratio.
+ * Small source images may be scaled up (capped at 4x) so evidence stays legible;
+ * without this, a fixed box (the previous behavior) stretched extreme aspect
+ * ratios — e.g. a 1264×19 element screenshot into 500×120 — into an unrecognizable smear.
+ */
+function fitImageBox(
+  dims: { width: number; height: number } | null,
+  maxW: number,
+  maxH: number,
+): { width: number; height: number } {
+  if (!dims || dims.width <= 0 || dims.height <= 0) {
+    return { width: maxW, height: Math.round(maxW * 0.24) };
+  }
+  const scale = Math.min(maxW / dims.width, maxH / dims.height, 4);
+  return {
+    width: Math.max(20, Math.round(dims.width * scale)),
+    height: Math.max(10, Math.round(dims.height * scale)),
+  };
 }
 
 // Derive team from issue (mirrors report page logic)
@@ -315,24 +405,12 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
   });
   const projectName = config.url || "PDF Document";
 
-  // ── Pillar-aware title ────────────────────────────────────────
+  // ── Pillar-aware title/score/badge ──────────────────────────
+  // Derived from the pillars actually selected for this audit — never a generic bucket name.
+  const displayInfo = getReportDisplayInfo(audit);
   const pillars =
     ((config as any).enabledPillars as string[] | undefined) || [];
-  const reportTitle =
-    pillars.length === 0 ||
-    (pillars.includes("accessibility") && pillars.length === 1)
-      ? "Accessibility Audit"
-      : pillars.length === 1
-        ? (
-            {
-              darkpatterns: "Dark Pattern Audit",
-              performance: "Performance Audit",
-              privacy: "Privacy Compliance Audit",
-            } as Record<string, string>
-          )[pillars[0]] || "Digital Trust Audit"
-        : pillars.length === 4
-          ? "TrustLens 4-Pillar Audit"
-          : "TrustLens Multi-Pillar Audit";
+  const reportTitle = displayInfo.reportTitle;
   const footerText = `Confidential  |  KPMG ${reportTitle}  |  Page `;
   const isA11y = pillars.length === 0 || pillars.includes("accessibility");
   const isDP = pillars.includes("darkpatterns");
@@ -658,14 +736,16 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                     width: 40,
                     bg: K.offWhite,
                   }),
-                  cell(String(audit.pages.length), { width: 60 }),
+                  cell(
+                    perfResult && perfResult.targetedPagesAudited
+                      ? formatPageCount(perfResult)
+                      : String(audit.pages.length),
+                    { width: 60 },
+                  ),
                 ],
               }),
               (() => {
-                const displayScore =
-                  perfOnly && perfResult
-                    ? perfResult.overallScore
-                    : score.overall;
+                const displayScore = displayInfo.score;
                 const scoreColor =
                   displayScore >= 75
                     ? K.teal
@@ -674,7 +754,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                       : K.critical;
                 return new TableRow({
                   children: [
-                    cell("Score", {
+                    cell(displayInfo.scoreLabel, {
                       bold: true,
                       color: K.navy,
                       width: 40,
@@ -688,31 +768,22 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                   ],
                 });
               })(),
-              (() => {
-                const displayCompliance =
-                  perfOnly && perfResult
-                    ? perfGradeLabel(perfResult.overallScore)
-                    : compLabel(score.complianceLevel);
-                const compLabel2 = perfOnly
-                  ? "Performance Grade"
-                  : "Compliance";
-                return new TableRow({
-                  children: [
-                    cell(compLabel2, {
-                      bold: true,
-                      color: K.navy,
-                      width: 40,
-                      bg: K.offWhite,
-                    }),
-                    cell(displayCompliance, { width: 60 }),
-                  ],
-                });
-              })(),
+              new TableRow({
+                children: [
+                  cell("Status", {
+                    bold: true,
+                    color: K.navy,
+                    width: 40,
+                    bg: K.offWhite,
+                  }),
+                  cell(displayInfo.statusLabel, { width: 60 }),
+                ],
+              }),
               (() => {
                 const displayIssues =
                   perfOnly && perfResult
                     ? String(perfResult.totalResourceIssues ?? 0)
-                    : String(score.totalIssues);
+                    : `${score.uniqueIssues} unique (${score.totalIssues} instances)`;
                 const issueLabel = perfOnly
                   ? "Resource Issues"
                   : "Total Issues";
@@ -752,7 +823,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
           h1("1. Executive Summary"),
           ...(
             report.executiveSummary ||
-            `This KPMG ${reportTitle} evaluated ${projectName}${isA11y ? ` against ${standard} Level ${testedLevel} guidelines` : ""}. The overall score is ${score.overall}/100 (${compLabel(score.complianceLevel)}). ${score.totalIssues} issue(s) were identified.`
+            `This KPMG ${reportTitle} evaluated ${projectName}${isA11y ? ` against ${standard} Level ${testedLevel} guidelines` : ""}. The overall score is ${displayInfo.score}/100 (${displayInfo.statusLabel}). ${score.uniqueIssues} unique issue(s) were identified (${score.totalIssues} total instances).`
           )
             .split("\n\n")
             .filter((s: string) => s.trim())
@@ -777,6 +848,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
               const total = Object.values(bySev).reduce((a, b) => a + b, 0);
               return new Table({
                 width: { size: 100, type: WidthType.PERCENTAGE },
+                layout: TableLayoutType.FIXED,
                 borders: TABLE_BORDERS,
                 rows: [
                   new TableRow({
@@ -882,12 +954,18 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
               []) as Array<{ severity: string }>;
             const pvF = ((audit as any).pillarResults?.privacy?.findings ??
               []) as Array<{ severity: string }>;
-            for (const f of [...issues, ...dpF, ...pvF]) {
+            const perfIssues = (
+              ((audit as any).pillarResults?.performance?.pages ?? []) as Array<{
+                resourceIssues?: Array<{ severity: string }>;
+              }>
+            ).flatMap((p) => p.resourceIssues ?? []);
+            for (const f of [...issues, ...dpF, ...pvF, ...perfIssues]) {
               if (f.severity in aggBySev) aggBySev[f.severity]++;
             }
             const aggTotal = Object.values(aggBySev).reduce((a, b) => a + b, 0);
             return new Table({
               width: { size: 100, type: WidthType.PERCENTAGE },
+              layout: TableLayoutType.FIXED,
               borders: TABLE_BORDERS,
               rows: [
                 new TableRow({
@@ -988,6 +1066,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                 h2("1.2 Category Scores (WCAG Principles)"),
                 new Table({
                   width: { size: 100, type: WidthType.PERCENTAGE },
+                  layout: TableLayoutType.FIXED,
                   borders: TABLE_BORDERS,
                   rows: [
                     new TableRow({
@@ -1070,6 +1149,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                     };
                     return new Table({
                       width: { size: 100, type: WidthType.PERCENTAGE },
+                      layout: TableLayoutType.FIXED,
                       borders: TABLE_BORDERS,
                       rows: [
                         new TableRow({
@@ -1190,6 +1270,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                   h2(`1.2 Pillar Score Summary`),
                   new Table({
                     width: { size: 100, type: WidthType.PERCENTAGE },
+                    layout: TableLayoutType.FIXED,
                     borders: TABLE_BORDERS,
                     rows: [
                       new TableRow({
@@ -1203,8 +1284,23 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                         ),
                       }),
                       new TableRow({
-                        children: pillars.map(() => {
-                          const v = score.overall;
+                        children: pillars.map((p) => {
+                          const v =
+                            (audit as any).trustScore?.pillarScores?.[p]
+                              ?.score ??
+                            (p === "accessibility"
+                              ? score.overall
+                              : p === "darkpatterns"
+                                ? (audit as any).pillarResults?.darkpatterns
+                                    ?.ethicsScore
+                                : p === "performance"
+                                  ? (audit as any).pillarResults?.performance
+                                      ?.overallScore
+                                  : p === "privacy"
+                                    ? (audit as any).pillarResults?.privacy
+                                        ?.overallScore
+                                    : 0) ??
+                            0;
                           const col =
                             v >= 75 ? K.teal : v >= 50 ? K.medium : K.critical;
                           return cell(String(v) + "/100", {
@@ -1234,6 +1330,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                 // Summary table — pillar-aware columns
                 new Table({
                   width: { size: 100, type: WidthType.PERCENTAGE },
+                  layout: TableLayoutType.FIXED,
                   borders: TABLE_BORDERS,
                   rows: [
                     new TableRow({
@@ -1333,14 +1430,67 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                   ],
                 }),
 
-                // Detail blocks
+                // Detail blocks — grouped by wcagCriterion::title so that a single
+                // reused component (identical `element` across every instance)
+                // renders ONE consolidated "Component Fix" card instead of N
+                // near-duplicate cards; genuinely distinct elements each keep
+                // their own full card with independent location evidence.
                 sp(200),
-                ...issues.flatMap((iss, idx) => {
+                ...(() => {
+                  const groupMap = new Map<string, AccessibilityIssue[]>();
+                  for (const iss of issues) {
+                    const key = `${iss.wcagCriterion}::${iss.title}`;
+                    if (!groupMap.has(key)) groupMap.set(key, []);
+                    groupMap.get(key)!.push(iss);
+                  }
+                  const groups = Array.from(groupMap.values());
+                  let cardCount = 0;
+                  return groups.flatMap((group) => {
+                    const distinctElements = new Set(
+                      group.map((i) => i.element),
+                    ).size;
+                    const isComponentFix =
+                      distinctElements === 1 && group.length > 1;
+                    const affectedPages = Array.from(
+                      new Set(group.map((i) => i.pageUrl)),
+                    );
+                    const toRender = isComponentFix ? [group[0]] : group;
+                    return toRender.flatMap((iss) => {
+                  const idx = cardCount++;
                   const acceptance = deriveAcceptance(iss);
                   const team = deriveTeam(iss);
                   const parts: (Paragraph | Table)[] = [
                     divider(),
                     h3(`#${String(idx + 1).padStart(3, "0")} — ${iss.title}`),
+                    ...(isComponentFix
+                      ? [
+                          new Paragraph({
+                            spacing: { after: 100 },
+                            shading: {
+                              type: ShadingType.SOLID,
+                              color: "E8F9F4",
+                              fill: "E8F9F4",
+                            },
+                            border: {
+                              left: {
+                                style: BorderStyle.THICK,
+                                size: 6,
+                                color: K.teal,
+                              },
+                            },
+                            children: [
+                              new TextRun({
+                                text: `  COMPONENT FIX — this is the same reused element on ${affectedPages.length} page(s) (${group.length} instance${group.length !== 1 ? "s" : ""} total). Fixing it once at the component/design-system level resolves every instance.`,
+                                bold: true,
+                                italics: true,
+                                font: "Calibri",
+                                size: 18,
+                                color: "047856",
+                              }),
+                            ],
+                          }),
+                        ]
+                      : []),
                     new Paragraph({
                       spacing: { after: 120 },
                       children: [
@@ -1421,23 +1571,119 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                       ],
                     }),
                     new Paragraph({
-                      spacing: { after: 60 },
+                      spacing: { after: 50 },
                       children: [
                         new TextRun({
-                          text: "Element Selector: ",
+                          text: "Developer Location",
+                          bold: true,
+                          font: "Calibri",
+                          size: 21,
+                          color: K.nearBlack,
+                        }),
+                      ],
+                    }),
+                    new Paragraph({
+                      spacing: { after: 40 },
+                      children: [
+                        new TextRun({
+                          text: "🎯 CSS Selector: ",
                           bold: true,
                           font: "Calibri",
                           size: 19,
                           color: K.navy,
                         }),
                         new TextRun({
-                          text: iss.element.substring(0, 120),
+                          text: iss.element,
                           font: "Consolas",
                           size: 17,
                           color: K.blue,
                         }),
                       ],
                     }),
+                    ...(iss.xpath
+                      ? [
+                          new Paragraph({
+                            spacing: { after: 40 },
+                            children: [
+                              new TextRun({
+                                text: "📍 XPath: ",
+                                bold: true,
+                                font: "Calibri",
+                                size: 19,
+                                color: K.navy,
+                              }),
+                              new TextRun({
+                                text: iss.xpath,
+                                font: "Consolas",
+                                size: 17,
+                                color: K.blue,
+                              }),
+                            ],
+                          }),
+                        ]
+                      : []),
+                    ...(() => {
+                      const cmd = buildDevToolsCommand(iss);
+                      return cmd
+                        ? [
+                            new Paragraph({
+                              spacing: { after: 60 },
+                              shading: {
+                                type: ShadingType.SOLID,
+                                color: "010B1A",
+                                fill: "010B1A",
+                              },
+                              children: [
+                                new TextRun({
+                                  text: `  🔧 DevTools Console: ${cmd}`,
+                                  font: "Consolas",
+                                  size: 17,
+                                  color: "86EFAC",
+                                }),
+                              ],
+                            }),
+                          ]
+                        : [];
+                    })(),
+                    ...(iss.elementScreenshot
+                      ? (() => {
+                          try {
+                            const imgBuf = Buffer.from(
+                              iss.elementScreenshot,
+                              "base64",
+                            );
+                            const dims = getImageDimensions(imgBuf, "png");
+                            const box = fitImageBox(dims, 500, 220);
+                            return [
+                              new Paragraph({
+                                spacing: { before: 60, after: 40 },
+                                children: [
+                                  new TextRun({
+                                    text: "📸 Element Screenshot (captured during audit)",
+                                    bold: true,
+                                    italics: true,
+                                    font: "Calibri",
+                                    size: 18,
+                                    color: K.midGrey,
+                                  }),
+                                ],
+                              }),
+                              new Paragraph({
+                                spacing: { after: 100 },
+                                children: [
+                                  new ImageRun({
+                                    data: imgBuf,
+                                    transformation: box,
+                                    type: "png",
+                                  }),
+                                ],
+                              }),
+                            ];
+                          } catch {
+                            return [];
+                          }
+                        })()
+                      : []),
                     sp(60),
                     new Paragraph({
                       spacing: { after: 50 },
@@ -1533,7 +1779,11 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                         }),
                       ],
                     }),
-                    body(iss.recommendation, "047856"),
+                    body(
+                      iss.recommendation ||
+                        "Recommendation not available — review the issue description and applicable WCAG criterion.",
+                      "047856",
+                    ),
                     sp(60),
                     iss.codeFix
                       ? new Paragraph({
@@ -1589,7 +1839,9 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                     ...acceptance.map((a) => bullet(`-  ${a}`)),
                   ];
                   return parts;
-                }),
+                    });
+                  });
+                })(),
 
                 // ─────────────────────────────────────────────────────
                 // SECTION 3: COMPONENT-LEVEL FINDINGS
@@ -1602,6 +1854,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                 sp(),
                 new Table({
                   width: { size: 100, type: WidthType.PERCENTAGE },
+                  layout: TableLayoutType.FIXED,
                   borders: TABLE_BORDERS,
                   rows: [
                     new TableRow({
@@ -1739,6 +1992,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                   sp(40),
                   new Table({
                     width: { size: 100, type: WidthType.PERCENTAGE },
+                    layout: TableLayoutType.FIXED,
                     borders: TABLE_BORDERS,
                     rows: [
                       new TableRow({
@@ -1872,6 +2126,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                     ? body("No issues in this category.", K.midGrey)
                     : new Table({
                         width: { size: 100, type: WidthType.PERCENTAGE },
+                        layout: TableLayoutType.FIXED,
                         borders: TABLE_BORDERS,
                         rows: grp.map(
                           (iss, i) =>
@@ -1914,6 +2169,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
 
                 new Table({
                   width: { size: 100, type: WidthType.PERCENTAGE },
+                  layout: TableLayoutType.FIXED,
                   borders: TABLE_BORDERS,
                   rows: [
                     new TableRow({
@@ -2014,6 +2270,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
               // Summary table
               new Table({
                 width: { size: 100, type: WidthType.PERCENTAGE },
+                layout: TableLayoutType.FIXED,
                 borders: TABLE_BORDERS,
                 rows: [
                   new TableRow({
@@ -2029,19 +2286,25 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                         bold: true,
                         bg: purple,
                         color: K.white,
-                        width: 28,
+                        width: 21,
+                      }),
+                      cell("Location", {
+                        bold: true,
+                        bg: purple,
+                        color: K.white,
+                        width: 17,
                       }),
                       cell("Category", {
                         bold: true,
                         bg: purple,
                         color: K.white,
-                        width: 18,
+                        width: 14,
                       }),
                       cell("CCPA", {
                         bold: true,
                         bg: purple,
                         color: K.white,
-                        width: 16,
+                        width: 14,
                       }),
                       cell("Severity", {
                         bold: true,
@@ -2054,13 +2317,13 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                         bold: true,
                         bg: purple,
                         color: K.white,
-                        width: 10,
+                        width: 8,
                       }),
                       cell("Priority", {
                         bold: true,
                         bg: purple,
                         color: K.white,
-                        width: 10,
+                        width: 8,
                         align: AlignmentType.CENTER,
                       }),
                     ],
@@ -2079,6 +2342,15 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                             bg: idx % 2 === 0 ? K.offWhite : K.white,
                             size: 17,
                           }),
+                          cell(
+                            f.element ||
+                              f.pageUrl.replace(/^https?:\/\/[^/]+/, "") ||
+                              "/",
+                            {
+                              bg: idx % 2 === 0 ? K.offWhite : K.white,
+                              size: 15,
+                            },
+                          ),
                           cell(f.category.replace(/-/g, " "), {
                             bg: idx % 2 === 0 ? K.offWhite : K.white,
                             size: 17,
@@ -2201,6 +2473,30 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                             }),
                           ]
                         : []),
+                    ],
+                  }),
+                  new Paragraph({
+                    spacing: { after: 100 },
+                    children: [
+                      new TextRun({
+                        text: "Location: ",
+                        bold: true,
+                        font: "Calibri",
+                        size: 20,
+                        color: K.navy,
+                      }),
+                      new TextRun({
+                        text: `${f.pageUrl.replace(/^https?:\/\/[^/]+/, "") || "/"}  →  `,
+                        font: "Calibri",
+                        size: 18,
+                        color: K.darkGrey,
+                      }),
+                      new TextRun({
+                        text: f.element || "(selector not resolved)",
+                        font: "Consolas",
+                        size: 18,
+                        color: K.lightBlue,
+                      }),
                     ],
                   }),
                   new Paragraph({
@@ -2383,13 +2679,16 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                     }),
                   );
                   try {
+                    const imgBuf = Buffer.from(base64Data, "base64");
+                    const dims = getImageDimensions(imgBuf, "jpg");
+                    const box = fitImageBox(dims, 500, 250);
                     parts.push(
                       new Paragraph({
                         spacing: { after: 160 },
                         children: [
                           new ImageRun({
-                            data: Buffer.from(base64Data, "base64"),
-                            transformation: { width: 500, height: 250 },
+                            data: imgBuf,
+                            transformation: box,
                             type: "jpg",
                           }),
                         ],
@@ -2429,12 +2728,13 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
             return [
               h1(`${perfSectionNum}. Performance Findings`),
               body(
-                `Core Web Vitals and resource analysis across ${perfPages.length} page(s). Overall performance score: ${perfResult.overallScore ?? "—"}/100.`,
+                `Core Web Vitals and resource analysis across ${formatPageCount(perfResult)}. Overall performance score: ${perfResult.overallScore ?? "—"}/100.`,
                 K.darkGrey,
               ),
               sp(),
               new Table({
                 width: { size: 100, type: WidthType.PERCENTAGE },
+                layout: TableLayoutType.FIXED,
                 borders: TABLE_BORDERS,
                 rows: [
                   new TableRow({
@@ -2545,20 +2845,249 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                 ],
               }),
               sp(120),
+
+              // ── AI Executive Summary ────────────────────────────
+              ...(() => {
+                const aiReport = perfResult.aiReport;
+                if (!aiReport?.executiveSummary) return [];
+                return [
+                  h2(`${perfSectionNum}.1 Executive Summary (AI-Generated)`),
+                  body(aiReport.executiveSummary, K.darkGrey),
+                  sp(),
+                  h2(`${perfSectionNum}.2 Business Impact Analysis`),
+                  body(aiReport.businessImpactNarrative || '', K.darkGrey),
+                  ...(aiReport.overallROI ? [sp(80), body(`Estimated ROI: ${aiReport.overallROI}`, K.teal)] : []),
+                  sp(),
+                  h2(`${perfSectionNum}.3 Developer Summary`),
+                  body(aiReport.developerSummary || '', K.darkGrey),
+                  sp(80),
+                ];
+              })(),
+
+              // ── UX Performance ─────────────────────────────────
+              ...(() => {
+                const uxPerf = perfResult.uxPerformance;
+                if (!uxPerf) return [];
+                return [
+                  h2(`${perfSectionNum}.${perfResult.aiReport ? 4 : 1} UX Performance`),
+                  body(`Overall UX Score: ${uxPerf.score}/100 — Loading: ${uxPerf.initialLoadExperience?.score ?? '?'}/100 · Stability: ${uxPerf.visualStability?.score ?? '?'}/100 · Responsiveness: ${uxPerf.responsiveness?.score ?? '?'}/100 · Animation: ${uxPerf.animationPerformance?.score ?? '?'}/100`, K.darkGrey),
+                  sp(),
+                  new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    layout: TableLayoutType.FIXED,
+                    borders: TABLE_BORDERS,
+                    rows: [
+                      new TableRow({ children: [
+                        cell('UX Feature', { bold: true, bg: '006E51', color: K.white, width: 50 }),
+                        cell('Status', { bold: true, bg: '006E51', color: K.white, width: 25 }),
+                        cell('Detail', { bold: true, bg: '006E51', color: K.white, width: 25 }),
+                      ]}),
+                      new TableRow({ children: [cell('Loading Indicator', { bg: K.offWhite }), cell(uxPerf.initialLoadExperience?.hasLoadingIndicator ? 'PASS ✓' : 'FAIL ✗', { color: uxPerf.initialLoadExperience?.hasLoadingIndicator ? K.pass : K.critical, bold: true }), cell(uxPerf.initialLoadExperience?.hasLoadingIndicator ? 'Spinner / progress bar detected' : 'Not found — users see blank content', { size: 17 })] }),
+                      new TableRow({ children: [cell('Skeleton Screens', {}), cell(uxPerf.initialLoadExperience?.hasSkeletonScreens ? 'PASS ✓' : 'FAIL ✗', { color: uxPerf.initialLoadExperience?.hasSkeletonScreens ? K.pass : K.critical, bold: true }), cell(uxPerf.initialLoadExperience?.hasSkeletonScreens ? 'Skeleton placeholders detected' : 'Not found — add skeleton loading', { size: 17 })] }),
+                      new TableRow({ children: [cell('Scroll Jank-free', { bg: K.offWhite }), cell(uxPerf.animationPerformance?.scrollJank === false ? 'PASS ✓' : 'FAIL ✗', { color: uxPerf.animationPerformance?.scrollJank === false ? K.pass : K.critical, bold: true }), cell(uxPerf.animationPerformance?.animationFps != null ? `${uxPerf.animationPerformance.animationFps} FPS measured` : '—', { size: 17 })] }),
+                    ],
+                  }),
+                  sp(80),
+                  ...(uxPerf.painPoints?.length > 0 ? [
+                    h3('UX Pain Points'),
+                    ...uxPerf.painPoints.slice(0, 5).map((pp: any) => bullet(`[${(pp.severity || '').toUpperCase()}] ${pp.description} — ${pp.userImpact}`)),
+                    sp(80),
+                  ] : []),
+                ];
+              })(),
+
+              // ── Third-Party Impact ─────────────────────────────
+              ...(() => {
+                const thirdParty: any[] = perfResult.thirdPartyImpact || [];
+                if (thirdParty.length === 0) return [];
+                return [
+                  h2(`Third-Party Script Impact`),
+                  body(`${thirdParty.length} third-party resource(s) detected. ${thirdParty.filter((t: any) => t.blocking).length} blocking the main thread.`, K.darkGrey),
+                  sp(),
+                  new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    layout: TableLayoutType.FIXED,
+                    borders: TABLE_BORDERS,
+                    rows: [
+                      new TableRow({ children: [
+                        cell('Script / Service', { bold: true, bg: K.navy, color: K.white, width: 30 }),
+                        cell('Category', { bold: true, bg: K.navy, color: K.white, width: 20 }),
+                        cell('Load Time', { bold: true, bg: K.navy, color: K.white, width: 15 }),
+                        cell('Blocking', { bold: true, bg: K.navy, color: K.white, width: 15 }),
+                        cell('Action', { bold: true, bg: K.navy, color: K.white, width: 20 }),
+                      ]}),
+                      ...thirdParty.slice(0, 15).map((t: any, i: number) => new TableRow({ children: [
+                        cell(t.label || t.domain || '—', { bg: i % 2 === 0 ? K.offWhite : K.white }),
+                        cell(t.category || '—', { bg: i % 2 === 0 ? K.offWhite : K.white, size: 17 }),
+                        cell(t.loadTimeMs != null ? `${t.loadTimeMs}ms` : '—', { bg: i % 2 === 0 ? K.offWhite : K.white, size: 17, color: (t.loadTimeMs ?? 0) > 500 ? K.high : K.darkGrey }),
+                        cell(t.blocking ? 'Yes ⚠' : 'No', { bg: i % 2 === 0 ? K.offWhite : K.white, bold: t.blocking, color: t.blocking ? K.critical : K.pass }),
+                        cell((t.recommendation || '—').toUpperCase(), { bg: i % 2 === 0 ? K.offWhite : K.white, size: 17 }),
+                      ]})),
+                    ],
+                  }),
+                  sp(80),
+                ];
+              })(),
+
+              // ── Technical Architecture ─────────────────────────
+              ...(() => {
+                const arch = perfResult.architecture;
+                if (!arch) return [];
+                return [
+                  h2('Technical Architecture'),
+                  new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    layout: TableLayoutType.FIXED,
+                    borders: TABLE_BORDERS,
+                    rows: [
+                      new TableRow({ children: [
+                        cell('Component', { bold: true, bg: K.navy, color: K.white, width: 25 }),
+                        cell('Detected', { bold: true, bg: K.navy, color: K.white, width: 30 }),
+                        cell('Performance Impact', { bold: true, bg: K.navy, color: K.white, width: 45 }),
+                      ]}),
+                      ...[
+                        ['Framework', arch.framework ?? 'Not detected', arch.framework ? 'Modern framework — good' : 'Unable to detect'],
+                        ['CMS', arch.cms ?? 'Not detected', arch.cms ? 'CMS detected — audit plugin overhead' : '—'],
+                        ['CDN', arch.cdn ?? 'No CDN ⚠', arch.cdn ? 'CDN active — reduced global latency' : 'No CDN — deploy static assets to CDN'],
+                        ['HTTP Version', arch.httpVersion ?? 'Unknown', arch.httpVersion === 'HTTP/2' || arch.httpVersion === 'HTTP/3' ? 'Multiplexing enabled' : 'Upgrade to HTTP/2'],
+                        ['Hosting', arch.hostingPlatform ?? 'Unknown', '—'],
+                        ['Service Worker', arch.hasServiceWorker ? 'Active ✓' : 'Not found', arch.hasServiceWorker ? 'Offline caching enabled' : 'Implement for PWA/offline'],
+                        ['Resource Hints', arch.hasResourceHints ? 'Present ✓' : 'Not found', arch.hasResourceHints ? 'Preload/prefetch active' : 'Add preload for critical assets'],
+                      ].map(([comp, val, impact], i) => new TableRow({ children: [
+                        cell(comp, { bg: i % 2 === 0 ? K.offWhite : K.white, bold: true, size: 17 }),
+                        cell(val, { bg: i % 2 === 0 ? K.offWhite : K.white, size: 17 }),
+                        cell(impact, { bg: i % 2 === 0 ? K.offWhite : K.white, size: 17 }),
+                      ]})),
+                    ],
+                  }),
+                  ...(arch.jsLibraries?.length > 0 ? [sp(80), body(`JS Libraries: ${arch.jsLibraries.join(', ')}`, K.darkGrey)] : []),
+                  sp(80),
+                ];
+              })(),
+
+              // ── Technical SEO ──────────────────────────────────
+              ...(() => {
+                const seo = perfResult.seoReadiness;
+                if (!seo) return [];
+                return [
+                  h2('Technical SEO Readiness'),
+                  new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    layout: TableLayoutType.FIXED,
+                    borders: TABLE_BORDERS,
+                    rows: [
+                      new TableRow({ children: [
+                        cell('SEO Check', { bold: true, bg: '006E51', color: K.white, width: 35 }),
+                        cell('Status', { bold: true, bg: '006E51', color: K.white, width: 15 }),
+                        cell('Detail / Recommendation', { bold: true, bg: '006E51', color: K.white, width: 50 }),
+                      ]}),
+                      ...[
+                        ['Meta Title', seo.hasMetaTitle, seo.metaTitleLength ? `${seo.metaTitleLength} chars. Keep 50–60 chars.` : 'Add a unique title tag per page.'],
+                        ['Meta Description', seo.hasMetaDescription, seo.metaDescriptionLength ? `${seo.metaDescriptionLength} chars. Target 120–160.` : 'Add meta description for search snippet.'],
+                        ['Canonical URL', seo.hasCanonical, seo.hasCanonical ? 'Canonical link tag present.' : 'Add <link rel="canonical"> to prevent duplicate content.'],
+                        ['Structured Data', seo.hasStructuredData, seo.hasStructuredData ? 'JSON-LD detected.' : 'Add schema.org structured data for rich search results.'],
+                        ['Open Graph', seo.hasOpenGraph, seo.hasOpenGraph ? 'OG tags present.' : 'Add og:title, og:description, og:image for social sharing.'],
+                        ['robots.txt', seo.hasRobotsTxt === true, seo.hasRobotsTxt ? '/robots.txt accessible.' : 'Create /robots.txt to guide search engine crawlers.'],
+                        ['XML Sitemap', seo.hasSitemap === true, seo.hasSitemap ? '/sitemap.xml accessible.' : 'Create XML sitemap and submit to Google Search Console.'],
+                      ].map(([label, pass, detail], i) => new TableRow({ children: [
+                        cell(label as string, { bg: i % 2 === 0 ? K.offWhite : K.white, bold: true, size: 17 }),
+                        cell(pass ? 'PASS ✓' : 'FAIL ✗', { color: pass ? K.pass : K.critical, bold: true }),
+                        cell(detail as string, { bg: i % 2 === 0 ? K.offWhite : K.white, size: 17 }),
+                      ]})),
+                      ...(seo.brokenLinks.length > 0 ? [new TableRow({ children: [
+                        cell('Broken Links', { bg: K.criticalBg, bold: true }),
+                        cell(`${seo.brokenLinks.length} broken`, { color: K.critical, bold: true }),
+                        cell(seo.brokenLinks.slice(0, 3).join(' | '), { size: 16 }),
+                      ]})] : []),
+                    ],
+                  }),
+                  sp(80),
+                ];
+              })(),
+
+              // ── Enriched Recommendations ───────────────────────
+              sp(120),
               ...(perfResult.recommendations?.length > 0
                 ? [
-                    h2(`${perfSectionNum}.1 Performance Recommendations`),
-                    ...(
-                      perfResult.recommendations as import("../types/performance").RecommendationItem[]
-                    )
-                      .slice(0, 10)
-                      .map((r) =>
-                        bullet(
-                          `[${r.priority}] ${r.title} — ${r.detail} (${r.effort}, ${r.impact} impact)`,
+                    h2(`Performance Recommendations`),
+                    new Table({
+                      width: { size: 100, type: WidthType.PERCENTAGE },
+                      layout: TableLayoutType.FIXED,
+                      borders: TABLE_BORDERS,
+                      rows: [
+                        new TableRow({ children: [
+                          cell('P', { bold: true, bg: '006E51', color: K.white, width: 5, align: AlignmentType.CENTER }),
+                          cell('Title', { bold: true, bg: '006E51', color: K.white, width: 25 }),
+                          cell('Description', { bold: true, bg: '006E51', color: K.white, width: 30 }),
+                          cell('Business Impact', { bold: true, bg: '006E51', color: K.white, width: 25 }),
+                          cell('Effort', { bold: true, bg: '006E51', color: K.white, width: 15 }),
+                        ]}),
+                        ...(perfResult.recommendations as import('../types/performance').RecommendationItem[]).slice(0, 15).map((r, i) =>
+                          new TableRow({ children: [
+                            cell(r.priority, { align: AlignmentType.CENTER, bold: true, bg: r.priority === 'P0' ? K.critical : r.priority === 'P1' ? K.high : r.priority === 'P2' ? K.medium : K.lightBlue, color: K.white }),
+                            cell(r.title, { bg: i % 2 === 0 ? K.offWhite : K.white, bold: true, size: 17 }),
+                            cell(r.businessImpact || r.detail, { bg: i % 2 === 0 ? K.offWhite : K.white, size: 17 }),
+                            cell(r.businessImpact || '—', { bg: i % 2 === 0 ? K.offWhite : K.white, size: 17 }),
+                            cell(r.effort, { bg: i % 2 === 0 ? K.offWhite : K.white, size: 17 }),
+                          ]}),
                         ),
-                      ),
+                      ],
+                    }),
                   ]
                 : []),
+
+              // ── AI-Enriched Recommendations (if AI report exists) ─
+              ...(() => {
+                const aiRecs: any[] = perfResult.aiReport?.recommendations || [];
+                if (aiRecs.length === 0) return [];
+                return [
+                  sp(120),
+                  h2('AI-Enriched Recommendations (All 9 Fields)'),
+                  new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    layout: TableLayoutType.FIXED,
+                    borders: TABLE_BORDERS,
+                    rows: [
+                      new TableRow({ children: [
+                        cell('P', { bold: true, bg: K.navy, color: K.white, width: 5, align: AlignmentType.CENTER }),
+                        cell('Title', { bold: true, bg: K.navy, color: K.white, width: 22 }),
+                        cell('Root Cause', { bold: true, bg: K.navy, color: K.white, width: 20 }),
+                        cell('Business Impact', { bold: true, bg: K.navy, color: K.white, width: 23 }),
+                        cell('Expected Improvement', { bold: true, bg: K.navy, color: K.white, width: 15 }),
+                        cell('ROI', { bold: true, bg: K.navy, color: K.white, width: 15 }),
+                      ]}),
+                      ...aiRecs.slice(0, 10).map((r: any, i: number) => new TableRow({ children: [
+                        cell(r.priority, { align: AlignmentType.CENTER, bold: true, bg: r.priority === 'P0' ? K.critical : r.priority === 'P1' ? K.high : r.priority === 'P2' ? K.medium : K.lightBlue, color: K.white }),
+                        cell(r.title || '—', { bg: i % 2 === 0 ? K.offWhite : K.white, bold: true, size: 17 }),
+                        cell(r.rootCause || '—', { bg: i % 2 === 0 ? K.offWhite : K.white, size: 17 }),
+                        cell(r.businessImpact || '—', { bg: i % 2 === 0 ? K.offWhite : K.white, size: 17 }),
+                        cell(r.expectedImprovement || '—', { bg: i % 2 === 0 ? K.offWhite : K.white, size: 17 }),
+                        cell(r.estimatedROI || '—', { bg: i % 2 === 0 ? K.offWhite : K.white, size: 16 }),
+                      ]})),
+                    ],
+                  }),
+                ];
+              })(),
+
+              // ── Developer Action Plan (AI Tickets) ────────────
+              ...(() => {
+                const tickets: any[] = perfResult.aiReport?.devTickets || [];
+                if (tickets.length === 0) return [];
+                return [
+                  sp(120),
+                  h2('Developer Action Plan — Jira / Azure DevOps Tickets'),
+                  ...tickets.map((t: any, i: number) => [
+                    h3(`[${t.priority}] ${t.title} (${t.storyPoints} pts)`),
+                    body(t.description || '', K.darkGrey),
+                    ...(t.acceptanceCriteria?.length > 0 ? [
+                      body('Acceptance Criteria:', K.navy),
+                      ...t.acceptanceCriteria.map((ac: string) => bullet(ac)),
+                    ] : []),
+                    ...(t.labels?.length > 0 ? [body(`Labels: ${t.labels.join(', ')}`, K.midGrey)] : []),
+                    ...(i < tickets.length - 1 ? [sp(80)] : []),
+                  ]).flat(),
+                ];
+              })(),
             ];
           })(),
 
@@ -2582,6 +3111,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
               sp(),
               new Table({
                 width: { size: 100, type: WidthType.PERCENTAGE },
+                layout: TableLayoutType.FIXED,
                 borders: TABLE_BORDERS,
                 rows: [
                   new TableRow({
@@ -2778,6 +3308,7 @@ export async function generateDocx(audit: AuditResult): Promise<Buffer> {
                     h2("9.2 Trackers Detected"),
                     new Table({
                       width: { size: 100, type: WidthType.PERCENTAGE },
+                      layout: TableLayoutType.FIXED,
                       borders: TABLE_BORDERS,
                       rows: [
                         new TableRow({

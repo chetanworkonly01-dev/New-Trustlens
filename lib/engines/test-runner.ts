@@ -362,6 +362,7 @@ async function testKeyboardNavigation(
         "A",
         "critical",
         "operable",
+        el,
       ),
     );
   }
@@ -450,6 +451,8 @@ async function testFocusVisibility(
             "AA",
             "critical",
             "operable",
+            undefined,
+            focusCheck.selector,
           ),
         );
       }
@@ -1007,6 +1010,8 @@ async function testColorContrast(page: Page, url: string): Promise<TestResult> {
         "AA",
         "high",
         "perceivable",
+        undefined,
+        f.el,
       ),
     );
   }
@@ -1117,6 +1122,7 @@ async function testHeadingStructure(
           "A",
           "high",
           "perceivable",
+          h.html,
         ),
       );
     }
@@ -1216,6 +1222,7 @@ async function testLinkPurpose(page: Page, url: string): Promise<TestResult> {
           "A",
           "high",
           "operable",
+          link.html,
         ),
       );
     }
@@ -1446,6 +1453,22 @@ function buildResult(
   };
 }
 
+/** Derives a real CSS selector from a captured outerHTML snippet (id > first class > tag name). */
+function deriveSelectorFromHtml(html?: string): string {
+  if (!html) return "body";
+  const tagMatch = html.match(/^<([a-zA-Z0-9]+)/);
+  if (!tagMatch) return "body";
+  const tagName = tagMatch[1].toLowerCase();
+  const idMatch = html.match(/\bid\s*=\s*["']([^"']+)["']/i);
+  if (idMatch) return `#${idMatch[1]}`;
+  const classMatch = html.match(/\bclass\s*=\s*["']([^"']+)["']/i);
+  if (classMatch) {
+    const firstClass = classMatch[1].trim().split(/\s+/)[0];
+    if (firstClass) return `${tagName}.${firstClass}`;
+  }
+  return tagName;
+}
+
 function mkIssue(
   url: string,
   testId: string,
@@ -1457,13 +1480,14 @@ function mkIssue(
   sev: "critical" | "high" | "medium" | "low",
   cat: AccessibilityIssue["category"],
   html?: string,
+  elementOverride?: string,
 ): AccessibilityIssue {
   return {
     id: uuidv4(),
     testId,
     title,
     description: desc,
-    element: "page-level",
+    element: elementOverride || deriveSelectorFromHtml(html),
     elementHtml: html,
     pageUrl: url,
     wcagCriterion: wcag,

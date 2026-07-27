@@ -113,6 +113,7 @@ export interface DarkPatternFinding {
   description: string;
   element: string; // CSS selector
   elementHtml?: string; // Outer HTML snippet
+  xpath?: string; // XPath to the element (most reliable locator in SPAs)
   pageUrl: string;
   severity: "critical" | "high" | "medium" | "low";
   regulation: DarkPatternRegulation[]; // Which regulations this violates

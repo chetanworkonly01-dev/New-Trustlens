@@ -2,6 +2,7 @@ import PptxGenJS from 'pptxgenjs';
 import { AuditResult, AccessibilityIssue } from '../types/audit';
 import type { DarkPatternFinding } from '../types/darkpattern';
 import type { RecommendationItem } from '../types/performance';
+import { getReportDisplayInfo } from './report-helpers';
 
 // ── KPMG Brand Palette ────────────────────────────────────────
 const K = {
@@ -115,13 +116,11 @@ export async function generatePptx(audit: AuditResult): Promise<Buffer> {
   const medium    = issues.filter(i => i.severity === 'medium');
   const quickWins = issues.filter(i => i.severity === 'low');
 
-  // ── Pillar-aware title ──────────────────────────────────────
+  // ── Pillar-aware title/score ─────────────────────────────────
+  // Derived from the pillars actually selected for this audit — never a generic bucket name.
+  const displayInfo = getReportDisplayInfo(audit);
   const pillars = ((config as any).enabledPillars as string[] | undefined) || [];
-  const reportTitle = pillars.length === 0 || (pillars.includes('accessibility') && pillars.length === 1)
-    ? 'Accessibility Audit'
-    : pillars.length === 1
-      ? ({ darkpatterns: 'Dark Pattern Audit', performance: 'Performance Audit', privacy: 'Privacy Compliance Audit' } as Record<string,string>)[pillars[0]] || 'Digital Trust Audit'
-      : pillars.length === 4 ? 'TrustLens 4-Pillar Audit' : 'TrustLens Multi-Pillar Audit';
+  const reportTitle = displayInfo.reportTitle;
   const isA11y = pillars.length === 0 || pillars.includes('accessibility');
   const isDP   = pillars.includes('darkpatterns');
   const isPerf = pillars.includes('performance');
@@ -154,15 +153,15 @@ export async function generatePptx(audit: AuditResult): Promise<Buffer> {
   title.addText([
     ...(isA11y ? [{ text: `${standard} Level ${testedLevel}   ·   `, options:{ bold:true, color: K.lightBlue, fontSize:11 } }] : []),
     { text: auditDate + '   ·   ', options:{ color: K.midGrey, fontSize:11 } },
-    { text: `Score: `, options:{ bold:true, color: K.lightBlue, fontSize:11 } },
-    { text: `${score.overall}/100`, options:{ bold:true, color: score.overall >= 75 ? K.teal : score.overall >= 50 ? K.medium : K.critical, fontSize:11 } },
+    { text: `${displayInfo.scoreLabel}: `, options:{ bold:true, color: K.lightBlue, fontSize:11 } },
+    { text: `${displayInfo.score}/100`, options:{ bold:true, color: displayInfo.score >= 75 ? K.teal : displayInfo.score >= 50 ? K.medium : K.critical, fontSize:11 } },
     ...(pillars.length > 1 ? [{ text: `   ·   Pillars: ${pillars.join(', ')}`, options:{ color: K.midGrey, fontSize:10 } }] : []),
   ], { x:0.4, y:4.0, w:9, h:0.4, fontFace:'Calibri' });
 
   // Score circle
   title.addShape('ellipse' as unknown as PptxGenJS.ShapeType, { x:7.6, y:2.0, w:2.0, h:2.0, fill:{ color: K.bgCard }, line:{ color: K.lightBlue, width:3 } });
-  title.addText(String(score.overall), { x:7.6, y:2.0, w:2.0, h:1.6, fontSize:44, fontFace:'Calibri', bold:true, color: score.overall >= 75 ? K.teal : score.overall >= 50 ? K.medium : K.critical, align:'center', valign:'middle' });
-  title.addText('SCORE', { x:7.6, y:3.4, w:2.0, h:0.4, fontSize:9, fontFace:'Calibri', color: K.midGrey, align:'center' });
+  title.addText(String(displayInfo.score), { x:7.6, y:2.0, w:2.0, h:1.6, fontSize:44, fontFace:'Calibri', bold:true, color: displayInfo.score >= 75 ? K.teal : displayInfo.score >= 50 ? K.medium : K.critical, align:'center', valign:'middle' });
+  title.addText(displayInfo.badgeLabel, { x:7.6, y:3.4, w:2.0, h:0.4, fontSize:8, fontFace:'Calibri', color: K.midGrey, align:'center' });
   title.addText('Confidential / KPMG Internal', { x:0, y:6.85, w:10, h:0.35, fontSize:8, fontFace:'Calibri', color: K.midGrey, align:'center', italic:true });
   addPageNum(title, n);
 
@@ -518,6 +517,7 @@ export async function generatePptx(audit: AuditResult): Promise<Buffer> {
       const dpHeaderRow: PptxGenJS.TableRow = [
         { text:'#',         options:{ bold:true, color:K.white, fill:{ color:'6A289B' }, fontSize:8, align:'center' } },
         { text:'Finding',   options:{ bold:true, color:K.white, fill:{ color:'6A289B' }, fontSize:8 } },
+        { text:'Location',  options:{ bold:true, color:K.white, fill:{ color:'6A289B' }, fontSize:8 } },
         { text:'Category',  options:{ bold:true, color:K.white, fill:{ color:'6A289B' }, fontSize:8 } },
         { text:'CCPA',  options:{ bold:true, color:K.white, fill:{ color:'6A289B' }, fontSize:8 } },
         { text:'Severity',  options:{ bold:true, color:K.white, fill:{ color:'6A289B' }, fontSize:8, align:'center' } },
@@ -525,7 +525,8 @@ export async function generatePptx(audit: AuditResult): Promise<Buffer> {
       ];
       const dpDataRows: PptxGenJS.TableRow[] = batchFindings.map((f, idx) => [
         { text:`#${String(batch+idx+1).padStart(3,'0')}`, options:{ fontSize:8, bold:true, color:K.nearBlack, align:'center' as const, fill:{ color: idx%2===0 ? K.offWhite : K.white } } },
-        { text:f.title.substring(0,55), options:{ fontSize:8, color:K.nearBlack, fill:{ color: idx%2===0 ? K.offWhite : K.white } } },
+        { text:f.title.substring(0,45), options:{ fontSize:8, color:K.nearBlack, fill:{ color: idx%2===0 ? K.offWhite : K.white } } },
+        { text:(f.element || f.pageUrl.replace(/^https?:\/\/[^/]+/, '') || '/').substring(0,30), options:{ fontSize:7.5, color:K.lightBlue, fill:{ color: idx%2===0 ? K.offWhite : K.white } } },
         { text:f.category.replace(/-/g,' '), options:{ fontSize:8, color:K.darkGrey, fill:{ color: idx%2===0 ? K.offWhite : K.white } } },
         { text:f.brignullPattern ? `#${f.brignullNumber} ${f.brignullPattern}` : '—', options:{ fontSize:8, color:'C084FC', fill:{ color: idx%2===0 ? K.offWhite : K.white } } },
         { text:f.severity.toUpperCase(), options:{ fontSize:8, bold:true, color:sevColor(f.severity), fill:{ color:sevBg(f.severity) }, align:'center' as const } },
@@ -534,7 +535,7 @@ export async function generatePptx(audit: AuditResult): Promise<Buffer> {
 
       dpSlide.addTable([dpHeaderRow, ...dpDataRows], {
         x:0.3, y:1.1, w:9.4,
-        colW:[0.65, 3.3, 1.8, 1.5, 0.95, 0.8],
+        colW:[0.6, 2.4, 1.7, 1.3, 1.2, 0.85, 0.7],
         border:{ type:'solid', pt:0.4, color:'D1DCE8' },
         rowH: batchFindings.length <= 8 ? 0.56 : 0.48,
         autoPage:false,
@@ -672,6 +673,182 @@ export async function generatePptx(audit: AuditResult): Promise<Buffer> {
       ];
       netSlide.addTable(netRows, { x:0.3, y:1.2, w:9.4, colW:[2.8,1.7,1.7,1.7,1.5], fontSize:10, fontFace:'Calibri', border:{type:'solid',pt:0.5,color:K.lightGrey} });
       addPageNum(netSlide, n);
+    }
+
+    // ── UX Performance slide ────────────────────────────────────
+    const uxPerf = perfResult?.uxPerformance;
+    if (uxPerf) {
+      n++;
+      const uxSlide = lightSlide(pptx);
+      addLogo(uxSlide);
+      addSlideTitle(uxSlide, 'UX Performance Analysis', `Overall UX Score: ${uxPerf.score}/100 — Loading · Stability · Responsiveness · Animation`);
+
+      // 4 dimension tiles
+      const uxDims = [
+        { label: 'Loading Experience', score: uxPerf.initialLoadExperience?.score ?? 0 },
+        { label: 'Visual Stability', score: uxPerf.visualStability?.score ?? 0 },
+        { label: 'Responsiveness', score: uxPerf.responsiveness?.score ?? 0 },
+        { label: 'Animation Smoothness', score: uxPerf.animationPerformance?.score ?? 0 },
+      ];
+      uxDims.forEach((dim, i) => {
+        const x = 0.3 + i * 2.4;
+        const color = dim.score >= 75 ? K.pass : dim.score >= 50 ? K.medium : K.critical;
+        uxSlide.addShape('rect' as unknown as PptxGenJS.ShapeType, { x, y:1.25, w:2.2, h:1.1, fill:{ color: K.offWhite }, line:{color:K.lightGrey, pt:1} });
+        uxSlide.addText(String(dim.score), { x, y:1.35, w:2.2, h:0.55, fontSize:32, fontFace:'Calibri', bold:true, color, align:'center' });
+        uxSlide.addText(dim.label, { x, y:1.9, w:2.2, h:0.35, fontSize:9, fontFace:'Calibri', color:K.darkGrey, align:'center' });
+      });
+
+      // UX checklist (loading indicators, skeleton, progressive)
+      const uxChecks = [
+        { label: 'Loading Indicator', pass: uxPerf.initialLoadExperience?.hasLoadingIndicator ?? false },
+        { label: 'Skeleton Screens', pass: uxPerf.initialLoadExperience?.hasSkeletonScreens ?? false },
+        { label: 'Progressive Loading', pass: uxPerf.initialLoadExperience?.hasProgressiveLoading ?? false },
+        { label: 'Scroll Jank-free', pass: !(uxPerf.animationPerformance?.scrollJank ?? true) },
+      ];
+      const uxCheckRows: any[][] = [
+        [{text:'UX Feature', options:{bold:true,color:K.white,fill:K.navy}}, {text:'Status', options:{bold:true,color:K.white,fill:K.navy}}],
+        ...uxChecks.map(c => [c.label, c.pass ? 'PASS ✓' : 'FAIL ✗']),
+      ];
+      uxSlide.addTable(uxCheckRows, { x:0.3, y:2.5, w:4.6, colW:[3.2,1.4], fontSize:10, fontFace:'Calibri', border:{type:'solid',pt:0.5,color:K.lightGrey} });
+
+      // Top pain points
+      const painPoints: any[] = (uxPerf.painPoints || []).slice(0, 4);
+      if (painPoints.length > 0) {
+        const ppRows: any[][] = [
+          [{text:'Pain Point', options:{bold:true,color:K.white,fill:'006E51'}}, {text:'Severity', options:{bold:true,color:K.white,fill:'006E51'}}, {text:'User Impact', options:{bold:true,color:K.white,fill:'006E51'}}],
+          ...painPoints.map((pp: any) => [
+            (pp.description || '').substring(0, 50),
+            (pp.severity || '').toUpperCase(),
+            (pp.userImpact || '').substring(0, 50),
+          ]),
+        ];
+        uxSlide.addTable(ppRows, { x:5.1, y:2.5, w:4.6, colW:[2.4,1,1.2], fontSize:9, fontFace:'Calibri', border:{type:'solid',pt:0.5,color:K.lightGrey} });
+      }
+      addPageNum(uxSlide, n);
+    }
+
+    // ── Business Impact slide ───────────────────────────────────
+    const aiReport = perfResult?.aiReport;
+    if (aiReport?.businessImpactNarrative || aiReport?.overallROI) {
+      n++;
+      const bizSlide = lightSlide(pptx);
+      addLogo(bizSlide);
+      addSlideTitle(bizSlide, 'Business Impact Analysis', 'Performance impact on conversion, bounce rate, and SEO');
+
+      if (aiReport.executiveSummary) {
+        bizSlide.addText('Executive Summary', { x:0.3, y:1.25, w:9.4, h:0.3, fontSize:12, fontFace:'Calibri', bold:true, color:K.navy });
+        bizSlide.addText(aiReport.executiveSummary, { x:0.3, y:1.55, w:9.4, h:0.9, fontSize:9.5, fontFace:'Calibri', color:K.darkGrey });
+      }
+      if (aiReport.businessImpactNarrative) {
+        bizSlide.addText('Business Impact', { x:0.3, y:2.55, w:9.4, h:0.3, fontSize:12, fontFace:'Calibri', bold:true, color:K.navy });
+        bizSlide.addText(aiReport.businessImpactNarrative.substring(0, 400), { x:0.3, y:2.85, w:9.4, h:1.2, fontSize:9.5, fontFace:'Calibri', color:K.darkGrey });
+      }
+      if (aiReport.overallROI) {
+        bizSlide.addShape('rect' as unknown as PptxGenJS.ShapeType, { x:0.3, y:4.15, w:9.4, h:0.65, fill:{ color: '00BA8C' } });
+        bizSlide.addText(`Estimated ROI: ${aiReport.overallROI}`, { x:0.5, y:4.2, w:9, h:0.55, fontSize:11, fontFace:'Calibri', bold:true, color:K.white });
+      }
+      addPageNum(bizSlide, n);
+    }
+
+    // ── Third-Party Impact slide ────────────────────────────────
+    const thirdParty: any[] = perfResult?.thirdPartyImpact || [];
+    if (thirdParty.length > 0) {
+      n++;
+      const tpSlide = lightSlide(pptx);
+      addLogo(tpSlide);
+      addSlideTitle(tpSlide, 'Third-Party Script Impact', `${thirdParty.length} third-party resource(s) detected · ${thirdParty.filter((t: any) => t.blocking).length} blocking`);
+      const tpRows: any[][] = [
+        [
+          {text:'Script / Service', options:{bold:true,color:K.white,fill:K.navy}},
+          {text:'Category', options:{bold:true,color:K.white,fill:K.navy}},
+          {text:'Load Time', options:{bold:true,color:K.white,fill:K.navy}},
+          {text:'Blocking', options:{bold:true,color:K.white,fill:K.navy}},
+          {text:'Action', options:{bold:true,color:K.white,fill:K.navy}},
+        ],
+        ...thirdParty.slice(0, 12).map((t: any) => [
+          (t.label || t.domain || '').substring(0, 30),
+          t.category || '—',
+          t.loadTimeMs != null ? `${t.loadTimeMs}ms` : '—',
+          t.blocking ? 'Yes ⚠' : 'No',
+          (t.recommendation || '—').toUpperCase(),
+        ]),
+      ];
+      tpSlide.addTable(tpRows, { x:0.3, y:1.2, w:9.4, colW:[2.8,1.8,1.4,1.2,2.2], fontSize:9, fontFace:'Calibri', border:{type:'solid',pt:0.5,color:K.lightGrey} });
+      addPageNum(tpSlide, n);
+    }
+
+    // ── Technical Architecture slide ────────────────────────────
+    const arch = perfResult?.architecture;
+    if (arch) {
+      n++;
+      const archSlide = lightSlide(pptx);
+      addLogo(archSlide);
+      addSlideTitle(archSlide, 'Technical Architecture', 'Detected technology stack and infrastructure');
+      const archRows: any[][] = [
+        [{text:'Component', options:{bold:true,color:K.white,fill:K.navy}}, {text:'Detected', options:{bold:true,color:K.white,fill:K.navy}}, {text:'Impact', options:{bold:true,color:K.white,fill:K.navy}}],
+        ['Framework', arch.framework || 'Not detected', arch.framework ? 'Modern framework — good' : 'Unable to detect'],
+        ['CMS', arch.cms || 'Not detected', arch.cms ? 'CMS detected — check plugin overhead' : '—'],
+        ['CDN', arch.cdn || 'No CDN detected ⚠️', arch.cdn ? 'CDN active — reduced latency' : 'No CDN — static assets served from origin'],
+        ['HTTP Protocol', arch.httpVersion || 'Unknown', arch.httpVersion === 'HTTP/2' || arch.httpVersion === 'HTTP/3' ? 'Multiplexing enabled' : 'Upgrade to HTTP/2 recommended'],
+        ['Hosting', arch.hostingPlatform || 'Unknown', '—'],
+        ['Service Worker', arch.hasServiceWorker ? 'Active ✓' : 'Not found', arch.hasServiceWorker ? 'Offline caching enabled' : 'Add service worker for PWA support'],
+        ['PWA Manifest', arch.hasPwaManifest ? 'Present ✓' : 'Not found', arch.hasPwaManifest ? 'Installable on mobile' : 'Add manifest for installability'],
+        ['Resource Hints', arch.hasResourceHints ? 'Present ✓' : 'Not found', arch.hasResourceHints ? 'Preload/prefetch active' : 'Add preload for critical assets'],
+      ];
+      archSlide.addTable(archRows, { x:0.3, y:1.2, w:9.4, colW:[2.4,2.5,4.5], fontSize:9.5, fontFace:'Calibri', border:{type:'solid',pt:0.5,color:K.lightGrey} });
+      if (arch.jsLibraries?.length > 0) {
+        archSlide.addText(`JS Libraries: ${arch.jsLibraries.join(', ')}`, { x:0.3, y:5.9, w:9.4, h:0.3, fontSize:9, fontFace:'Calibri', color:K.darkGrey });
+      }
+      addPageNum(archSlide, n);
+    }
+
+    // ── Technical SEO slide ─────────────────────────────────────
+    const seo = perfResult?.seoReadiness;
+    if (seo) {
+      n++;
+      const seoSlide = lightSlide(pptx);
+      addLogo(seoSlide);
+      addSlideTitle(seoSlide, 'Technical SEO Readiness', `${[seo.hasMetaTitle, seo.hasMetaDescription, seo.hasCanonical, seo.hasStructuredData, seo.hasOpenGraph, seo.hasRobotsTxt, seo.hasSitemap].filter(Boolean).length}/7 checks passing`);
+      const seoRows: any[][] = [
+        [{text:'SEO Check', options:{bold:true,color:K.white,fill:'006E51'}}, {text:'Status', options:{bold:true,color:K.white,fill:'006E51'}}, {text:'Detail', options:{bold:true,color:K.white,fill:'006E51'}}],
+        ['Meta Title', seo.hasMetaTitle ? 'PASS ✓' : 'FAIL ✗', seo.metaTitleLength ? `${seo.metaTitleLength} chars` : '—'],
+        ['Meta Description', seo.hasMetaDescription ? 'PASS ✓' : 'FAIL ✗', seo.metaDescriptionLength ? `${seo.metaDescriptionLength} chars` : '—'],
+        ['Canonical URL', seo.hasCanonical ? 'PASS ✓' : 'FAIL ✗', '—'],
+        ['Structured Data', seo.hasStructuredData ? 'PASS ✓' : 'FAIL ✗', 'JSON-LD / schema.org'],
+        ['Open Graph Tags', seo.hasOpenGraph ? 'PASS ✓' : 'FAIL ✗', 'Social sharing metadata'],
+        ['robots.txt', seo.hasRobotsTxt === true ? 'PASS ✓' : seo.hasRobotsTxt === null ? 'WARN ?' : 'FAIL ✗', '/robots.txt'],
+        ['XML Sitemap', seo.hasSitemap === true ? 'PASS ✓' : seo.hasSitemap === null ? 'WARN ?' : 'FAIL ✗', '/sitemap.xml'],
+        ['Broken Links', seo.brokenLinks.length === 0 ? 'PASS ✓' : `FAIL — ${seo.brokenLinks.length} broken`, '404 responses'],
+      ];
+      seoSlide.addTable(seoRows, { x:0.3, y:1.2, w:9.4, colW:[2.8,1.5,5.1], fontSize:9.5, fontFace:'Calibri', border:{type:'solid',pt:0.5,color:K.lightGrey} });
+      addPageNum(seoSlide, n);
+    }
+
+    // ── Prioritised Roadmap slide ───────────────────────────────
+    const aiRecs: any[] = aiReport?.recommendations || [];
+    const baseRecs = ((perfResult?.recommendations || []) as RecommendationItem[]);
+    const roadmapItems = aiRecs.length > 0 ? aiRecs : baseRecs;
+    if (roadmapItems.length > 0) {
+      n++;
+      const roadSlide = lightSlide(pptx);
+      addLogo(roadSlide);
+      addSlideTitle(roadSlide, 'Prioritised Performance Roadmap', 'Ranked by business impact — address Critical items immediately');
+      const roadRows: any[][] = [
+        [
+          {text:'Priority', options:{bold:true,color:K.white,fill:K.navy}},
+          {text:'Recommendation', options:{bold:true,color:K.white,fill:K.navy}},
+          {text:'Effort', options:{bold:true,color:K.white,fill:K.navy}},
+          {text:'Expected Improvement', options:{bold:true,color:K.white,fill:K.navy}},
+        ],
+        ...roadmapItems.slice(0, 12).map((r: any) => {
+          const effort = r.estimatedEffort || r.effort || '—';
+          const improvement = r.expectedImprovement || '—';
+          const desc = (r.description || r.detail || '').substring(0, 55);
+          return [r.priority, desc, effort, improvement.substring(0, 45)];
+        }),
+      ];
+      roadSlide.addTable(roadRows, { x:0.3, y:1.2, w:9.4, colW:[0.95,4.0,1.6,2.85], fontSize:8.5, fontFace:'Calibri', border:{type:'solid',pt:0.5,color:K.lightGrey} });
+      addPageNum(roadSlide, n);
     }
   }
 

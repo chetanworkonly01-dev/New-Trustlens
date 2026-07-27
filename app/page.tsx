@@ -908,7 +908,7 @@ export default function HomePage() {
                   {p.regs.map((r) => (
                     <span
                       key={r}
-                      style={{
+                      style={{display: "inline-flex", alignItems: "center", 
                         fontSize: 12,
                         padding: "2px 6px",
                         borderRadius: 99,
@@ -962,7 +962,7 @@ export default function HomePage() {
                 }}
               >
                 <div
-                  style={{
+                  style={{display: "inline-flex", alignItems: "center", 
                     position: "absolute",
                     top: 10,
                     right: 12,
@@ -1003,7 +1003,7 @@ export default function HomePage() {
                   {p.regs.map((r) => (
                     <span
                       key={r}
-                      style={{
+                      style={{display: "inline-flex", alignItems: "center", 
                         fontSize: 8,
                         padding: "2px 6px",
                         borderRadius: 99,
@@ -1363,7 +1363,7 @@ export default function HomePage() {
                   {m.desc}
                 </div>
                 {/* <span
-                  style={{
+                  style={{display: "inline-flex", alignItems: "center", 
                     fontSize: 12,
                     padding: "2px 7px",
                     borderRadius: 99,
@@ -1435,7 +1435,7 @@ export default function HomePage() {
                               return (
                                 <span
                                   key={p}
-                                  style={{
+                                  style={{display: "inline-flex", alignItems: "center", 
                                     fontSize: 9,
                                     padding: "1px 6px",
                                     borderRadius: 99,

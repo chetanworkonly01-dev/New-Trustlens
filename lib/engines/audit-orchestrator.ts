@@ -617,7 +617,10 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
           await page
             .waitForLoadState("networkidle", { timeout: 8000 })
             .catch(() => {});
-          const el = await page.$(issue.element).catch(() => null);
+          let el = await page.$(issue.element).catch(() => null);
+          if (!el && issue.xpath) {
+            el = await page.$(`xpath=${issue.xpath}`).catch(() => null);
+          }
           if (el) {
             const buf = await el
               .screenshot({ type: "png", timeout: 5000 })
@@ -1197,6 +1200,7 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
       testedLevel,
       {
         enabledPillars,
+        trustScore: audit.trustScore,
         darkpatterns: darkPatternResult,
         performance: performanceResult,
         privacy: privacyResult,
@@ -1314,6 +1318,7 @@ export async function runPdfAudit(
       undefined,
       [],
       "AA",
+      { enabledPillars: ["accessibility"] },
     );
     audit.status = "complete";
     audit.progress = 100;

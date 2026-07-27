@@ -176,6 +176,10 @@ export interface AccessibilityIssue {
   description: string;
   element: string;
   elementHtml?: string;
+  /** XPath to the violating element (most reliable locator in SPAs/shadow DOM) */
+  xpath?: string;
+  /** Raw axe-core check result data (e.g. measured contrast ratio, actual attribute value) */
+  checkData?: Record<string, unknown>;
   /** Base64-encoded PNG screenshot of the violating element */
   elementScreenshot?: string;
   pageUrl: string;
