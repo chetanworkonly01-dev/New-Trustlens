@@ -16,10 +16,20 @@ interface AxeViolation {
   nodes: AxeNode[];
 }
 
+interface AxeCheckResult {
+  id: string;
+  message: string;
+  data?: unknown;
+}
+
 interface AxeNode {
   html: string;
   target: string[];
+  xpath?: string[];
   failureSummary?: string;
+  any?: AxeCheckResult[];
+  all?: AxeCheckResult[];
+  none?: AxeCheckResult[];
 }
 
 const AXE_WCAG_TAG_MAP: Record<string, { criterion: string; name: string; level: 'A' | 'AA' | 'AAA' }> = {
@@ -212,6 +222,7 @@ export async function scanWithAxe(
 
     const results = await new AxeBuilder({ page })
       .withTags(buildAxeTags(wcagLevels))
+      .options({ xpath: true })
       .analyze();
 
     // ── VIOLATIONS → Issues
@@ -229,6 +240,10 @@ export async function scanWithAxe(
           description: violation.description + (node.failureSummary ? ` — ${node.failureSummary}` : ''),
           element: node.target.join(' > '),
           elementHtml: node.html.substring(0, 500),
+          xpath: node.xpath?.[0],
+          checkData: (node.any?.find(c => c.data != null)?.data ??
+            node.all?.find(c => c.data != null)?.data ??
+            node.none?.find(c => c.data != null)?.data) as Record<string, unknown> | undefined,
           pageUrl: pageData.url,
           wcagCriterion: wcagMapping.criterion,
           wcagName: wcagMapping.name,

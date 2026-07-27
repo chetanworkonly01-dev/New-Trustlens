@@ -121,7 +121,7 @@ function getPerfGrade(s: number) {
 
 function getAuditTitle(pillars: string[]): string {
   if (!pillars || pillars.length === 0) return "Accessibility Audit";
-  if (pillars.length === 4) return "TrustLens 3-Pillar Audit";
+  if (pillars.length === 4) return "TrustLens 4-Pillar Audit";
   if (pillars.length === 1) {
     return (
       (
@@ -884,7 +884,7 @@ export default function HomePage() {
                   {p.regs.map((r) => (
                     <span
                       key={r}
-                      style={{
+                      style={{display: "inline-flex", alignItems: "center", 
                         fontSize: 12,
                         padding: "2px 6px",
                         borderRadius: 99,
@@ -938,7 +938,7 @@ export default function HomePage() {
                 }}
               >
                 <div
-                  style={{
+                  style={{display: "inline-flex", alignItems: "center", 
                     position: "absolute",
                     top: 10,
                     right: 12,
@@ -979,7 +979,7 @@ export default function HomePage() {
                   {p.regs.map((r) => (
                     <span
                       key={r}
-                      style={{
+                      style={{display: "inline-flex", alignItems: "center", 
                         fontSize: 8,
                         padding: "2px 6px",
                         borderRadius: 99,
@@ -1339,7 +1339,7 @@ export default function HomePage() {
                   {m.desc}
                 </div>
                 {/* <span
-                  style={{
+                  style={{display: "inline-flex", alignItems: "center", 
                     fontSize: 12,
                     padding: "2px 7px",
                     borderRadius: 99,
@@ -1409,7 +1409,7 @@ export default function HomePage() {
             ].map(([label, color]) => (
               <span
                 key={label}
-                style={{
+                style={{display: "inline-flex", alignItems: "center", 
                   fontSize: 12,
                   padding: "8px 16px",
                   borderRadius: 99,
@@ -1523,7 +1523,7 @@ export default function HomePage() {
                               return (
                                 <span
                                   key={p}
-                                  style={{
+                                  style={{display: "inline-flex", alignItems: "center", 
                                     fontSize: 9,
                                     padding: "1px 6px",
                                     borderRadius: 99,
@@ -1793,8 +1793,8 @@ export default function HomePage() {
                           >
                             {a.config?.url || "PDF Document"}
                           </span>
-                          {/* <span
-                            style={{
+                          <span
+                            style={{display: "inline-flex", alignItems: "center",
                               fontSize: 13,
                               padding: "2px 7px",
                               borderRadius: 99,
@@ -1805,7 +1805,7 @@ export default function HomePage() {
                             }}
                           >
                             {auditTitle}
-                          </span> */}
+                          </span>
                           {isA11yOnly && (
                             <span
                               className={`audit-level-chip ${level.toLowerCase()}`}
@@ -1817,11 +1817,11 @@ export default function HomePage() {
                         </div>
 
                         {/* Pillar badges */}
-                        {/* {pillars.length > 0 && (
+                        {pillars.length > 0 && (
                           <div
                             style={{
                               display: "flex",
-                              gap: 14,
+                              gap: 8,
                               flexWrap: "wrap",
                               marginBottom: 8,
                             }}
@@ -1843,13 +1843,13 @@ export default function HomePage() {
                                   key={p}
                                   style={{
                                     fontSize: 13,
-                                    // padding: "2px 8px",
+                                    padding: "2px 8px",
                                     borderRadius: 99,
                                     background: `${m.color}15`,
                                     color: m.color,
                                     border: `1px solid ${m.color}35`,
                                     fontWeight: 700,
-                                    display: "flex",
+                                    display: "inline-flex",
                                     alignItems: "center",
                                     gap: 3,
                                   }}
@@ -1870,7 +1870,7 @@ export default function HomePage() {
                               );
                             })}
                           </div>
-                        )} */}
+                        )}
 
                         {/* Meta row */}
                         <div
@@ -1884,7 +1884,7 @@ export default function HomePage() {
                           }}
                         >
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               padding: "2px 7px",
                               borderRadius: 99,
                               border: "1px solid var(--kpmg-dynamic)",
@@ -1897,7 +1897,7 @@ export default function HomePage() {
                             {a.crawlCoverage?.pagesAudited ?? "—"} pages
                           </span>
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               padding: "2px 7px",
                               borderRadius: 99,
                               border: "1px solid var(--kpmg-dynamic)",
@@ -1911,7 +1911,7 @@ export default function HomePage() {
                           </span>
                           {a.crawlCoverage && (
                             <span
-                              style={{
+                              style={{display: "inline-flex", alignItems: "center", 
                                 padding: "2px 7px",
                                 borderRadius: 99,
                                 border: "1px solid var(--kpmg-dynamic)",
@@ -1925,7 +1925,7 @@ export default function HomePage() {
                             </span>
                           )}
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               padding: "2px 7px",
                               borderRadius: 99,
                               border: "1px solid var(--kpmg-dynamic)",
@@ -1957,7 +1957,7 @@ export default function HomePage() {
                       >
                         {a.trustScore ? (
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               fontSize: 13,
                               padding: "4px 10px",
                               borderRadius: 99,
@@ -1974,7 +1974,7 @@ export default function HomePage() {
                           </span>
                         ) : isPerfOnly ? (
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               fontSize: 13,
                               padding: "4px 10px",
                               borderRadius: 99,
@@ -1988,7 +1988,7 @@ export default function HomePage() {
                           </span>
                         ) : (
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               fontSize: 13,
                               padding: "4px 10px",
                               borderRadius: 99,

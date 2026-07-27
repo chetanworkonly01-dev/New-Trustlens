@@ -39,6 +39,38 @@ function getElementContext(html: string, index: number, length: number = 200): s
   return html.substring(start, end).replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Resolves a real CSS selector for a regex match position by locating the
+ * enclosing HTML tag (searching backward for '<' and forward for '>') and
+ * extracting its id/class. Falls back to the given label when no tag can be
+ * resolved (e.g. a match inside a <style>/<script> block with no nearby id/class) —
+ * developers should then rely on the elementHtml snippet to locate the code.
+ */
+function resolveSelector(html: string, matchIndex: number, fallbackLabel: string): string {
+  let tagStart = matchIndex;
+  if (html[matchIndex] !== '<') {
+    const searchStart = Math.max(0, matchIndex - 500);
+    const before = html.substring(searchStart, matchIndex);
+    const lastOpen = before.lastIndexOf('<');
+    if (lastOpen === -1) return fallbackLabel;
+    tagStart = searchStart + lastOpen;
+  }
+  const closeIdx = html.indexOf('>', tagStart);
+  if (closeIdx === -1) return fallbackLabel;
+  const tagHtml = html.substring(tagStart, closeIdx + 1);
+  const tagNameMatch = tagHtml.match(/^<([a-zA-Z0-9]+)/);
+  if (!tagNameMatch) return fallbackLabel;
+  const tagName = tagNameMatch[1].toLowerCase();
+  const idMatch = tagHtml.match(/\bid\s*=\s*["']([^"']+)["']/i);
+  if (idMatch) return `#${idMatch[1]}`;
+  const classMatch = tagHtml.match(/\bclass\s*=\s*["']([^"']+)["']/i);
+  if (classMatch) {
+    const firstClass = classMatch[1].trim().split(/\s+/)[0];
+    if (firstClass) return `${tagName}.${firstClass}`;
+  }
+  return tagName;
+}
+
 // ========== CUSTOM RULES DEFINITIONS ==========
 
 const customRules: CustomRule[] = [
@@ -59,7 +91,7 @@ const customRules: CustomRule[] = [
         const attrs = match[1];
         if (!attrs.includes('alt=') && !attrs.includes('role="presentation"') && !attrs.includes('role="none"')) {
           results.push({
-            element: 'img',
+            element: resolveSelector(html, match.index, 'img'),
             elementHtml: match[0].substring(0, 200),
             description: 'Image element is missing an alt attribute, making it inaccessible to screen reader users.',
             recommendation: 'Add a descriptive alt attribute to the image. Use alt="" for decorative images.',
@@ -86,7 +118,7 @@ const customRules: CustomRule[] = [
         const fullTag = match[0];
         if (!fullTag.includes('role="presentation"') && !fullTag.includes('role="none"') && !fullTag.includes('aria-hidden="true"')) {
           results.push({
-            element: 'img[alt=""]',
+            element: resolveSelector(html, match.index, 'img[alt=""]'),
             elementHtml: fullTag.substring(0, 200),
             description: 'Image with empty alt text should also have role="presentation" or aria-hidden="true" to properly convey decorative intent.',
             recommendation: 'Add role="presentation" or aria-hidden="true" for decorative images with empty alt text.',
@@ -113,7 +145,7 @@ const customRules: CustomRule[] = [
         const videoContent = match[1];
         if (!videoContent.includes('<track') || !videoContent.toLowerCase().includes('kind="captions"')) {
           results.push({
-            element: 'video',
+            element: resolveSelector(html, match.index, 'video'),
             elementHtml: match[0].substring(0, 300),
             description: 'Video element is missing captions track. Deaf and hard-of-hearing users cannot access audio content.',
             recommendation: 'Add a <track> element with kind="captions" and a valid .vtt caption file.',
@@ -140,7 +172,7 @@ const customRules: CustomRule[] = [
         const videoContent = match[1];
         if (!videoContent.toLowerCase().includes('kind="descriptions"')) {
           results.push({
-            element: 'video',
+            element: resolveSelector(html, match.index, 'video'),
             elementHtml: match[0].substring(0, 300),
             description: 'Video element is missing audio descriptions track for blind users.',
             recommendation: 'Add a <track> element with kind="descriptions" to describe important visual information.',
@@ -172,7 +204,7 @@ const customRules: CustomRule[] = [
           const context = getElementContext(html, match.index);
           if (!context.includes('aria-') && !context.includes('role=') && !context.includes('icon') && !context.includes('✓') && !context.includes('✗')) {
             results.push({
-              element: 'element with color-only indicator',
+              element: resolveSelector(html, match.index, 'element with color-only indicator'),
               elementHtml: context,
               description: 'Content appears to use color as the sole method of conveying information.',
               recommendation: 'Add text, icons, or patterns alongside color to convey information. Do not rely on color alone.',
@@ -201,7 +233,7 @@ const customRules: CustomRule[] = [
         const level = parseInt(match[1]);
         if (lastLevel > 0 && level > lastLevel + 1) {
           results.push({
-            element: `h${level}`,
+            element: resolveSelector(html, match.index, `h${level}`),
             elementHtml: getElementContext(html, match.index, 100),
             description: `Heading level h${level} skips from h${lastLevel}. Heading levels should not skip (e.g., h${lastLevel} → h${lastLevel + 1}).`,
             recommendation: `Change to h${lastLevel + 1} or add intermediate heading levels. Headings should form a logical outline.`,
@@ -236,7 +268,7 @@ const customRules: CustomRule[] = [
         if (!hasAriaLabel && !hasTitle) {
           if (!hasId) {
             results.push({
-              element: `input[type="${inputType}"]`,
+              element: resolveSelector(html, match.index, `input[type="${inputType}"]`),
               elementHtml: match[0].substring(0, 200),
               description: 'Form input has no id attribute and no ARIA label, so it cannot be associated with a <label>.',
               recommendation: 'Add an id attribute and associate it with a <label for="id"> element, or add an aria-label.',
@@ -269,7 +301,7 @@ const customRules: CustomRule[] = [
             (fg.includes('white') && bg.includes('white')) ||
             (fg === 'gray' || fg === 'grey' || fg === '#999' || fg === '#ccc' || fg === 'silver')) {
           results.push({
-            element: 'element with inline styles',
+            element: resolveSelector(html, match.index, 'element with inline styles'),
             elementHtml: getElementContext(html, match.index, 200),
             description: 'Element has inline styles with potentially insufficient color contrast.',
             recommendation: 'Ensure text color and background color have a contrast ratio of at least 4.5:1 for normal text and 3:1 for large text.',
@@ -295,7 +327,7 @@ const customRules: CustomRule[] = [
         const width = parseInt(match[1]);
         if (width > 320) {
           results.push({
-            element: 'element with fixed width',
+            element: resolveSelector(html, match.index, 'element with fixed width'),
             elementHtml: getElementContext(html, match.index, 200),
             description: `Element has a fixed width of ${width}px which may cause horizontal scrolling at 320px viewport.`,
             recommendation: 'Use responsive units (%, rem, vw) instead of fixed pixel widths. Ensure content reflows at 320px width.',
@@ -327,7 +359,7 @@ const customRules: CustomRule[] = [
         const hasRole = attrs.includes('role="img"');
         if (!hasAriaHidden && !hasAriaLabel && !hasTitle) {
           results.push({
-            element: 'svg',
+            element: resolveSelector(html, match.index, 'svg'),
             elementHtml: match[0].substring(0, 200),
             description: 'SVG element is missing accessible name. Screen readers cannot describe this graphic.',
             recommendation: 'Add role="img" and aria-label to the SVG, or add a <title> element as the first child. Use aria-hidden="true" for purely decorative SVGs.',
@@ -358,7 +390,7 @@ const customRules: CustomRule[] = [
         const attrs = match[2];
         if (!attrs.includes('tabindex') && !attrs.includes('role="button"') && !attrs.includes('role="link"')) {
           results.push({
-            element: tag,
+            element: resolveSelector(html, match.index, tag),
             elementHtml: getElementContext(html, match.index, 150),
             description: `<${tag}> has a click handler but is not keyboard accessible. This element cannot be focused or activated via keyboard.`,
             recommendation: `Use a <button> or <a> element instead, or add tabindex="0", role="button", and keyboard event handlers.`,
@@ -441,7 +473,7 @@ const customRules: CustomRule[] = [
         const value = parseInt(match[1]);
         if (value > 0) {
           results.push({
-            element: `element[tabindex="${value}"]`,
+            element: resolveSelector(html, match.index, `element[tabindex="${value}"]`),
             elementHtml: getElementContext(html, match.index, 150),
             description: `Positive tabindex value (${value}) disrupts natural tab order and creates an unpredictable focus sequence.`,
             recommendation: 'Remove positive tabindex values. Use tabindex="0" to add elements to natural tab order, or tabindex="-1" for programmatic focus only.',
@@ -469,7 +501,7 @@ const customRules: CustomRule[] = [
         const text = match[1].replace(/<[^>]+>/g, '').trim().toLowerCase();
         if (badTexts.includes(text)) {
           results.push({
-            element: 'a',
+            element: resolveSelector(html, match.index, 'a'),
             elementHtml: match[0].substring(0, 200),
             description: `Link text "${text}" is not descriptive. Screen reader users cannot determine the link's destination or purpose.`,
             recommendation: 'Use descriptive link text that explains where the link goes, e.g., "Read the accessibility guidelines" instead of "Click here".',
@@ -497,7 +529,7 @@ const customRules: CustomRule[] = [
         const block = match[1];
         if (!block.includes('box-shadow') && !block.includes('border') && !block.includes('outline-offset')) {
           results.push({
-            element: ':focus styles',
+            element: resolveSelector(html, match.index, ':focus styles'),
             elementHtml: match[0].substring(0, 200),
             description: 'CSS removes focus outline without providing an alternative focus indicator.',
             recommendation: 'Never remove focus indicators without providing a visible alternative (e.g., box-shadow, border, or custom outline).',
@@ -526,7 +558,7 @@ const customRules: CustomRule[] = [
         const matches = findAllMatches(html, pattern);
         for (const match of matches) {
           results.push({
-            element: 'timeout/redirect',
+            element: resolveSelector(html, match.index, 'timeout/redirect'),
             elementHtml: match[0].substring(0, 200),
             description: 'Page may have automatic timeouts or redirects. Users with disabilities may need more time to read or interact with content.',
             recommendation: 'Allow users to extend, adjust, or turn off any time limits. Provide a warning at least 20 seconds before timeout.',
@@ -550,7 +582,7 @@ const customRules: CustomRule[] = [
       const matches = findAllMatches(html, autoplayRegex);
       for (const match of matches) {
         results.push({
-          element: match[1],
+          element: resolveSelector(html, match.index, match[1]),
           elementHtml: match[0].substring(0, 200),
           description: 'Media element auto-plays, which can be disruptive to screen reader users and users with cognitive disabilities.',
           recommendation: 'Remove the autoplay attribute, or provide a mechanism to pause, stop, or mute the media within 3 seconds.',
@@ -579,7 +611,7 @@ const customRules: CustomRule[] = [
           const context = getElementContext(html, match.index, 200);
           if (context.match(/<(a|button|input|select)\b/i)) {
             results.push({
-              element: 'interactive element',
+              element: resolveSelector(html, match.index, 'interactive element'),
               elementHtml: context,
               description: `Interactive element has a target size of ${size}px, which is below the minimum 24×24px requirement.`,
               recommendation: 'Increase the clickable area to at least 24×24 CSS pixels. Use padding to increase touch target size.',
@@ -648,7 +680,7 @@ const customRules: CustomRule[] = [
         }
         if (!hasLabel && !hasId) {
           results.push({
-            element: `${tag}[type="${inputType}"]`,
+            element: resolveSelector(html, match.index, `${tag}[type="${inputType}"]`),
             elementHtml: match[0].substring(0, 200),
             description: `Form ${tag} element has no visible label, aria-label, or associated <label> element.`,
             recommendation: `Add a <label> element with a matching "for" attribute, or add an aria-label attribute.`,
@@ -673,7 +705,7 @@ const customRules: CustomRule[] = [
       const matches = findAllMatches(html, focusChangeRegex);
       for (const match of matches) {
         results.push({
-          element: 'element with onfocus',
+          element: resolveSelector(html, match.index, 'element with onfocus'),
           elementHtml: getElementContext(html, match.index, 200),
           description: 'Element triggers a context change (navigation/submission) on focus, which is unexpected for keyboard users.',
           recommendation: 'Do not change context when an element receives focus. Use explicit user actions (click/submit) for context changes.',
@@ -696,7 +728,7 @@ const customRules: CustomRule[] = [
       const matches = findAllMatches(html, selectChangeRegex);
       for (const match of matches) {
         results.push({
-          element: 'select[onchange]',
+          element: resolveSelector(html, match.index, 'select[onchange]'),
           elementHtml: match[0].substring(0, 200),
           description: 'Dropdown/select element triggers a context change (navigation/submission) on value change without warning.',
           recommendation: 'Add a separate submit button instead of auto-submitting on selection change.',
@@ -723,7 +755,7 @@ const customRules: CustomRule[] = [
         const visibleText = match[3].toLowerCase().trim();
         if (visibleText && ariaLabel && !ariaLabel.includes(visibleText)) {
           results.push({
-            element: match[1],
+            element: resolveSelector(html, match.index, match[1]),
             elementHtml: match[0].substring(0, 200),
             description: `Accessible name "${match[2]}" does not contain the visible text "${match[3]}". Voice control users cannot activate this element by speaking its visible label.`,
             recommendation: 'Ensure the aria-label contains the visible text label. The accessible name should start with or include the visible text.',
@@ -763,7 +795,7 @@ const customRules: CustomRule[] = [
         const role = match[1].toLowerCase().trim();
         if (!validRoles.has(role)) {
           results.push({
-            element: `element[role="${role}"]`,
+            element: resolveSelector(html, match.index, `element[role="${role}"]`),
             elementHtml: getElementContext(html, match.index, 150),
             description: `Invalid ARIA role "${role}" used. Assistive technologies will not recognize this role.`,
             recommendation: `Use a valid ARIA role from the WAI-ARIA specification. Common roles: button, link, navigation, main, dialog.`,
@@ -790,7 +822,7 @@ const customRules: CustomRule[] = [
         const attrs = match[1];
         if (!attrs.includes('aria-label') && !attrs.includes('aria-labelledby') && !attrs.includes('title=')) {
           results.push({
-            element: 'button (icon-only)',
+            element: resolveSelector(html, match.index, 'button (icon-only)'),
             elementHtml: match[0].substring(0, 200),
             description: 'Button contains only an icon with no accessible text. Screen readers will announce it as an empty button.',
             recommendation: 'Add aria-label to describe the button\'s purpose, e.g., aria-label="Close" or aria-label="Search".',
@@ -850,7 +882,7 @@ const customRules: CustomRule[] = [
           const context = getElementContext(html, match.index, 300);
           if (!context.includes('aria-live') && !context.includes('role="alert"') && !context.includes('role="status"')) {
             results.push({
-              element: 'status/notification element',
+              element: resolveSelector(html, match.index, 'status/notification element'),
               elementHtml: context.substring(0, 200),
               description: 'Status message or notification element does not use aria-live or role="alert". Screen readers will not announce dynamic content updates.',
               recommendation: 'Add aria-live="polite" for status updates or role="alert" for important messages.',

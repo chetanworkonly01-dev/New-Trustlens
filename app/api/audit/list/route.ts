@@ -17,13 +17,16 @@ export async function GET() {
       ? perfResult.overallScore
       : a.trustScore?.overall ?? a.score.overall;
 
-    // Pillar-aware issue count
+    // Pillar-aware issue count — uses UNIQUE violation types, not raw per-element
+    // instance counts (a.score.totalIssues is one row per failing DOM node, which
+    // wildly inflates the number shown on the dashboard vs. what's actually distinct).
+    const a11yIssues   = a.score.uniqueIssues ?? a.score.totalIssues;
     const perfIssues   = perfResult?.totalResourceIssues ?? 0;
     const dpIssues     = (dpResult?.findings ?? []).length;
     const privIssues   = (privResult?.findings ?? []).length;
     const totalIssues  = pillars.length > 0 && !pillars.includes('accessibility')
       ? perfIssues + dpIssues + privIssues
-      : a.score.totalIssues + perfIssues + dpIssues + privIssues;
+      : a11yIssues + perfIssues + dpIssues + privIssues;
 
     // Per-pillar scores for the card
     const pillarScores: Record<string, number> = {};

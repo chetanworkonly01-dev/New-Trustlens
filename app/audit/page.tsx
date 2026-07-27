@@ -2588,7 +2588,7 @@ export default function AuditPage() {
                 {p.desc}
               </span>
               <span
-                style={{
+                style={{display: "inline-flex", alignItems: "center", 
                   fontSize: 10,
                   fontWeight: 700,
                   textTransform: "uppercase",
@@ -2655,7 +2655,7 @@ export default function AuditPage() {
               CWV · Auth Flows · Network Sim
             </span>
             <span
-              style={{
+              style={{display: "inline-flex", alignItems: "center", 
                 fontSize: 10,
                 fontWeight: 700,
                 textTransform: "uppercase",
@@ -2699,7 +2699,7 @@ export default function AuditPage() {
               Tracker detection · Cookie audit
             </span>
             <span
-              style={{
+              style={{display: "inline-flex", alignItems: "center", 
                 fontSize: 8,
                 fontWeight: 700,
                 padding: "2px 7px",
@@ -2747,7 +2747,7 @@ export default function AuditPage() {
               What has the client reported?
             </span>
             <span
-              style={{
+              style={{display: "inline-flex", alignItems: "center", 
                 fontSize: 10,
                 color: "var(--text-secondary)",
                 background: "rgba(255,255,255,0.06)",
@@ -3019,7 +3019,7 @@ export default function AuditPage() {
         >
           Screenshot / Image
           {/* <span
-            style={{
+            style={{display: "inline-flex", alignItems: "center", 
               marginLeft: 5,
               fontSize: 8,
               padding: "1px 5px",
@@ -3042,7 +3042,7 @@ export default function AuditPage() {
         >
           Video Recording
           {/* <span
-            style={{
+            style={{display: "inline-flex", alignItems: "center", 
               marginLeft: 5,
               fontSize: 8,
               padding: "1px 5px",
@@ -3178,7 +3178,7 @@ export default function AuditPage() {
                 >
                   {m.rec && (
                     <span
-                      style={{
+                      style={{display: "inline-flex", alignItems: "center", 
                         position: "absolute",
                         top: 8,
                         right: 8,
@@ -3223,7 +3223,7 @@ export default function AuditPage() {
                     {m.tags.map((t) => (
                       <span
                         key={t}
-                        style={{
+                        style={{display: "inline-flex", alignItems: "center", 
                           fontSize: 9,
                           padding: "2px 6px",
                           borderRadius: 99,
@@ -3569,7 +3569,7 @@ export default function AuditPage() {
                               </span>
                             </div>
                             <span
-                              style={{
+                              style={{display: "inline-flex", alignItems: "center", 
                                 fontSize: 12,
                                 fontWeight: 700,
                                 padding: "2px 7px",
@@ -3656,7 +3656,7 @@ export default function AuditPage() {
                             {j.ccpaPatterns.slice(0, 3).map((bp) => (
                               <span
                                 key={bp}
-                                style={{
+                                style={{display: "inline-flex", alignItems: "center", 
                                   fontSize: 8,
                                   fontWeight: 700,
                                   padding: "1px 6px",
@@ -3696,7 +3696,7 @@ export default function AuditPage() {
                             {j.regulationFocus.slice(0, 2).map((reg) => (
                               <span
                                 key={reg}
-                                style={{
+                                style={{display: "inline-flex", alignItems: "center", 
                                   fontSize: 8,
                                   fontWeight: 700,
                                   padding: "1px 6px",
@@ -3942,7 +3942,7 @@ export default function AuditPage() {
                             {/* {selectedTemplate.regulationFocus.map((reg) => (
                               <span
                                 key={reg}
-                                style={{
+                                style={{display: "inline-flex", alignItems: "center", 
                                   fontSize: 8,
                                   fontWeight: 700,
                                   padding: "2px 7px",
@@ -4057,7 +4057,7 @@ export default function AuditPage() {
                                 {selectedTemplate.ccpaPatterns.map((bp) => (
                                   <span
                                     key={bp}
-                                    style={{
+                                    style={{display: "inline-flex", alignItems: "center", 
                                       fontSize: 8,
                                       fontWeight: 700,
                                       padding: "2px 7px",
@@ -5029,7 +5029,7 @@ export default function AuditPage() {
                 Video Recording Audit
               </span>
               {/* <span
-                style={{
+                style={{display: "inline-flex", alignItems: "center", 
                   fontSize: 9,
                   padding: "2px 8px",
                   borderRadius: 99,

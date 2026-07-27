@@ -68,6 +68,8 @@ interface AuditData {
       averageVitals: Record<string, number | null>;
       totalResourceIssues: number;
       recommendations: PerfRecommendation[];
+      basePagesAudited?: number;
+      targetedPagesAudited?: number;
       authFlow?: {
         loginUrl: string;
         timeToFormMs: number | null;
@@ -617,7 +619,7 @@ function ScreenshotPanel({
                 {label}
               </span>
               <span
-                style={{
+                style={{display: "inline-flex", alignItems: "center", 
                   padding: "2px 8px",
                   borderRadius: 99,
                   background: "rgba(0,0,0,0.55)",
@@ -1197,7 +1199,7 @@ export default function AuditResultPage() {
                     return (
                       <span
                         key={p}
-                        style={{
+                        style={{display: "inline-flex", alignItems: "center", 
                           fontSize: 9,
                           padding: "2px 8px",
                           borderRadius: 99,
@@ -1289,7 +1291,7 @@ export default function AuditResultPage() {
                       </span>
                       {entry.methodology && (
                         <span
-                          style={{
+                          style={{display: "inline-flex", alignItems: "center", 
                             fontSize: 9,
                             padding: "2px 8px",
                             borderRadius: 99,
@@ -1389,7 +1391,7 @@ export default function AuditResultPage() {
                       {/* methodology badge — shown on sub-steps & summaries */}
                       {entry.methodology && !isPhaseHeader && (
                         <span
-                          style={{
+                          style={{alignItems: "center", 
                             display: "inline-block",
                             marginLeft: 7,
                             verticalAlign: "middle",
@@ -1581,7 +1583,7 @@ export default function AuditResultPage() {
             )}
             {data.siteProfile && (
               <span
-                style={{
+                style={{display: "inline-flex", alignItems: "center", 
                   fontSize: 10,
                   padding: "3px 8px",
                   borderRadius: 99,
@@ -2579,7 +2581,16 @@ export default function AuditResultPage() {
                   fontWeight: 300,
                 }}
               >
-                {data.score.uniqueIssues ?? "—"}
+                {(a11yEnabled ? data.score.uniqueIssues ?? 0 : 0) +
+                  (dpEnabled
+                    ? data.pillarResults?.darkpatterns?.totalFindings ?? 0
+                    : 0) +
+                  (perfEnabled
+                    ? data.pillarResults?.performance?.totalResourceIssues ?? 0
+                    : 0) +
+                  (privEnabled
+                    ? data.pillarResults?.privacy?.findings?.length ?? 0
+                    : 0)}
               </div>
               <div
                 style={{
@@ -3165,7 +3176,7 @@ export default function AuditResultPage() {
                       {tr.testName}
                     </span>
                     {/* <span
-                      style={{
+                      style={{display: "inline-flex", alignItems: "center", 
                         fontSize: 10,
                         padding: "2px 7px",
                         borderRadius: 99,
@@ -3383,7 +3394,7 @@ export default function AuditResultPage() {
                       >
                         {g.occurrenceCount > 1 && (
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               background: "rgba(123,79,187,0.12)",
                               color: "var(--offshade-text)",
                               fontSize: 10,
@@ -4340,7 +4351,7 @@ export default function AuditResultPage() {
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     <span
-                      style={{
+                      style={{display: "inline-flex", alignItems: "center", 
                         fontSize: 10,
                         padding: "2px 8px",
                         borderRadius: 99,
@@ -4365,7 +4376,7 @@ export default function AuditResultPage() {
                       /{journeySteps.length} steps resolved
                     </span>
                     <span
-                      style={{
+                      style={{display: "inline-flex", alignItems: "center", 
                         fontSize: 10,
                         padding: "2px 8px",
                         borderRadius: 99,
@@ -4450,7 +4461,7 @@ export default function AuditResultPage() {
                             }}
                           >
                             <span
-                              style={{
+                              style={{display: "inline-flex", alignItems: "center", 
                                 fontSize: 10,
                                 fontWeight: 700,
                                 padding: "2px 8px",
@@ -4474,7 +4485,7 @@ export default function AuditResultPage() {
                             </span>
                             {wasAudited ? (
                               <span
-                                style={{
+                                style={{display: "inline-flex", alignItems: "center", 
                                   fontSize: 9,
                                   padding: "2px 7px",
                                   borderRadius: 99,
@@ -4488,7 +4499,7 @@ export default function AuditResultPage() {
                               </span>
                             ) : isApproximate ? (
                               <span
-                                style={{
+                                style={{display: "inline-flex", alignItems: "center", 
                                   fontSize: 9,
                                   padding: "2px 7px",
                                   borderRadius: 99,
@@ -4502,7 +4513,7 @@ export default function AuditResultPage() {
                               </span>
                             ) : (
                               <span
-                                style={{
+                                style={{display: "inline-flex", alignItems: "center", 
                                   fontSize: 9,
                                   padding: "2px 7px",
                                   borderRadius: 99,
@@ -5039,7 +5050,7 @@ export default function AuditResultPage() {
                   //       🔬 Detection Intelligence
                   //     </span>
                   //     <span
-                  //       style={{
+                  //       style={{display: "inline-flex", alignItems: "center", 
                   //         fontSize: 10,
                   //         padding: "2px 7px",
                   //         borderRadius: 99,
@@ -5308,7 +5319,7 @@ export default function AuditResultPage() {
                   //                 )}
                   //                 <span>{pattern}</span>
                   //                 <span
-                  //                   style={{
+                  //                   style={{display: "inline-flex", alignItems: "center", 
                   //                     background: "rgba(205,171,254,0.2)",
                   //                     borderRadius: 99,
                   //                     padding: "0 5px",
@@ -5357,7 +5368,7 @@ export default function AuditResultPage() {
                       Regulatory Compliance Context
                     </span>
                     <span
-                      style={{
+                      style={{display: "inline-flex", alignItems: "center", 
                         fontSize: 10,
                         padding: "2px 7px",
                         borderRadius: 99,
@@ -5371,7 +5382,7 @@ export default function AuditResultPage() {
                       IRDAI / RBI / SEBI
                     </span>
                     <span
-                      style={{
+                      style={{display: "inline-flex", alignItems: "center", 
                         marginLeft: "auto",
                         fontSize: 11,
                         fontWeight: 700,
@@ -5448,7 +5459,7 @@ export default function AuditResultPage() {
                           <span>{catIconMap[cat] || "📋"}</span>
                           <span>{catLabelMap[cat] || cat}</span>
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               background: "rgba(240,171,0,0.2)",
                               borderRadius: 99,
                               padding: "0 5px",
@@ -5721,7 +5732,7 @@ export default function AuditResultPage() {
                         </span> */}
                         {/* {(f as any).fixPriority && (
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               fontSize: 9,
                               fontWeight: 700,
                               padding: "2px 7px",
@@ -5748,7 +5759,7 @@ export default function AuditResultPage() {
                         {/* Instance count badge */}
                         {/* {instanceCount > 1 && (
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               fontSize: 9,
                               padding: "2px 7px",
                               borderRadius: 99,
@@ -5765,7 +5776,7 @@ export default function AuditResultPage() {
                         {/* Compliance Exemption badge */}
                         {/* {f.complianceExemption && (
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               fontSize: 9,
                               padding: "2px 7px",
                               borderRadius: 99,
@@ -5867,7 +5878,7 @@ export default function AuditResultPage() {
                         }}
                       >
                         <span
-                          style={{
+                          style={{display: "inline-flex", alignItems: "center", 
                             fontSize: 9,
                             padding: "2px 6px",
                             borderRadius: 99,
@@ -5882,7 +5893,7 @@ export default function AuditResultPage() {
                         </span>
                         {(f as any).brignullPattern && (
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               fontSize: 9,
                               padding: "2px 6px",
                               borderRadius: 99,
@@ -5900,7 +5911,7 @@ export default function AuditResultPage() {
                         )}
                         {(f as any).findingVerdict && (
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               fontSize: 9,
                               padding: "2px 7px",
                               borderRadius: 99,
@@ -5954,7 +5965,7 @@ export default function AuditResultPage() {
                               Compliance Context
                             </span>
                             <span
-                              style={{
+                              style={{display: "inline-flex", alignItems: "center", 
                                 fontSize: 9,
                                 padding: "1px 5px",
                                 borderRadius: 99,
@@ -6179,7 +6190,7 @@ export default function AuditResultPage() {
                             }}
                           >
                             {/* <span
-                              style={{
+                              style={{display: "inline-flex", alignItems: "center", 
                                 fontSize: 9,
                                 fontWeight: 700,
                                 padding: "2px 8px",
@@ -6217,7 +6228,7 @@ export default function AuditResultPage() {
                             </span> */}
                             {/* {(f as any).estimatedEffort && (
                               <span
-                                style={{
+                                style={{display: "inline-flex", alignItems: "center", 
                                   fontSize: 9,
                                   fontWeight: 700,
                                   padding: "2px 7px",
@@ -6233,7 +6244,7 @@ export default function AuditResultPage() {
                             )} */}
                             {/* {(f as any).dsaArticle && (
                               <span
-                                style={{
+                                style={{display: "inline-flex", alignItems: "center", 
                                   fontSize: 9,
                                   fontWeight: 600,
                                   padding: "2px 7px",
@@ -6369,7 +6380,7 @@ export default function AuditResultPage() {
                           >
                             {/* {(f as any).brignullPattern && (
                               <span
-                                style={{
+                                style={{display: "inline-flex", alignItems: "center", 
                                   fontSize: 9,
                                   fontWeight: 700,
                                   padding: "2px 8px",
@@ -6473,7 +6484,7 @@ export default function AuditResultPage() {
                             }}
                           >
                             <span
-                              style={{
+                              style={{display: "inline-flex", alignItems: "center", 
                                 fontSize: 9,
                                 fontWeight: 700,
                                 padding: "2px 8px",
@@ -6609,7 +6620,7 @@ export default function AuditResultPage() {
                               </span>
                               {(f as any).estimatedEffort && (
                                 <span
-                                  style={{
+                                  style={{display: "inline-flex", alignItems: "center", 
                                     fontSize: 9,
                                     fontWeight: 700,
                                     padding: "2px 7px",
@@ -6672,6 +6683,8 @@ export default function AuditResultPage() {
                 : val <= poor
                   ? "#F0AB00"
                   : "#FF3356";
+          const fmtThreshold = (n: number, unit: string, isDecimal: boolean) =>
+            isDecimal ? n.toFixed(2) : `${n}${unit}`;
           const vLabel = (val: number | null, good: number, poor: number) =>
             val === null
               ? "N/A"
@@ -6680,6 +6693,18 @@ export default function AuditResultPage() {
                 : val <= poor
                   ? "Needs Work"
                   : "Poor";
+          const vThreshold = (
+            val: number | null,
+            good: number,
+            poor: number,
+            unit: string = "",
+            isDecimal: boolean = false,
+          ) =>
+            val === null
+              ? ""
+              : val <= good
+                ? `≤${fmtThreshold(good, unit, isDecimal)} good`
+                : `≤${fmtThreshold(poor, unit, isDecimal)} needs work`;
           const grade =
             perf.overallScore >= 90
               ? "A"
@@ -6826,6 +6851,17 @@ export default function AuditResultPage() {
                   >
                     Pages Tested
                   </div>
+                  {!!perf.targetedPagesAudited && (
+                    <div
+                      style={{
+                        fontSize: 9,
+                        color: "var(--text-muted)",
+                        marginTop: 2,
+                      }}
+                    >
+                      {perf.basePagesAudited ?? 0} crawled + {perf.targetedPagesAudited} targeted
+                    </div>
+                  )}
                 </div>
                 <div
                   className="glass-card"
@@ -6939,7 +6975,7 @@ export default function AuditResultPage() {
                                   {ci.flagLabel}
                                 </span>
                                 <span
-                                  style={{
+                                  style={{display: "inline-flex", alignItems: "center", 
                                     fontSize: 9,
                                     fontWeight: 700,
                                     padding: "1px 7px",
@@ -7032,11 +7068,26 @@ export default function AuditResultPage() {
                     poor: 600,
                     max: 1200,
                   },
+                  {
+                    key: "inp",
+                    label: "INP",
+                    desc: "Interaction to Next Paint",
+                    unit: "ms",
+                    good: 200,
+                    poor: 500,
+                    max: 1000,
+                  },
                 ].map((m) => {
                   const raw = perf.averageVitals[m.key];
                   const val = raw ?? null;
+                  const isInp = m.key === "inp";
                   const color = vColor(val, m.good, m.poor);
-                  const label = vLabel(val, m.good, m.poor);
+                  const label =
+                    val === null && isInp ? "Not Measured" : vLabel(val, m.good, m.poor);
+                  const threshold =
+                    val === null && isInp
+                      ? "requires real user interaction"
+                      : vThreshold(val, m.good, m.poor, m.unit, m.key === "cls");
                   const pct =
                     val === null ? 0 : Math.min(100, (val / m.max) * 100);
                   const display =
@@ -7105,7 +7156,7 @@ export default function AuditResultPage() {
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <span
-                          style={{
+                          style={{display: "inline-flex", alignItems: "center", 
                             fontSize: 9,
                             fontWeight: 700,
                             padding: "2px 7px",
@@ -7117,6 +7168,18 @@ export default function AuditResultPage() {
                         >
                           {label}
                         </span>
+                        {threshold && (
+                          <div
+                            style={{
+                              fontSize: 8,
+                              color: "var(--text-secondary)",
+                              marginTop: 3,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {threshold}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -7379,7 +7442,7 @@ export default function AuditResultPage() {
                             {Math.round(row.val)}ms
                           </span>
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               fontSize: 9,
                               fontWeight: 700,
                               padding: "2px 7px",
@@ -7431,7 +7494,7 @@ export default function AuditResultPage() {
                           {(perf.authFlow.totalRoundTripMs / 1000).toFixed(1)}s
                         </span>
                         <span
-                          style={{
+                          style={{display: "inline-flex", alignItems: "center", 
                             fontSize: 9,
                             fontWeight: 700,
                             padding: "2px 8px",
@@ -7629,7 +7692,7 @@ export default function AuditResultPage() {
                                 >
                                   {p.resourceIssues.length > 0 ? (
                                     <span
-                                      style={{
+                                      style={{display: "inline-flex", alignItems: "center", 
                                         fontSize: 10,
                                         fontWeight: 700,
                                         padding: "2px 7px",
@@ -7712,7 +7775,7 @@ export default function AuditResultPage() {
                           }}
                         >
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               fontSize: 10,
                               fontWeight: 700,
                               padding: "2px 9px",
@@ -7769,7 +7832,7 @@ export default function AuditResultPage() {
                                         )}
                                     </span>
                                     <span
-                                      style={{
+                                      style={{display: "inline-flex", alignItems: "center", 
                                         marginLeft: 8,
                                         fontSize: 9,
                                         fontWeight: 700,
@@ -7883,7 +7946,7 @@ export default function AuditResultPage() {
                             }}
                           >
                             <span
-                              style={{
+                              style={{display: "inline-flex", alignItems: "center", 
                                 fontSize: 11,
                                 fontWeight: 700,
                                 padding: "2px 8px",
@@ -7940,7 +8003,7 @@ export default function AuditResultPage() {
                           >
                             {r.effort && (
                               <span
-                                style={{
+                                style={{display: "inline-flex", alignItems: "center", 
                                   fontSize: 9,
                                   fontWeight: 600,
                                   padding: "1px 7px",
@@ -7956,7 +8019,7 @@ export default function AuditResultPage() {
                             )}
                             {r.impact && (
                               <span
-                                style={{
+                                style={{display: "inline-flex", alignItems: "center", 
                                   fontSize: 9,
                                   fontWeight: 700,
                                   padding: "1px 7px",

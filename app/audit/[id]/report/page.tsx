@@ -2,6 +2,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
+import {
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, Legend, PieChart, Pie, Cell, RadialBarChart, RadialBar,
+} from "recharts";
 
 // ── Accessibility types ──────────────────────────────────────
 interface Issue {
@@ -11,6 +16,9 @@ interface Issue {
   description: string;
   element: string;
   elementHtml?: string;
+  xpath?: string;
+  checkData?: Record<string, unknown>;
+  elementScreenshot?: string;
   pageUrl: string;
   wcagCriterion: string;
   wcagName: string;
@@ -71,6 +79,92 @@ interface RecItem {
   effort: string;
   impact: string;
   clientReported?: boolean;
+  rootCause?: string;
+  whyItMatters?: string;
+  businessImpact?: string;
+  expectedImprovement?: string;
+  sampleCode?: string;
+  estimatedROI?: string;
+}
+interface ThirdPartyItem {
+  url: string;
+  domain: string;
+  label: string;
+  category: string;
+  loadTimeMs: number | null;
+  transferSize: number;
+  blocking: boolean;
+  async: boolean;
+  recommendation: string;
+}
+interface ArchInfo {
+  framework: string | null;
+  cms: string | null;
+  cdn: string | null;
+  httpVersion: string | null;
+  jsLibraries: string[];
+  cssFrameworks: string[];
+  hostingPlatform: string | null;
+  hasServiceWorker: boolean;
+  hasPwaManifest: boolean;
+  hasResourceHints: boolean;
+}
+interface SeoData {
+  hasMetaTitle: boolean;
+  hasMetaDescription: boolean;
+  hasRobotsTxt: boolean | null;
+  hasSitemap: boolean | null;
+  hasCanonical: boolean;
+  hasStructuredData: boolean;
+  hasOpenGraph: boolean;
+  metaTitleLength: number | null;
+  metaDescriptionLength: number | null;
+  brokenLinks: string[];
+  issues: Array<{ type: string; severity: string; detail: string; recommendation: string }>;
+}
+interface UXPainPoint {
+  area: string;
+  severity: string;
+  description: string;
+  userImpact: string;
+}
+interface UXImprovement {
+  area: string;
+  recommendation: string;
+  expectedUplift: string;
+  effort: string;
+}
+interface UXResult {
+  score: number;
+  initialLoadExperience: { score: number; hasLoadingIndicator: boolean; hasSkeletonScreens: boolean; hasProgressiveLoading: boolean; timeToInteractiveMs: number | null };
+  visualStability: { score: number; clsDuringInteractionMs: number | null; layoutJankScore: string };
+  responsiveness: { score: number; mobileUsabilityScore: number | null; navigationResponseMs: number | null; formResponseMs: number | null; searchResponseMs: number | null };
+  animationPerformance: { score: number; scrollJank: boolean; animationFps: number | null; pageTransitionMs: number | null; smoothnessScore: string };
+  painPoints: UXPainPoint[];
+  improvementOpportunities: UXImprovement[];
+}
+interface AIRec {
+  priority: string;
+  title: string;
+  description: string;
+  rootCause: string;
+  whyItMatters: string;
+  businessImpact: string;
+  recommendation: string;
+  estimatedEffort: string;
+  expectedImprovement: string;
+  sampleCode?: string;
+  estimatedROI?: string;
+}
+interface AIReportData {
+  executiveSummary: string;
+  developerSummary: string;
+  uxNarrative: string;
+  businessImpactNarrative: string;
+  overallROI: string;
+  recommendations: AIRec[];
+  devTickets: Array<{ title: string; description: string; acceptanceCriteria: string[]; labels: string[]; storyPoints: number; priority: string }>;
+  generatedAt: string;
 }
 interface PerfResult {
   pages: PerfPage[];
@@ -86,6 +180,8 @@ interface PerfResult {
   totalResourceIssues: number;
   resourceIssuesByType: Record<string, number>;
   recommendations: RecItem[];
+  basePagesAudited?: number;
+  targetedPagesAudited?: number;
   authFlow?: {
     loginUrl: string;
     timeToFormMs: number | null;
@@ -113,6 +209,58 @@ interface PerfResult {
     evidence: string;
   }>;
   clientReportedFlags?: string[];
+  thirdPartyImpact?: ThirdPartyItem[];
+  architecture?: ArchInfo;
+  seoReadiness?: SeoData;
+  uxPerformance?: UXResult;
+  aiReport?: AIReportData;
+}
+
+// ── Dark Pattern finding ─────────────────────────────────────
+interface DPFinding {
+  id: string;
+  ruleId: string;
+  category: string;
+  principle: string;
+  title: string;
+  description: string;
+  element: string;
+  elementHtml?: string;
+  xpath?: string;
+  pageUrl: string;
+  severity: "critical" | "high" | "medium" | "low";
+  regulation: string[];
+  confidence: string;
+  recommendation: string;
+  userImpact: string;
+  evidence: {
+    summary: string;
+    details: string[];
+    screenshotDataUrl?: string;
+  };
+  source: string;
+  brignullPattern?: string;
+  brignullNumber?: number;
+  dsaArticle?: string;
+  fixPriority?: "P0" | "P1" | "P2" | "P3";
+  developerFix?: string;
+  designerFix?: string;
+  legalSummary?: string;
+  estimatedEffort?: string;
+  findingVerdict?: "verdict" | "signal";
+}
+
+interface DPResult {
+  findings: DPFinding[];
+  ethicsScore: number;
+  principleScores: Record<string, number>;
+  categoryBreakdown: Record<string, number>;
+  consentIntegrity: number;
+  choiceSymmetry: number;
+  manipulationIndex: number;
+  totalFindings: number;
+  findingsBySeverity: Record<string, number>;
+  regulatoryRisks: string[];
 }
 
 // ── Shared AuditData type ────────────────────────────────────
@@ -150,8 +298,13 @@ interface AuditData {
   };
   pillarResults?: {
     performance?: PerfResult;
-    darkpatterns?: any;
+    darkpatterns?: DPResult;
     privacy?: any;
+  };
+  trustScore?: {
+    overall: number;
+    trustLevel: "trusted" | "moderate" | "at-risk" | "critical";
+    pillarScores: Record<string, { pillar: string; score: number; weight: number; totalFindings: number; status: string }>;
   };
   startedAt: string;
   completedAt?: string;
@@ -539,6 +692,628 @@ function Card({
   );
 }
 
+// ── Developer location helpers ──────────────────────────────────
+/** Heuristic: does this "element" value look like a real CSS selector, or is it a prose fallback label? */
+function looksLikeSelector(s: string): boolean {
+  if (!s) return false;
+  if (s.includes("/")) return false; // e.g. "timeout/redirect", "status/notification element"
+  const withoutCombinators = s.replace(/\s*>\s*/g, ">");
+  if (/\s/.test(withoutCombinators)) return false; // remaining whitespace = prose
+  return true;
+}
+
+function SelectorRow({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: 11,
+          color: "var(--text-muted)",
+          marginBottom: 4,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <span>{label}</span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            navigator.clipboard.writeText(value);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+          style={{
+            fontSize: 10,
+            padding: "2px 8px",
+            borderRadius: 4,
+            border: "1px solid var(--border)",
+            background: copied ? "rgba(0,186,140,0.15)" : "var(--bg-glass)",
+            color: copied ? "#00BA8C" : "var(--text-muted)",
+            cursor: "pointer",
+          }}
+        >
+          {copied ? "Copied ✓" : "Copy"}
+        </button>
+      </div>
+      <code
+        style={{
+          display: "block",
+          fontSize: 11,
+          background: "rgba(0,0,0,0.3)",
+          padding: "6px 8px",
+          borderRadius: 3,
+          wordBreak: "break-all",
+          whiteSpace: "pre-wrap",
+          maxHeight: 120,
+          overflowY: "auto",
+        }}
+      >
+        {value}
+      </code>
+    </div>
+  );
+}
+
+// ── Issue grouping (one row per violation type, drill down to instances) ──
+interface IssueGroup {
+  key: string;
+  title: string;
+  wcagCriterion: string;
+  wcagName: string;
+  wcagLevel: string;
+  severity: Issue["severity"];
+  category: string;
+  instances: (Issue & { team: string; effort: string; component: string })[];
+}
+
+function groupIssuesByType(
+  items: (Issue & { team: string; effort: string; component: string })[],
+): IssueGroup[] {
+  const map = new Map<string, IssueGroup>();
+  for (const item of items) {
+    const key = `${item.wcagCriterion}::${item.title}`;
+    let g = map.get(key);
+    if (!g) {
+      g = {
+        key,
+        title: item.title,
+        wcagCriterion: item.wcagCriterion,
+        wcagName: item.wcagName,
+        wcagLevel: item.wcagLevel,
+        severity: item.severity,
+        category: item.category,
+        instances: [],
+      };
+      map.set(key, g);
+    }
+    g.instances.push(item);
+  }
+  const sevOrder: Record<string, number> = {
+    critical: 0,
+    high: 1,
+    medium: 2,
+    low: 3,
+  };
+  return Array.from(map.values()).sort(
+    (a, b) => sevOrder[a.severity] - sevOrder[b.severity],
+  );
+}
+
+function GroupedIssueCard({
+  group,
+  idx,
+  statusMap,
+  onStatusChange,
+}: {
+  group: IssueGroup;
+  idx: number;
+  statusMap: Record<string, IssueStatus>;
+  onStatusChange: (id: string, s: IssueStatus) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const count = group.instances.length;
+
+  if (count === 1) {
+    return (
+      <IssueCard
+        issue={group.instances[0]}
+        idx={idx}
+        status={statusMap[group.instances[0].id] || "Open"}
+        onStatusChange={onStatusChange}
+      />
+    );
+  }
+
+  const affectedPages = Array.from(
+    new Set(group.instances.map((i) => i.pageUrl)),
+  );
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "12px 16px",
+          cursor: "pointer",
+          flexWrap: "wrap",
+          border: `1px solid ${expanded ? "var(--kpmg-dynamic)" : "var(--dynamic-border)"}`,
+          borderLeft: `3px solid ${SEV_COLOR[group.severity]}`,
+          background: expanded ? "var(--bg-card-hover)" : "var(--bg-card)",
+          transition: "var(--transition)",
+        }}
+      >
+        <span
+          style={{
+            fontSize: 12,
+            fontFamily: "monospace",
+            color: "var(--text-muted)",
+            flexShrink: 0,
+          }}
+        >
+          #{String(idx).padStart(3, "0")}
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontWeight: 700, fontSize: 13 }}>{group.title}</span>
+          <span
+            style={{ marginLeft: 8, fontSize: 12, color: "var(--text-muted)" }}
+          >
+            {affectedPages.length} page{affectedPages.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+        <span
+          style={{display: "inline-flex", alignItems: "center", 
+            padding: "2px 8px",
+            borderRadius: 99,
+            fontSize: 12,
+            fontWeight: 500,
+            background: SEV_BG[group.severity],
+            color: SEV_COLOR[group.severity],
+            border: `1px solid ${SEV_COLOR[group.severity]}40`,
+            textTransform: "uppercase",
+          }}
+        >
+          {group.severity}
+        </span>
+        <span
+          style={{display: "inline-flex", alignItems: "center", 
+            padding: "2px 8px",
+            borderRadius: 99,
+            fontSize: 12,
+            fontWeight: 700,
+            background: "rgba(0,145,218,0.12)",
+            color: "#0091DA",
+          }}
+        >
+          × {count} instances
+        </span>
+        <span
+          style={{
+            fontSize: 12,
+            color: "var(--text-muted)",
+            transform: expanded ? "rotate(180deg)" : "",
+            transition: "0.2s",
+            userSelect: "none",
+          }}
+        >
+          ▼
+        </span>
+      </div>
+      {expanded && (
+        <div
+          style={{
+            paddingLeft: 14,
+            marginTop: 6,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            borderLeft: "2px solid var(--dynamic-border)",
+          }}
+        >
+          {group.instances.map((inst, j) => (
+            <IssueCard
+              key={inst.id}
+              issue={inst}
+              idx={j + 1}
+              status={statusMap[inst.id] || "Open"}
+              onStatusChange={onStatusChange}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Dark Pattern finding grouping (one row per rule+page, drill down to instances) ──
+interface DPFindingGroup {
+  key: string;
+  title: string;
+  ruleId: string;
+  severity: DPFinding["severity"];
+  category: string;
+  pageUrl: string;
+  instances: DPFinding[];
+}
+
+function groupDPFindings(items: DPFinding[]): DPFindingGroup[] {
+  const map = new Map<string, DPFindingGroup>();
+  for (const item of items) {
+    const key = `${item.ruleId}::${item.pageUrl}`;
+    let g = map.get(key);
+    if (!g) {
+      g = {
+        key,
+        title: item.title,
+        ruleId: item.ruleId,
+        severity: item.severity,
+        category: item.category,
+        pageUrl: item.pageUrl,
+        instances: [],
+      };
+      map.set(key, g);
+    }
+    g.instances.push(item);
+  }
+  const sevOrder: Record<string, number> = {
+    critical: 0,
+    high: 1,
+    medium: 2,
+    low: 3,
+  };
+  return Array.from(map.values()).sort(
+    (a, b) => sevOrder[a.severity] - sevOrder[b.severity],
+  );
+}
+
+function DPFindingCard({ finding, idx }: { finding: DPFinding; idx: number }) {
+  const [open, setOpen] = useState(false);
+  const elementIsSelector = looksLikeSelector(finding.element || "");
+  const devToolsCmd =
+    finding.xpath
+      ? `$x('${finding.xpath.replace(/'/g, "\\'")}')[0]`
+      : elementIsSelector
+        ? `document.querySelector('${finding.element.replace(/'/g, "\\'")}')`
+        : null;
+
+  return (
+    <div
+      style={{
+        border: `1px solid ${open ? "var(--kpmg-dynamic)" : "var(--dynamic-border)"}`,
+        borderLeft: `3px solid ${SEV_COLOR[finding.severity]}`,
+        background: open ? "var(--bg-card-hover)" : "var(--bg-card)",
+        marginBottom: 8,
+        padding: "10px",
+        transition: "var(--transition)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "12px 16px",
+          cursor: "pointer",
+          flexWrap: "wrap",
+        }}
+        onClick={() => setOpen(!open)}
+      >
+        <span
+          style={{
+            fontSize: 12,
+            fontFamily: "monospace",
+            color: "var(--text-muted)",
+            flexShrink: 0,
+          }}
+        >
+          #{String(idx).padStart(3, "0")}
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontWeight: 700, fontSize: 13 }}>
+            {finding.title}
+          </span>
+          <span
+            style={{ marginLeft: 8, fontSize: 13, color: "var(--text-muted)" }}
+          >
+            {finding.pageUrl.replace(/^https?:\/\/[^/]+/, "") || "/"}
+          </span>
+        </div>
+        <span
+          style={{display: "inline-flex", alignItems: "center", 
+            padding: "2px 8px",
+            borderRadius: 99,
+            fontSize: 13,
+            fontWeight: 500,
+            background: SEV_BG[finding.severity],
+            color: SEV_COLOR[finding.severity],
+            border: `1px solid ${SEV_COLOR[finding.severity]}40`,
+            textTransform: "uppercase",
+          }}
+        >
+          {finding.severity}
+        </span>
+        {finding.brignullPattern && (
+          <span
+            style={{display: "inline-flex", alignItems: "center", 
+              padding: "2px 7px",
+              borderRadius: 99,
+              fontSize: 12,
+              fontWeight: 500,
+              background: "rgba(205,171,254,0.12)",
+              color: "#CDABFE",
+            }}
+          >
+            {finding.brignullPattern}
+          </span>
+        )}
+        <span
+          style={{display: "inline-flex", alignItems: "center", 
+            padding: "2px 7px",
+            borderRadius: 99,
+            fontSize: 12,
+            fontWeight: 500,
+            background: "rgba(0,145,218,0.1)",
+            color: "#0091DA",
+          }}
+        >
+          {finding.ruleId}
+        </span>
+        <span
+          style={{
+            fontSize: 12,
+            color: "var(--text-muted)",
+            transform: open ? "rotate(180deg)" : "",
+            transition: "0.2s",
+            userSelect: "none",
+          }}
+        >
+          ▼
+        </span>
+      </div>
+      {open && (
+        <div
+          style={{
+            padding: "0 16px 18px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
+          <div
+            style={{ height: 1, background: "var(--border)", marginBottom: 4 }}
+          />
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div>
+                <SectionLabel label="Description" />
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-secondary)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {finding.description}
+                </div>
+              </div>
+              <div>
+                <SectionLabel label="Evidence" />
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-secondary)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {finding.evidence?.summary}
+                </div>
+              </div>
+              <div>
+                <SectionLabel label="User Impact" />
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-secondary)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {finding.userImpact}
+                </div>
+              </div>
+              <div>
+                <SectionLabel label="Recommendation" />
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-secondary)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {finding.developerFix || finding.recommendation}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div>
+                <SectionLabel label="Developer Location" />
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                  {finding.evidence?.screenshotDataUrl && (
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "var(--text-muted)",
+                          marginBottom: 4,
+                        }}
+                      >
+                        📸 Element Screenshot (captured during audit)
+                      </div>
+                      <img
+                        src={finding.evidence.screenshotDataUrl}
+                        alt="Screenshot of flagged element"
+                        style={{
+                          maxWidth: "100%",
+                          border: "1px solid var(--border)",
+                          borderRadius: 4,
+                          display: "block",
+                        }}
+                      />
+                    </div>
+                  )}
+                  {finding.findingVerdict === "signal" && !finding.element ? (
+                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                      AI-detected pattern — no precise DOM element available.
+                      See the screenshot and description above for visual
+                      context.
+                    </div>
+                  ) : (
+                    <>
+                      <SelectorRow
+                        label="🎯 CSS Selector"
+                        value={finding.element || "(not resolved)"}
+                      />
+                      {finding.xpath && (
+                        <SelectorRow label="📍 XPath" value={finding.xpath} />
+                      )}
+                      {devToolsCmd && (
+                        <SelectorRow
+                          label="🔧 DevTools Console Command"
+                          value={devToolsCmd}
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+              {finding.elementHtml && (
+                <div>
+                  <SectionLabel label="Affected Element (HTML)" />
+                  <pre
+                    style={{
+                      margin: 0,
+                      fontSize: 12,
+                      background: "#010B1A",
+                      border: "1px solid var(--border)",
+                      borderRadius: 4,
+                      padding: "8px 10px",
+                      overflowX: "auto",
+                      color: "#B0D4F0",
+                      lineHeight: 1.5,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {finding.elementHtml.substring(0, 400)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DPFindingGroupCard({ group }: { group: DPFindingGroup }) {
+  const [expanded, setExpanded] = useState(false);
+  const count = group.instances.length;
+
+  if (count === 1) {
+    return <DPFindingCard finding={group.instances[0]} idx={1} />;
+  }
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "12px 16px",
+          cursor: "pointer",
+          flexWrap: "wrap",
+          border: `1px solid ${expanded ? "var(--kpmg-dynamic)" : "var(--dynamic-border)"}`,
+          borderLeft: `3px solid ${SEV_COLOR[group.severity]}`,
+          background: expanded ? "var(--bg-card-hover)" : "var(--bg-card)",
+          transition: "var(--transition)",
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontWeight: 700, fontSize: 13 }}>{group.title}</span>
+          <span
+            style={{ marginLeft: 8, fontSize: 12, color: "var(--text-muted)" }}
+          >
+            {group.pageUrl.replace(/^https?:\/\/[^/]+/, "") || "/"}
+          </span>
+        </div>
+        <span
+          style={{display: "inline-flex", alignItems: "center", 
+            padding: "2px 8px",
+            borderRadius: 99,
+            fontSize: 12,
+            fontWeight: 500,
+            background: SEV_BG[group.severity],
+            color: SEV_COLOR[group.severity],
+            border: `1px solid ${SEV_COLOR[group.severity]}40`,
+            textTransform: "uppercase",
+          }}
+        >
+          {group.severity}
+        </span>
+        <span
+          style={{display: "inline-flex", alignItems: "center", 
+            padding: "2px 8px",
+            borderRadius: 99,
+            fontSize: 12,
+            fontWeight: 700,
+            background: "rgba(0,145,218,0.12)",
+            color: "#0091DA",
+          }}
+        >
+          × {count} instances
+        </span>
+        <span
+          style={{
+            fontSize: 12,
+            color: "var(--text-muted)",
+            transform: expanded ? "rotate(180deg)" : "",
+            transition: "0.2s",
+            userSelect: "none",
+          }}
+        >
+          ▼
+        </span>
+      </div>
+      {expanded && (
+        <div
+          style={{
+            paddingLeft: 14,
+            marginTop: 6,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            borderLeft: "2px solid var(--dynamic-border)",
+          }}
+        >
+          {group.instances.map((inst, j) => (
+            <DPFindingCard key={inst.id} finding={inst} idx={j + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── IssueCard (Accessibility) ─────────────────────────────────
 function IssueCard({
   issue,
@@ -556,6 +1331,12 @@ function IssueCard({
   const effort = deriveEffort(issue);
   const component = deriveComponent(issue);
   const acceptance = deriveAcceptanceCriteria(issue);
+  const elementIsSelector = looksLikeSelector(issue.element);
+  const devToolsCmd = issue.xpath
+    ? `$x('${issue.xpath.replace(/'/g, "\\'")}')[0]`
+    : elementIsSelector
+      ? `document.querySelector('${issue.element.replace(/'/g, "\\'")}')`
+      : null;
   const statusColors: Record<IssueStatus, string> = {
     // Open: "#FF3356",
     // "In Review": "#F0AB00",
@@ -618,7 +1399,7 @@ function IssueCard({
           }}
         >
           <span
-            style={{
+            style={{display: "inline-flex", alignItems: "center", 
               padding: "2px 8px",
               borderRadius: 99,
               fontSize: 13,
@@ -632,7 +1413,7 @@ function IssueCard({
             {issue.severity}
           </span>
           <span
-            style={{
+            style={{display: "inline-flex", alignItems: "center", 
               padding: "2px 8px",
               borderRadius: 99,
               fontSize: 12,
@@ -645,7 +1426,7 @@ function IssueCard({
             {team}
           </span>
           <span
-            style={{
+            style={{display: "inline-flex", alignItems: "center", 
               padding: "2px 8px",
               borderRadius: 99,
               fontSize: 12,
@@ -658,7 +1439,7 @@ function IssueCard({
             {effort}
           </span>
           <span
-            style={{
+            style={{display: "inline-flex", alignItems: "center", 
               padding: "2px 7px",
               borderRadius: 99,
               fontSize: 12,
@@ -731,7 +1512,7 @@ function IssueCard({
                 <div style={{ fontSize: 13 }}>
                   <strong>{issue.wcagCriterion}</strong> — {issue.wcagName}{" "}
                   <span
-                    style={{
+                    style={{display: "inline-flex", alignItems: "center", 
                       padding: "1px 6px",
                       borderRadius: 99,
                       fontSize: 12,
@@ -770,17 +1551,29 @@ function IssueCard({
                     </code>
                   </li>
                   <li>
-                    Locate:{" "}
-                    <code
-                      style={{
-                        fontSize: 11,
-                        background: "rgba(0,0,0,0.3)",
-                        padding: "1px 5px",
-                        borderRadius: 3,
-                      }}
-                    >
-                      {issue.element.substring(0, 60)}
-                    </code>
+                    Open DevTools → Console, then paste:{" "}
+                    {devToolsCmd ? (
+                      <code
+                        style={{
+                          fontSize: 11,
+                          background: "rgba(0,0,0,0.3)",
+                          padding: "1px 5px",
+                          borderRadius: 3,
+                          wordBreak: "break-all",
+                        }}
+                      >
+                        {devToolsCmd}
+                      </code>
+                    ) : (
+                      <span style={{ color: "var(--text-muted)" }}>
+                        no reliable selector — search the page source for the
+                        HTML snippet shown under &quot;Affected Element&quot;
+                      </span>
+                    )}
+                  </li>
+                  <li>
+                    The element will be selected and highlighted in the
+                    Elements panel
                   </li>
                   <li>Attempt keyboard-only interaction (Tab, Enter, Space)</li>
                   <li>
@@ -854,13 +1647,85 @@ function IssueCard({
                         lineHeight: 1.5,
                       }}
                     >
-                      {issue.recommendation.substring(0, 200)}
+                      {(
+                        issue.recommendation ||
+                        "Recommendation not available — review the issue description and applicable WCAG criterion."
+                      ).substring(0, 200)}
                     </div>
                   </div>
                 </div>
               </div>
+              {issue.checkData && Object.keys(issue.checkData).length > 0 && (
+                <div>
+                  <SectionLabel label="Measured Values" />
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 3,
+                      fontSize: 12,
+                      background: "rgba(0,0,0,0.2)",
+                      borderRadius: 4,
+                      padding: "8px 10px",
+                    }}
+                  >
+                    {Object.entries(issue.checkData).map(([k, v]) => (
+                      <div key={k} style={{ display: "flex", gap: 6 }}>
+                        <span style={{ color: "var(--text-muted)" }}>
+                          {k}:
+                        </span>
+                        <span style={{ fontFamily: "monospace" }}>
+                          {typeof v === "object"
+                            ? JSON.stringify(v)
+                            : String(v)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div>
+                <SectionLabel label="Developer Location" />
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                  {issue.elementScreenshot && (
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "var(--text-muted)",
+                          marginBottom: 4,
+                        }}
+                      >
+                        📸 Element Screenshot (captured during audit)
+                      </div>
+                      <img
+                        src={`data:image/png;base64,${issue.elementScreenshot}`}
+                        alt="Screenshot of affected element"
+                        style={{
+                          maxWidth: "100%",
+                          border: "1px solid var(--border)",
+                          borderRadius: 4,
+                          display: "block",
+                        }}
+                      />
+                    </div>
+                  )}
+                  <SelectorRow label="🎯 CSS Selector" value={issue.element} />
+                  {issue.xpath && (
+                    <SelectorRow label="📍 XPath" value={issue.xpath} />
+                  )}
+                  {devToolsCmd && (
+                    <SelectorRow
+                      label="🔧 DevTools Console Command"
+                      value={devToolsCmd}
+                    />
+                  )}
+                </div>
+              </div>
               <div>
                 <SectionLabel label="Affected Element (HTML)" />
                 {issue.elementHtml ? (
@@ -1057,7 +1922,7 @@ function CwvGauge({
 function ResourceIssueBadge({ severity }: { severity: string }) {
   return (
     <span
-      style={{
+      style={{display: "inline-flex", alignItems: "center", 
         padding: "1px 7px",
         borderRadius: 99,
         fontSize: 12,
@@ -1089,6 +1954,10 @@ export default function FinalReportPage() {
   const [expandedPage, setExpandedPage] = useState<string | null>(null);
   const [showAllBacklog, setShowAllBacklog] = useState(false);
   const [showAllAcceptance, setShowAllAcceptance] = useState(false);
+  const [aiPersona, setAiPersona] = useState<"executive" | "developer" | "pm" | "consultant">("executive");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [expandedTicket, setExpandedTicket] = useState<number | null>(null);
+  const [expandedRec, setExpandedRec] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/audit/${id}`);
@@ -1171,6 +2040,11 @@ export default function FinalReportPage() {
       (effortFilter === "all" || i.effort === effortFilter) &&
       (compFilter === "all" || i.component === compFilter),
   );
+  const groupedBacklog = groupIssuesByType(filtered);
+
+  // ── Dark Pattern derived data ───────────────────────────────────
+  const dpFindings: DPFinding[] = data.pillarResults?.darkpatterns?.findings || [];
+  const dpGroupedFindings = groupDPFindings(dpFindings);
   const compGroups: Record<string, typeof augmented> = {};
   augmented.forEach((i) => {
     if (!compGroups[i.component]) compGroups[i.component] = [];
@@ -1204,32 +2078,125 @@ export default function FinalReportPage() {
       (riTypeFilter === "all" || r.type === riTypeFilter),
   );
 
-  // ── Display values (pillar-aware) ─────────────────────────────
-  const displayScore = perfOnly ? perfScore : score.overall;
+  // ── Enterprise layer derived data ─────────────────────────────
+  const thirdParty = perfResult?.thirdPartyImpact || [];
+  const architecture = perfResult?.architecture;
+  const seoReadiness = perfResult?.seoReadiness;
+  const uxPerf = perfResult?.uxPerformance;
+  const aiReport = perfResult?.aiReport;
+
+  // Recharts data builders
+  const uxRadarData = uxPerf ? [
+    { subject: "Loading", value: uxPerf.initialLoadExperience.score, fullMark: 100 },
+    { subject: "Stability", value: uxPerf.visualStability.score, fullMark: 100 },
+    { subject: "Responsiveness", value: uxPerf.responsiveness.score, fullMark: 100 },
+    { subject: "Animation", value: uxPerf.animationPerformance.score, fullMark: 100 },
+    { subject: "Mobile", value: uxPerf.responsiveness.mobileUsabilityScore ?? 75, fullMark: 100 },
+  ] : [];
+
+  const uxResponsivenessData = uxPerf ? [
+    { name: "Navigation", ms: uxPerf.responsiveness.navigationResponseMs ?? 0, target: 300 },
+    { name: "Form Input", ms: uxPerf.responsiveness.formResponseMs ?? 0, target: 100 },
+    { name: "Search", ms: uxPerf.responsiveness.searchResponseMs ?? 0, target: 300 },
+  ].filter(d => d.ms > 0) : [];
+
+  const networkSimData = (perfResult?.networkSimulation || []).map(s => ({
+    name: s.label,
+    LCP: s.lcp ?? 0,
+    Score: s.score ?? 0,
+  }));
+
+  const riPieData = Object.entries(perfResult?.resourceIssuesByType || {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([name, value]) => ({ name: name.replace(/-/g, ' '), value }));
+
+  const PIE_COLORS = ["#E8002D", "#FF6B00", "#F0AB00", "#0091DA", "#00B2A9", "#00BA8C", "#CDABFE", "#FE7141"];
+
+  const triggerAIAnalysis = async () => {
+    if (!data?.id || aiGenerating) return;
+    setAiGenerating(true);
+    try {
+      const res = await fetch("/api/audit/perf-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: data.id }),
+      });
+      if (res.ok) {
+        await fetchData();
+      }
+    } catch (err) {
+      console.error("AI analysis failed:", err);
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const exportPerfCSV = () => {
+    const rows = [["Page URL", "Issue Type", "Severity", "Description", "Recommendation", "Effort", "Priority"]];
+    recs.forEach(r => {
+      rows.push([`"${data.config?.url || ''}"`, r.issueType || r.title, r.impact, `"${r.detail.replace(/"/g, '""')}"`, `"${r.detail.replace(/"/g, '""')}"`, r.effort, r.priority]);
+    });
+    allResourceIssues.forEach(ri => {
+      rows.push([`"${ri.pageUrl}"`, ri.type, ri.severity, `"${ri.description.replace(/"/g, '""')}"`, `"${ri.recommendation.replace(/"/g, '""')}"`, "", ""]);
+    });
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url2 = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url2;
+    a.download = `kpmg-perf-issues-${data.id}.csv`;
+    a.click();
+  };
+
+  // ── Display values (pillar-aware) ──────────────────────────────
+  // Derived from the pillars actually selected for this audit — never a generic bucket name.
+  const PILLAR_LABEL: Record<string, string> = {
+    accessibility: "Accessibility",
+    darkpatterns: "Dark Patterns",
+    performance: "Performance",
+    privacy: "Privacy",
+  };
+  const pillarNames = enabledPillars.map((p) => PILLAR_LABEL[p] ?? p);
+  const isMultiPillar = enabledPillars.length > 1;
+  const joinedPillarNames =
+    enabledPillars.length === 4 ? null : pillarNames.join(" + ");
+  const displayScore = isMultiPillar
+    ? (data.trustScore?.overall ?? score.overall)
+    : perfOnly
+      ? perfScore
+      : isDP
+        ? (data.pillarResults?.darkpatterns?.ethicsScore ?? score.overall)
+        : isPriv && !isA11y
+          ? (data.pillarResults?.privacy?.overallScore ?? score.overall)
+          : score.overall;
   const scoreColor =
     displayScore >= 75 ? "#00BA8C" : displayScore >= 50 ? "#F0AB00" : "#FF3356";
-  const reportTitle = perfOnly
-    ? "Performance Audit"
-    : enabledPillars.length === 1 && isDP
-      ? "Dark Pattern Audit"
-      : enabledPillars.length === 4
-        ? "TrustLens 4-Pillar Audit"
-        : enabledPillars.length === 1
-          ? "Accessibility Audit"
-          : "TrustLens Multi-Pillar Audits";
+  const reportTitle = isMultiPillar
+    ? joinedPillarNames
+      ? `${joinedPillarNames} Audit`
+      : "TrustLens 4-Pillar Audit"
+    : `${pillarNames[0]} Audit`;
   const headerSub = perfOnly
     ? `${data.config?.url || ""} · Performance Score: ${perfScore}/100 · ${reportDate}`
-    : `${data.config?.url || ""} · ${isA11y ? `${standard} Level ${testedLevel}` : enabledPillars.join(", ")} · ${reportDate}`;
+    : `${data.config?.url || ""} · ${isA11y && !isMultiPillar ? `${standard} Level ${testedLevel}` : enabledPillars.join(", ")} · ${reportDate}`;
 
   // ── Tabs (pillar-aware) ───────────────────────────────────────
   const TABS = perfOnly
     ? [
         { id: "executive", label: "Executive Summary" },
         { id: "cwv", label: "Core Web Vitals" },
+        { id: "ux-performance", label: "UX Performance" },
         { id: "pages", label: "Page Analysis" },
         { id: "resources", label: "Resource Issues" },
+        { id: "third-party", label: "Third-Party Impact" },
+        { id: "architecture", label: "Architecture" },
+        { id: "seo", label: "Technical SEO" },
+        { id: "best-practices", label: "Best Practices" },
         { id: "action-plan", label: "Action Plan" },
         { id: "network", label: "Network & Auth" },
+        { id: "ai-insights", label: "AI Insights" },
+        { id: "roadmap", label: "Roadmap" },
       ]
     : [
         { id: "executive", label: "Executive Summary" },
@@ -1242,6 +2209,7 @@ export default function FinalReportPage() {
               { id: "acceptance", label: "Acceptance / QA" },
             ]
           : []),
+        ...(isDP ? [{ id: "dark-patterns", label: "Dark Patterns" }] : []),
         ...(isPerf ? [{ id: "performance", label: "Performance" }] : []),
       ];
 
@@ -1473,7 +2441,7 @@ export default function FinalReportPage() {
                 {enabledPillars.map((p) => (
                   <span
                     key={p}
-                    style={{
+                    style={{display: "inline-flex", alignItems: "center", 
                       padding: "2px 10px",
                       borderRadius: 99,
                       marginTop: "10px",
@@ -1526,6 +2494,21 @@ export default function FinalReportPage() {
                 {isA11y && (
                   <button
                     onClick={exportCSV}
+                    className="btn btn-secondary btn-sm"
+                    style={{
+                      fontSize: 11,
+                      background: "rgba(255,255,255,0.12)",
+                      color: "white",
+                      width: "120px",
+                      border: "1px solid rgba(255,255,255,0.25)",
+                    }}
+                  >
+                    Export CSV
+                  </button>
+                )}
+                {perfOnly && (
+                  <button
+                    onClick={exportPerfCSV}
                     className="btn btn-secondary btn-sm"
                     style={{
                       fontSize: 11,
@@ -1686,7 +2669,11 @@ export default function FinalReportPage() {
                     val={perfPages.length}
                     label="Pages Analysed"
                     color="#0091DA"
-                    sub="Core Web Vitals"
+                    sub={
+                      perfResult?.targetedPagesAudited
+                        ? `${perfResult.basePagesAudited ?? 0} crawled + ${perfResult.targetedPagesAudited} targeted`
+                        : "Core Web Vitals"
+                    }
                   />
                 </div>
 
@@ -2004,7 +2991,7 @@ export default function FinalReportPage() {
                           }}
                         >
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               padding: "2px 8px",
                               borderRadius: 99,
                               fontSize: 10,
@@ -2016,7 +3003,7 @@ export default function FinalReportPage() {
                             {r.impact} Impact
                           </span>
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               padding: "2px 8px",
                               borderRadius: 99,
                               fontSize: 10,
@@ -2087,7 +3074,7 @@ export default function FinalReportPage() {
                             {ci.flagLabel || ci.flag}
                           </div>
                           <span
-                            style={{
+                            style={{display: "inline-flex", alignItems: "center", 
                               padding: "2px 8px",
                               borderRadius: 99,
                               fontSize: 10,
@@ -2162,9 +3149,10 @@ export default function FinalReportPage() {
                     sub="/100"
                   />
                   <Tile
-                    val={issues.length}
-                    label="Total Issues"
+                    val={score.uniqueIssues ?? issues.length}
+                    label="Unique Issues"
                     color="#FF6B00"
+                    sub={`${issues.length} instances`}
                   />
                   <Tile
                     val={score.issueBySeverity.critical}
@@ -2480,7 +3468,7 @@ export default function FinalReportPage() {
                           </div>
                         </div>
                         <span
-                          style={{
+                          style={{display: "inline-flex", alignItems: "center", 
                             marginLeft: "auto",
                             padding: "2px 8px",
                             borderRadius: 99,
@@ -3356,7 +4344,7 @@ export default function FinalReportPage() {
                         </div>
                         {r.clientReported && (
                           <span
-                            style={{
+                            style={{alignItems: "center", 
                               display: "inline-block",
                               marginTop: 4,
                               padding: "1px 7px",
@@ -3380,7 +4368,7 @@ export default function FinalReportPage() {
                         }}
                       >
                         <span
-                          style={{
+                          style={{display: "inline-flex", alignItems: "center", 
                             padding: "2px 8px",
                             borderRadius: 99,
                             fontSize: 10,
@@ -3392,7 +4380,7 @@ export default function FinalReportPage() {
                           {r.impact} Impact
                         </span>
                         <span
-                          style={{
+                          style={{display: "inline-flex", alignItems: "center", 
                             padding: "2px 8px",
                             borderRadius: 99,
                             fontSize: 10,
@@ -3578,7 +4566,7 @@ export default function FinalReportPage() {
                             </td>
                             <td style={{ padding: "10px 14px" }}>
                               <span
-                                style={{
+                                style={{display: "inline-flex", alignItems: "center", 
                                   padding: "2px 8px",
                                   borderRadius: 99,
                                   fontSize: 10,
@@ -3803,6 +4791,603 @@ export default function FinalReportPage() {
           </div>
         )}
 
+        {/* ══ UX PERFORMANCE TAB ══ */}
+        {activeTab === "ux-performance" && perfOnly && (
+          <div className="animate-fade-in">
+            {uxPerf ? (
+              <>
+                {/* UX Score Hero */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 28 }}>
+                  {[
+                    { label: "UX Score", val: uxPerf.score, icon: "🎯" },
+                    { label: "Loading Experience", val: uxPerf.initialLoadExperience.score, icon: "⏳" },
+                    { label: "Visual Stability", val: uxPerf.visualStability.score, icon: "🔒" },
+                    { label: "Responsiveness", val: uxPerf.responsiveness.score, icon: "⚡" },
+                    { label: "Animation Smoothness", val: uxPerf.animationPerformance.score, icon: "🎬" },
+                  ].map(({ label, val, icon }) => (
+                    <div key={label} style={{ background: "var(--bg-darkcard)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", padding: "16px 14px", textAlign: "center" }}>
+                      <div style={{ fontSize: 20, marginBottom: 6 }}>{icon}</div>
+                      <div style={{ fontSize: 26, fontWeight: 800, color: val >= 75 ? "#00BA8C" : val >= 50 ? "#F0AB00" : "#E8002D", lineHeight: 1 }}>{val}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Radar Chart */}
+                {uxRadarData.length > 0 && (
+                  <Card style={{ marginBottom: 24 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>📊 UX Performance Dimensions</h3>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <RadarChart data={uxRadarData}>
+                        <PolarGrid stroke="rgba(255,255,255,0.1)" />
+                        <PolarAngleAxis dataKey="subject" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
+                        <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "var(--text-muted)", fontSize: 10 }} />
+                        <Radar name="Score" dataKey="value" stroke="#0091DA" fill="#0091DA" fillOpacity={0.3} />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </Card>
+                )}
+
+                {/* Responsiveness Chart */}
+                {uxResponsivenessData.length > 0 && (
+                  <Card style={{ marginBottom: 24 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>⚡ Responsiveness: Measured vs Target (ms)</h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={uxResponsivenessData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+                        <XAxis dataKey="name" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
+                        <YAxis tick={{ fill: "var(--text-muted)", fontSize: 11 }} />
+                        <Tooltip contentStyle={{ background: "var(--bg-darkcard)", border: "1px solid var(--border-subtle)", borderRadius: 8, fontSize: 12 }} />
+                        <Legend />
+                        <Bar dataKey="ms" name="Measured (ms)" fill="#0091DA" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="target" name="Target (ms)" fill="rgba(0,186,140,0.4)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Card>
+                )}
+
+                {/* Loading Experience Details */}
+                <Card style={{ marginBottom: 20 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>⏳ Initial Load Experience</h3>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+                    {[
+                      { label: "Loading Indicator", ok: uxPerf.initialLoadExperience.hasLoadingIndicator, pass: "Detected", fail: "Not found — users see blank content during load" },
+                      { label: "Skeleton Screens", ok: uxPerf.initialLoadExperience.hasSkeletonScreens, pass: "Detected", fail: "Not found — add skeleton placeholders for perceived speed" },
+                      { label: "Progressive Loading", ok: uxPerf.initialLoadExperience.hasProgressiveLoading, pass: "Content loads progressively", fail: "Single paint event — consider chunked loading" },
+                    ].map(({ label, ok, pass, fail }) => (
+                      <div key={label} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", background: ok ? "rgba(0,186,140,0.06)" : "rgba(232,0,45,0.06)", borderRadius: 8, border: `1px solid ${ok ? "rgba(0,186,140,0.2)" : "rgba(232,0,45,0.2)"}` }}>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>{ok ? "✅" : "❌"}</span>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{ok ? pass : fail}</div>
+                        </div>
+                      </div>
+                    ))}
+                    {uxPerf.initialLoadExperience.timeToInteractiveMs !== null && (
+                      <div style={{ padding: "10px 12px", background: "var(--bg-darkcard)", borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
+                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Time to Interactive</div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: uxPerf.initialLoadExperience.timeToInteractiveMs <= 3800 ? "#00BA8C" : "#F0AB00" }}>{Math.round(uxPerf.initialLoadExperience.timeToInteractiveMs)}ms</div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                {/* Pain Points */}
+                {uxPerf.painPoints.length > 0 && (
+                  <Card style={{ marginBottom: 20 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>🚨 UX Pain Points</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {uxPerf.painPoints.map((pp, i) => (
+                        <div key={i} style={{ padding: "12px 14px", borderRadius: 8, background: "var(--bg-darkcard)", border: `1px solid ${pp.severity === "critical" ? "#E8002D40" : pp.severity === "high" ? "#FF6B0040" : "var(--border-subtle)"}`, display: "flex", gap: 12 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "white", background: pp.severity === "critical" ? "#E8002D" : pp.severity === "high" ? "#FF6B00" : "#F0AB00", padding: "2px 8px", borderRadius: 4, height: "fit-content", flexShrink: 0, marginTop: 2 }}>{pp.severity.toUpperCase()}</span>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{pp.description}</div>
+                            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>👤 {pp.userImpact}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Improvement Opportunities */}
+                {uxPerf.improvementOpportunities.length > 0 && (
+                  <Card>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>💡 Improvement Opportunities</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {uxPerf.improvementOpportunities.map((opp, i) => (
+                        <div key={i} style={{ padding: "12px 14px", borderRadius: 8, background: "rgba(0,145,218,0.06)", border: "1px solid rgba(0,145,218,0.2)", display: "flex", gap: 12, alignItems: "flex-start" }}>
+                          <span style={{ fontSize: 18, flexShrink: 0 }}>🚀</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>{opp.area}</div>
+                            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>{opp.recommendation}</div>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <span style={{ fontSize: 11, color: "#00BA8C", background: "rgba(0,186,140,0.1)", padding: "2px 8px", borderRadius: 4 }}>↑ {opp.expectedUplift}</span>
+                              <span style={{ fontSize: 11, color: "var(--text-muted)", background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: 4 }}>🕐 {opp.effort}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+              </>
+            ) : (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)" }}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>🎯</div>
+                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>UX Performance data not available</div>
+                <div style={{ fontSize: 13 }}>UX Performance analysis (Layer M) requires a complete audit. Re-run the audit to capture UX metrics.</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══ THIRD-PARTY IMPACT TAB ══ */}
+        {activeTab === "third-party" && perfOnly && (
+          <div className="animate-fade-in">
+            {thirdParty.length > 0 ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+                  <Tile val={thirdParty.length} label="Third-Party Resources" color="#0091DA" />
+                  <Tile val={thirdParty.filter(t => t.blocking).length} label="Blocking Scripts" color={thirdParty.filter(t => t.blocking).length > 0 ? "#E8002D" : "#00BA8C"} />
+                  <Tile val={thirdParty.filter(t => (t.loadTimeMs ?? 0) > 500).length} label="Slow Scripts (>500ms)" color={thirdParty.filter(t => (t.loadTimeMs ?? 0) > 500).length > 0 ? "#F0AB00" : "#00BA8C"} />
+                </div>
+
+                {/* Bar chart of third-party load times */}
+                {thirdParty.slice(0, 8).length > 0 && (
+                  <Card style={{ marginBottom: 24 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>📊 Third-Party Load Times (ms)</h3>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <BarChart data={thirdParty.slice(0, 8).map(t => ({ name: t.label, ms: t.loadTimeMs ?? 0, blocking: t.blocking }))} layout="vertical" margin={{ top: 5, right: 30, left: 80, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+                        <XAxis type="number" tick={{ fill: "var(--text-muted)", fontSize: 11 }} />
+                        <YAxis type="category" dataKey="name" tick={{ fill: "var(--text-muted)", fontSize: 11 }} width={80} />
+                        <Tooltip contentStyle={{ background: "var(--bg-darkcard)", border: "1px solid var(--border-subtle)", borderRadius: 8, fontSize: 12 }} />
+                        <Bar dataKey="ms" name="Load time (ms)" radius={[0, 4, 4, 0]}>
+                          {thirdParty.slice(0, 8).map((t, i) => (
+                            <Cell key={i} fill={t.blocking ? "#E8002D" : (t.loadTimeMs ?? 0) > 500 ? "#F0AB00" : "#00BA8C"} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Card>
+                )}
+
+                <Card>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>🌐 Third-Party Script Inventory</h3>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                          {["Script / Service", "Category", "Load Time", "Size", "Blocking", "Recommendation"].map(h => (
+                            <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600, color: "var(--text-muted)", fontSize: 11 }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {thirdParty.map((t, i) => (
+                          <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                            <td style={{ padding: "10px 10px", fontWeight: 600, color: "var(--text-primary)" }}>{t.label}</td>
+                            <td style={{ padding: "10px 10px" }}><span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "rgba(0,145,218,0.12)", color: "#0091DA" }}>{t.category}</span></td>
+                            <td style={{ padding: "10px 10px", color: (t.loadTimeMs ?? 0) > 500 ? "#F0AB00" : "var(--text-secondary)" }}>{t.loadTimeMs !== null ? `${t.loadTimeMs}ms` : "—"}</td>
+                            <td style={{ padding: "10px 10px", color: "var(--text-muted)" }}>{t.transferSize > 0 ? `${Math.round(t.transferSize / 1024)}KB` : "—"}</td>
+                            <td style={{ padding: "10px 10px" }}>{t.blocking ? <span style={{ color: "#E8002D", fontWeight: 700 }}>⚠ Blocking</span> : <span style={{ color: "#00BA8C" }}>✓ Non-blocking</span>}</td>
+                            <td style={{ padding: "10px 10px" }}>
+                              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, fontWeight: 600, background: t.recommendation === "remove" ? "rgba(232,0,45,0.15)" : t.recommendation === "defer" ? "rgba(240,171,0,0.15)" : "rgba(0,186,140,0.15)", color: t.recommendation === "remove" ? "#E8002D" : t.recommendation === "defer" ? "#F0AB00" : "#00BA8C" }}>{t.recommendation.toUpperCase()}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </>
+            ) : (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)" }}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
+                <div style={{ fontSize: 15, fontWeight: 600 }}>No significant third-party scripts detected</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══ ARCHITECTURE TAB ══ */}
+        {activeTab === "architecture" && perfOnly && (
+          <div className="animate-fade-in">
+            {architecture ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 24 }}>
+                  {[
+                    { icon: "⚛️", label: "JavaScript Framework", value: architecture.framework ?? "Not detected", highlight: !!architecture.framework },
+                    { icon: "📝", label: "CMS Platform", value: architecture.cms ?? "Not detected", highlight: !!architecture.cms },
+                    { icon: "🌐", label: "CDN Provider", value: architecture.cdn ?? "No CDN detected ⚠️", highlight: !!architecture.cdn, warnIfFalsy: true },
+                    { icon: "🔗", label: "HTTP Protocol", value: architecture.httpVersion ?? "Unknown", highlight: architecture.httpVersion !== "HTTP/1.1", warnIfFalsy: true },
+                    { icon: "☁️", label: "Hosting Platform", value: architecture.hostingPlatform ?? "Unknown", highlight: !!architecture.hostingPlatform },
+                    { icon: "⚙️", label: "Service Worker", value: architecture.hasServiceWorker ? "Active ✓" : "Not found", highlight: architecture.hasServiceWorker },
+                    { icon: "📱", label: "PWA Manifest", value: architecture.hasPwaManifest ? "Present ✓" : "Not found", highlight: architecture.hasPwaManifest },
+                    { icon: "⚡", label: "Resource Hints", value: architecture.hasResourceHints ? "Preload/Prefetch present ✓" : "Not found", highlight: architecture.hasResourceHints },
+                  ].map(({ icon, label, value, highlight, warnIfFalsy }) => (
+                    <div key={label} style={{ padding: "16px", background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)", border: `1px solid ${highlight ? "rgba(0,145,218,0.25)" : warnIfFalsy && !highlight ? "rgba(240,171,0,0.3)" : "var(--border-subtle)"}` }}>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>{icon} {label}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: highlight ? "#0091DA" : warnIfFalsy ? "#F0AB00" : "var(--text-primary)" }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {architecture.jsLibraries.length > 0 && (
+                  <Card style={{ marginBottom: 16 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📦 Detected JavaScript Libraries</h3>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {architecture.jsLibraries.map((lib, i) => (
+                        <span key={i} style={{ fontSize: 12, padding: "4px 12px", background: "rgba(0,145,218,0.1)", border: "1px solid rgba(0,145,218,0.2)", borderRadius: 20, color: "#0091DA" }}>{lib}</span>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {architecture.cssFrameworks.length > 0 && (
+                  <Card>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>🎨 Detected CSS Frameworks</h3>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {architecture.cssFrameworks.map((fw, i) => (
+                        <span key={i} style={{ fontSize: 12, padding: "4px 12px", background: "rgba(205,171,254,0.1)", border: "1px solid rgba(205,171,254,0.2)", borderRadius: 20, color: "#CDABFE" }}>{fw}</span>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+              </>
+            ) : (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)" }}>Architecture detection data not available. Re-run the audit to capture architecture information.</div>
+            )}
+          </div>
+        )}
+
+        {/* ══ TECHNICAL SEO TAB ══ */}
+        {activeTab === "seo" && perfOnly && (
+          <div className="animate-fade-in">
+            {seoReadiness ? (
+              <>
+                {/* SEO Checklist */}
+                <Card style={{ marginBottom: 24 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>✅ SEO Readiness Checklist</h3>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+                    {[
+                      { label: "Meta Title", ok: seoReadiness.hasMetaTitle, detail: seoReadiness.metaTitleLength ? `${seoReadiness.metaTitleLength} chars` : undefined },
+                      { label: "Meta Description", ok: seoReadiness.hasMetaDescription, detail: seoReadiness.metaDescriptionLength ? `${seoReadiness.metaDescriptionLength} chars` : undefined },
+                      { label: "Canonical URL", ok: seoReadiness.hasCanonical },
+                      { label: "Structured Data (JSON-LD)", ok: seoReadiness.hasStructuredData },
+                      { label: "Open Graph Tags", ok: seoReadiness.hasOpenGraph },
+                      { label: "robots.txt", ok: seoReadiness.hasRobotsTxt === true, warn: seoReadiness.hasRobotsTxt === null },
+                      { label: "XML Sitemap", ok: seoReadiness.hasSitemap === true, warn: seoReadiness.hasSitemap === null },
+                      { label: "No Broken Links", ok: seoReadiness.brokenLinks.length === 0, detail: seoReadiness.brokenLinks.length > 0 ? `${seoReadiness.brokenLinks.length} broken` : undefined },
+                    ].map(({ label, ok, detail, warn }) => (
+                      <div key={label} style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", background: ok ? "rgba(0,186,140,0.06)" : warn ? "rgba(240,171,0,0.06)" : "rgba(232,0,45,0.06)", borderRadius: 8, border: `1px solid ${ok ? "rgba(0,186,140,0.2)" : warn ? "rgba(240,171,0,0.2)" : "rgba(232,0,45,0.2)"}` }}>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>{ok ? "✅" : warn ? "⚠️" : "❌"}</span>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
+                          {detail && <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{detail}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+
+                {/* SEO Issues */}
+                {seoReadiness.issues.length > 0 && (
+                  <Card style={{ marginBottom: 20 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>🔍 SEO Issues Found</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {seoReadiness.issues.map((issue, i) => (
+                        <div key={i} style={{ padding: "12px 14px", borderRadius: 8, background: "var(--bg-darkcard)", border: `1px solid ${issue.severity === "critical" ? "#E8002D40" : issue.severity === "high" ? "#FF6B0040" : "var(--border-subtle)"}` }}>
+                          <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "white", background: issue.severity === "critical" ? "#E8002D" : issue.severity === "high" ? "#FF6B00" : "#F0AB00", padding: "2px 8px", borderRadius: 4, flexShrink: 0 }}>{issue.severity.toUpperCase()}</span>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{issue.detail}</div>
+                              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>→ {issue.recommendation}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Broken Links */}
+                {seoReadiness.brokenLinks.length > 0 && (
+                  <Card>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: "#E8002D" }}>🔗 Broken Links (404)</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {seoReadiness.brokenLinks.map((link, i) => (
+                        <div key={i} style={{ fontSize: 12, padding: "8px 12px", background: "rgba(232,0,45,0.06)", borderRadius: 6, fontFamily: "monospace", color: "var(--text-muted)", wordBreak: "break-all" }}>{link}</div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+              </>
+            ) : (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)" }}>SEO readiness data not available. Re-run the audit to capture SEO signals.</div>
+            )}
+          </div>
+        )}
+
+        {/* ══ BEST PRACTICES TAB ══ */}
+        {activeTab === "best-practices" && perfOnly && (
+          <div className="animate-fade-in">
+            <Card>
+              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>⚡ Front-End Performance Best Practices</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {[
+                  { label: "Resource Preloading (preload/prefetch/preconnect)", ok: architecture?.hasResourceHints ?? false, recommendation: "Add <link rel='preload'> for critical fonts and LCP images. Add <link rel='prefetch'> for next-page resources." },
+                  { label: "Service Worker / Offline Support", ok: architecture?.hasServiceWorker ?? false, recommendation: "Implement a service worker for offline caching. Use Workbox for easy setup." },
+                  { label: "PWA Web App Manifest", ok: architecture?.hasPwaManifest ?? false, recommendation: "Add a web app manifest (manifest.json) for installability and improved mobile UX." },
+                  { label: "CDN for Static Assets", ok: !!architecture?.cdn, recommendation: "Deploy all static assets (JS, CSS, images) via a CDN. Reduces latency by 50-80% globally." },
+                  { label: "HTTP/2 or HTTP/3 Protocol", ok: architecture?.httpVersion !== "HTTP/1.1" && !!architecture?.httpVersion, recommendation: "Upgrade to HTTP/2 for request multiplexing. HTTP/3 (QUIC) reduces connection overhead on mobile." },
+                  { label: "Gzip / Brotli Compression", ok: !allResourceIssues.some(r => r.type === "missing-compression"), recommendation: "Enable brotli compression for 15-25% better compression than gzip." },
+                  { label: "Browser Caching (Cache-Control)", ok: !allResourceIssues.some(r => r.type === "missing-cache-headers"), recommendation: "Set Cache-Control: max-age=31536000, immutable on versioned assets." },
+                  { label: "Image Optimization (WebP/AVIF)", ok: !allResourceIssues.some(r => r.type === "unoptimized-image"), recommendation: "Serve images in WebP or AVIF format. Use srcset for responsive images." },
+                  { label: "Code Splitting / Lazy Loading", ok: !allResourceIssues.some(r => r.type === "large-bundle"), recommendation: "Split JS bundles by route. Lazy-load non-critical components and third-party scripts." },
+                  { label: "Async/Defer Script Loading", ok: !allResourceIssues.some(r => r.type === "sync-scripts"), recommendation: "Add async or defer attribute to all non-critical <script> tags in <head>." },
+                ].map(({ label, ok, recommendation }) => (
+                  <div key={label} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", background: ok ? "rgba(0,186,140,0.05)" : "rgba(232,0,45,0.04)", borderRadius: 8, border: `1px solid ${ok ? "rgba(0,186,140,0.18)" : "rgba(232,0,45,0.18)"}` }}>
+                    <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1 }}>{ok ? "✅" : "❌"}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: ok ? 0 : 4 }}>{label}</div>
+                      {!ok && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>→ {recommendation}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* ══ AI INSIGHTS TAB ══ */}
+        {activeTab === "ai-insights" && perfOnly && (
+          <div className="animate-fade-in">
+            {!aiReport ? (
+              <div style={{ textAlign: "center", padding: "48px 32px" }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>🤖</div>
+                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>AI Performance Analysis</h3>
+                <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 24, maxWidth: 480, margin: "0 auto 24px" }}>
+                  Generate deep AI insights powered by Claude: executive summaries, root cause analysis, business impact narrative, ROI estimates, and Jira/ADO tickets.
+                </p>
+                <button
+                  onClick={triggerAIAnalysis}
+                  disabled={aiGenerating}
+                  className="btn btn-primary"
+                  style={{ fontSize: 14, padding: "12px 28px", opacity: aiGenerating ? 0.7 : 1 }}
+                >
+                  {aiGenerating ? "⏳ Generating AI Report..." : "✨ Generate AI Report"}
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Persona Selector */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+                  {(["executive", "developer", "pm", "consultant"] as const).map(p => (
+                    <button key={p} onClick={() => setAiPersona(p)} style={{ fontSize: 12, padding: "6px 16px", borderRadius: 20, border: `1px solid ${aiPersona === p ? "#0091DA" : "var(--border-subtle)"}`, background: aiPersona === p ? "rgba(0,145,218,0.15)" : "transparent", color: aiPersona === p ? "#0091DA" : "var(--text-muted)", cursor: "pointer", fontWeight: aiPersona === p ? 700 : 400 }}>
+                      {p === "executive" ? "👔 Executive" : p === "developer" ? "💻 Developer" : p === "pm" ? "📋 Product Manager" : "🎯 Consultant"}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Persona-specific content */}
+                <Card style={{ marginBottom: 20 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: "flex", gap: 8, alignItems: "center" }}>
+                    <span>{aiPersona === "executive" ? "👔 Executive Summary" : aiPersona === "developer" ? "💻 Technical Analysis" : aiPersona === "pm" ? "📋 Product Manager View" : "🎯 Consultant View"}</span>
+                  </h3>
+                  <p style={{ fontSize: 14, lineHeight: 1.7, color: "var(--text-secondary)" }}>
+                    {aiPersona === "executive" ? aiReport.executiveSummary
+                     : aiPersona === "developer" ? aiReport.developerSummary
+                     : aiPersona === "pm" ? aiReport.uxNarrative
+                     : `${aiReport.businessImpactNarrative}\n\nROI Estimate: ${aiReport.overallROI}`}
+                  </p>
+                  {aiPersona === "consultant" && (
+                    <div style={{ marginTop: 12, padding: "10px 14px", background: "rgba(0,186,140,0.08)", borderRadius: 8, border: "1px solid rgba(0,186,140,0.2)", fontSize: 13, color: "#00BA8C" }}>
+                      💰 {aiReport.overallROI}
+                    </div>
+                  )}
+                </Card>
+
+                {/* AI Recommendations */}
+                <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>🎯 AI-Enriched Recommendations</h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+                  {aiReport.recommendations.map((rec, i) => (
+                    <div key={i} style={{ background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)", overflow: "hidden" }}>
+                      <button onClick={() => setExpandedRec(expandedRec === i ? null : i)} style={{ width: "100%", textAlign: "left", padding: "14px 16px", background: "none", border: "none", cursor: "pointer", display: "flex", gap: 12, alignItems: "center" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 4, background: rec.priority === "P0" ? "#E8002D" : rec.priority === "P1" ? "#FF6B00" : rec.priority === "P2" ? "#F0AB00" : "#0091DA", color: "white", flexShrink: 0 }}>{rec.priority}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, flex: 1, color: "var(--text-primary)" }}>{rec.title}</span>
+                        <span style={{ fontSize: 11, color: "var(--text-muted)", padding: "2px 8px", background: "rgba(255,255,255,0.06)", borderRadius: 4, flexShrink: 0 }}>{rec.estimatedEffort}</span>
+                        <span style={{ color: "var(--text-muted)", fontSize: 14, flexShrink: 0 }}>{expandedRec === i ? "▲" : "▼"}</span>
+                      </button>
+                      {expandedRec === i && (
+                        <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border-subtle)" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                            {[
+                              { label: "📋 Description", value: rec.description },
+                              { label: "🔍 Root Cause", value: rec.rootCause },
+                              { label: "❓ Why It Matters", value: rec.whyItMatters },
+                              { label: "💼 Business Impact", value: rec.businessImpact },
+                              { label: "🔧 Recommendation", value: rec.recommendation },
+                              { label: "📈 Expected Improvement", value: rec.expectedImprovement },
+                            ].map(({ label, value }) => (
+                              <div key={label} style={{ padding: "10px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 8 }}>
+                                <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, marginBottom: 4 }}>{label}</div>
+                                <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>{value}</div>
+                              </div>
+                            ))}
+                          </div>
+                          {rec.sampleCode && (
+                            <div style={{ marginTop: 12, padding: "10px 12px", background: "#0d1117", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)" }}>
+                              <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>💡 Sample Implementation</div>
+                              <pre style={{ fontSize: 12, color: "#a8ff78", margin: 0, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{rec.sampleCode}</pre>
+                            </div>
+                          )}
+                          {rec.estimatedROI && (
+                            <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(0,186,140,0.08)", borderRadius: 8, fontSize: 12, color: "#00BA8C" }}>💰 ROI: {rec.estimatedROI}</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Dev Tickets */}
+                {aiReport.devTickets.length > 0 && (
+                  <>
+                    <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>🎫 Jira / Azure DevOps Tickets</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {aiReport.devTickets.map((ticket, i) => (
+                        <div key={i} style={{ background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)", overflow: "hidden" }}>
+                          <button onClick={() => setExpandedTicket(expandedTicket === i ? null : i)} style={{ width: "100%", textAlign: "left", padding: "12px 16px", background: "none", border: "none", cursor: "pointer", display: "flex", gap: 10, alignItems: "center" }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: ticket.priority === "Critical" ? "#E8002D" : ticket.priority === "High" ? "#FF6B00" : ticket.priority === "Medium" ? "#F0AB00" : "#0091DA", color: "white", flexShrink: 0 }}>{ticket.priority}</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, flex: 1, color: "var(--text-primary)" }}>{ticket.title}</span>
+                            <span style={{ fontSize: 11, color: "var(--text-muted)", padding: "2px 7px", background: "rgba(255,255,255,0.06)", borderRadius: 4 }}>{ticket.storyPoints} pts</span>
+                            <span style={{ color: "var(--text-muted)", fontSize: 14 }}>{expandedTicket === i ? "▲" : "▼"}</span>
+                          </button>
+                          {expandedTicket === i && (
+                            <div style={{ padding: "0 16px 14px", borderTop: "1px solid var(--border-subtle)" }}>
+                              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6, marginTop: 10, marginBottom: 12 }}>{ticket.description}</p>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 6 }}>Acceptance Criteria:</div>
+                              <ul style={{ margin: 0, padding: "0 0 0 18px" }}>
+                                {ticket.acceptanceCriteria.map((ac, j) => (
+                                  <li key={j} style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4, lineHeight: 1.5 }}>{ac}</li>
+                                ))}
+                              </ul>
+                              <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                                {ticket.labels.map((label, j) => (
+                                  <span key={j} style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "rgba(0,145,218,0.12)", color: "#0091DA", border: "1px solid rgba(0,145,218,0.2)" }}>{label}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <div style={{ marginTop: 20, fontSize: 11, color: "var(--text-muted)", textAlign: "right" }}>
+                  Generated by Claude AI · {new Date(aiReport.generatedAt).toLocaleString("en-GB")}
+                  <button onClick={triggerAIAnalysis} disabled={aiGenerating} style={{ marginLeft: 12, fontSize: 11, padding: "3px 10px", borderRadius: 4, background: "rgba(255,255,255,0.08)", border: "1px solid var(--border-subtle)", cursor: "pointer", color: "var(--text-muted)" }}>
+                    {aiGenerating ? "Regenerating..." : "Regenerate"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ══ ROADMAP TAB ══ */}
+        {activeTab === "roadmap" && perfOnly && (
+          <div className="animate-fade-in">
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>
+              Prioritized implementation roadmap. Address Critical items immediately, High items in the next sprint, Medium in the next quarter, and Low as time permits.
+            </p>
+
+            {/* Priority swimlanes */}
+            {(["P0", "P1", "P2", "P3/P4"] as const).map((pLabel) => {
+              const labelMap: Record<string, { label: string; color: string; bg: string }> = {
+                "P0": { label: "🚨 Critical", color: "#E8002D", bg: "rgba(232,0,45,0.06)" },
+                "P1": { label: "🔴 High", color: "#FF6B00", bg: "rgba(255,107,0,0.06)" },
+                "P2": { label: "🟡 Medium", color: "#F0AB00", bg: "rgba(240,171,0,0.06)" },
+                "P3/P4": { label: "🔵 Low", color: "#0091DA", bg: "rgba(0,145,218,0.06)" },
+              };
+              const style = labelMap[pLabel];
+              const items = (aiReport?.recommendations || recs).filter(r => {
+                if (pLabel === "P3/P4") return r.priority === "P3" || r.priority === "P4";
+                return r.priority === pLabel;
+              });
+              if (items.length === 0) return null;
+              return (
+                <div key={pLabel} style={{ marginBottom: 24 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: style.color }}>{style.label}</h3>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                    {items.map((item, i) => {
+                      const effort = "estimatedEffort" in item ? item.estimatedEffort : item.effort;
+                      const desc = "description" in item ? item.description : item.detail;
+                      const improvement = "expectedImprovement" in item ? item.expectedImprovement : undefined;
+                      return (
+                        <div key={i} style={{ padding: "14px 16px", borderRadius: "var(--radius-md)", background: style.bg, border: `1px solid ${style.color}30` }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: "var(--text-primary)", lineHeight: 1.4 }}>{item.title}</div>
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10, lineHeight: 1.5 }}>{desc}</div>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "rgba(255,255,255,0.08)", color: "var(--text-muted)" }}>🕐 {effort}</span>
+                            {improvement && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "rgba(0,186,140,0.1)", color: "#00BA8C" }}>↑ {improvement}</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Effort vs Impact chart */}
+            {recs.length > 0 && (
+              <Card style={{ marginTop: 16 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>📊 Issue Type Distribution</h3>
+                {riPieData.length > 0 && (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <PieChart>
+                      <Pie data={riPieData} cx="50%" cy="50%" outerRadius={100} dataKey="value" nameKey="name" label={({ name, value }) => `${name}: ${value}`} labelLine={false}>
+                        {riPieData.map((_, idx) => (
+                          <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ background: "var(--bg-darkcard)", border: "1px solid var(--border-subtle)", borderRadius: 8, fontSize: 12 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* ══ DARK PATTERNS TAB ══ */}
+        {activeTab === "dark-patterns" && isDP && (
+          <div className="animate-fade-in">
+            {dpFindings.length > 0 ? (
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    marginBottom: 18,
+                    alignItems: "center",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    Showing <strong>{dpGroupedFindings.length}</strong>{" "}
+                    finding{dpGroupedFindings.length !== 1 ? "s" : ""} (
+                    {dpFindings.length} instance
+                    {dpFindings.length !== 1 ? "s" : ""})
+                  </span>
+                </div>
+                {dpGroupedFindings.map((group) => (
+                  <DPFindingGroupCard key={group.key} group={group} />
+                ))}
+              </>
+            ) : (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: 56,
+                  color: "var(--text-muted)",
+                }}
+              >
+                <div style={{ fontSize: 36, marginBottom: 10 }}>✅</div>
+                <div>No dark pattern findings detected.</div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ══ PERFORMANCE TAB (multi-pillar) ══ */}
         {activeTab === "performance" && !perfOnly && perfResult && (
           <div className="animate-fade-in">
@@ -3840,6 +5425,11 @@ export default function FinalReportPage() {
                 val={perfPages.length}
                 label="Pages Analysed"
                 color="#0091DA"
+                sub={
+                  perfResult?.targetedPagesAudited
+                    ? `${perfResult.basePagesAudited ?? 0} crawled + ${perfResult.targetedPagesAudited} targeted`
+                    : undefined
+                }
               />
             </div>
             <div
@@ -4137,8 +5727,9 @@ export default function FinalReportPage() {
                   color: "var(--text-muted)",
                 }}
               >
-                Showing <strong>{filtered.length}</strong> of {issues.length}{" "}
-                issues
+                Showing <strong>{groupedBacklog.length}</strong> issue type
+                {groupedBacklog.length !== 1 ? "s" : ""} ({filtered.length}{" "}
+                instance{filtered.length !== 1 ? "s" : ""})
               </span>
               <button
                 onClick={exportCSV}
@@ -4148,18 +5739,19 @@ export default function FinalReportPage() {
                 Export CSV
               </button>
             </div>
-            {(showAllBacklog ? filtered : filtered.slice(0, 10)).map(
-              (issue, i) => (
-                <IssueCard
-                  key={issue.id}
-                  issue={issue}
-                  idx={i + 1}
-                  status={statusMap[issue.id] || "Open"}
-                  onStatusChange={handleStatusChange}
-                />
-              ),
-            )}
-            {filtered.length > 10 && !showAllBacklog && (
+            {(showAllBacklog
+              ? groupedBacklog
+              : groupedBacklog.slice(0, 10)
+            ).map((group, i) => (
+              <GroupedIssueCard
+                key={group.key}
+                group={group}
+                idx={i + 1}
+                statusMap={statusMap}
+                onStatusChange={handleStatusChange}
+              />
+            ))}
+            {groupedBacklog.length > 10 && !showAllBacklog && (
               <div style={{ textAlign: "center", marginTop: 20 }}>
                 <button
                   onClick={() => setShowAllBacklog(true)}
@@ -4169,7 +5761,7 @@ export default function FinalReportPage() {
                     padding: "10px 24px",
                   }}
                 >
-                  Show All {filtered.length} Issues
+                  Show All {groupedBacklog.length} Issue Types
                 </button>
               </div>
             )}
@@ -4299,7 +5891,7 @@ export default function FinalReportPage() {
                           .map((s) => (
                             <span
                               key={s}
-                              style={{
+                              style={{display: "inline-flex", alignItems: "center", 
                                 padding: "2px 8px",
                                 borderRadius: 99,
                                 fontSize: 13,
@@ -4408,7 +6000,7 @@ export default function FinalReportPage() {
                     <div style={{ display: "flex", gap: 6 }}>
                       {critCount > 0 && (
                         <span
-                          style={{
+                          style={{display: "inline-flex", alignItems: "center", 
                             padding: "2px 8px",
                             borderRadius: 99,
                             fontSize: 10,
@@ -4421,7 +6013,7 @@ export default function FinalReportPage() {
                         </span>
                       )}
                       <span
-                        style={{
+                        style={{display: "inline-flex", alignItems: "center", 
                           padding: "2px 8px",
                           borderRadius: 99,
                           fontSize: 10,
@@ -4492,7 +6084,7 @@ export default function FinalReportPage() {
                           WCAG {issue.wcagCriterion}
                         </span>
                         <span
-                          style={{
+                          style={{display: "inline-flex", alignItems: "center", 
                             padding: "2px 7px",
                             borderRadius: 99,
                             fontSize: 12,
@@ -4718,7 +6310,7 @@ export default function FinalReportPage() {
                           {issue.title}
                         </span>
                         <span
-                          style={{
+                          style={{display: "inline-flex", alignItems: "center", 
                             padding: "2px 8px",
                             borderRadius: 99,
                             fontSize: 13,
@@ -4731,7 +6323,7 @@ export default function FinalReportPage() {
                           {issue.severity}
                         </span>
                         <span
-                          style={{
+                          style={{display: "inline-flex", alignItems: "center", 
                             padding: "2px 7px",
                             borderRadius: 99,
                             fontSize: 13,

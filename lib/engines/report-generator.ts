@@ -12,13 +12,15 @@ import {
 import { WCAG_CRITERIA } from "../wcag/criteria";
 import { SEVERITY_WEIGHTS, LEVEL_MULTIPLIERS } from "../wcag/severity";
 import { getComplianceLabel, groupIssues } from "./scoring";
-import type { AuditPillar } from "../types/trustscore";
+import type { AuditPillar, TrustScore } from "../types/trustscore";
 import type { DarkPatternResult } from "../types/darkpattern";
 import type { PerformanceResult } from "../types/performance";
 import type { PrivacyResult } from "../types/privacy";
 
 export interface PillarContext {
   enabledPillars: AuditPillar[];
+  /** Combined weighted score across all enabled pillars — present whenever more than one pillar ran */
+  trustScore?: TrustScore | null;
   darkpatterns?: DarkPatternResult | null;
   performance?: PerformanceResult | null;
   privacy?: PrivacyResult | null;
@@ -117,6 +119,20 @@ function generateExecutiveSummary(
 
   let summary = `This KPMG TrustLens audit evaluated the target across ${enabledPillars.length} pillar(s): ${pillarNames.join(", ")}. `;
 
+  // ── Combined score (multi-pillar audits only) ──
+  if (enabledPillars.length > 1 && pillarCtx?.trustScore) {
+    const ts = pillarCtx.trustScore;
+    const trustLevelLabel =
+      ts.trustLevel.charAt(0).toUpperCase() + ts.trustLevel.slice(1).replace("-", " ");
+    const pillarScoreParts = enabledPillars
+      .map((p) => {
+        const ps = ts.pillarScores[p];
+        return ps ? `${pillarNames[enabledPillars.indexOf(p)]} (${ps.score})` : null;
+      })
+      .filter(Boolean);
+    summary += `\n  TRUSTLENS SCORE : ${ts.overall}/100 (${trustLevelLabel}) — combining ${pillarScoreParts.join(", ")}. `;
+  }
+
   // ── Accessibility summary ──
   if (a11yEnabled) {
     const compliance = getComplianceLabel(score.complianceLevel);
@@ -152,16 +168,16 @@ function generateExecutiveSummary(
   // ── Dark Patterns summary ──
   if (dpEnabled && pillarCtx?.darkpatterns) {
     const dp = pillarCtx.darkpatterns;
-    // summary += `\n\nDARK PATTERNS: Ethics Score: ${dp.ethicsScore}/100 | `;
-    // summary += `${dp.totalFindings} pattern(s) detected | `;
-    // summary += `Consent Integrity: ${dp.consentIntegrity}/100 | `;
-    // summary += `Manipulation Index: ${dp.manipulationIndex}/100. `;
+    summary += `\n\nDARK PATTERNS: Ethics Score: ${dp.ethicsScore}/100 | `;
+    summary += `${dp.totalFindings} pattern(s) detected | `;
+    summary += `Consent Integrity: ${dp.consentIntegrity}/100 | `;
+    summary += `Manipulation Index: ${dp.manipulationIndex}/100. `;
     if (dp.regulatoryRisks.length > 0) {
       summary += `Regulatory risks: ${dp.regulatoryRisks.join(", ")}. `;
     }
     const complianceCount = (dp as any).complianceExemptions;
     if (complianceCount > 0) {
-      // summary += `\n\nCOMPLIANCE CONTEXT (IRDAI/RBI/SEBI): ${complianceCount} finding(s) have been flagged as potentially compliance-driven under Indian financial services regulations. These require backend validation before enforcement action. Score impact has been proportionally reduced for these findings.`;
+      summary += `\n\nCOMPLIANCE CONTEXT (IRDAI/RBI/SEBI): ${complianceCount} finding(s) have been flagged as potentially compliance-driven under Indian financial services regulations. These require backend validation before enforcement action. Score impact has been proportionally reduced for these findings.`;
     }
   } else if (dpEnabled) {
     summary += `\n\nDARK PATTERNS: No dark patterns detected — the interface respects ethical design principles. `;

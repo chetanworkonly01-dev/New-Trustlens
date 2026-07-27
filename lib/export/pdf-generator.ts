@@ -4,6 +4,8 @@ import autoTable from "jspdf-autotable";
 import { AuditResult, AccessibilityIssue, GroupedIssue } from "../types/audit";
 import type { DarkPatternFinding } from "../types/darkpattern";
 import type { RecommendationItem } from "../types/performance";
+import { CWV_THRESHOLDS } from "../types/performance";
+import { getReportDisplayInfo, formatPageCount } from "./report-helpers";
 
 // ── KPMG Brand Palette (RGB) ──────────────────────────────────
 const K = {
@@ -63,6 +65,106 @@ function addKpmgLogoToPdf(
 
   // jsPDF injects base64 PNG data instantly onto the page context
   doc.addImage(imageDataUri, "PNG", x, y, width, height);
+}
+
+/** Heuristic: does this "element" value look like a real CSS selector, or a prose fallback label? */
+function looksLikeSelectorPdf(s: string): boolean {
+  if (!s) return false;
+  if (s.includes("/")) return false;
+  const withoutCombinators = s.replace(/\s*>\s*/g, ">");
+  if (/\s/.test(withoutCombinators)) return false;
+  return true;
+}
+
+/** Mirrors the DevTools command generator used elsewhere (report page / DOCX export). */
+function buildDevToolsCommandPdf(inst: {
+  xpath?: string;
+  element: string;
+}): string | null {
+  if (inst.xpath) return `$x('${inst.xpath.replace(/'/g, "\\'")}')[0]`;
+  if (looksLikeSelectorPdf(inst.element)) {
+    return `document.querySelector('${inst.element.replace(/'/g, "\\'")}')`;
+  }
+  return null;
+}
+
+/** Reads pixel dimensions from a PNG (IHDR chunk) or JPEG (SOFx marker) base64 string, or null if unreadable. */
+function getImageDimensionsFromBase64(
+  base64: string,
+  format: "PNG" | "JPEG",
+): { width: number; height: number } | null {
+  try {
+    const buf = Buffer.from(base64, "base64");
+    if (format === "PNG") {
+      if (buf.length < 24 || buf[0] !== 0x89 || buf[1] !== 0x50) return null;
+      return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+    }
+    if (buf.length < 4 || buf[0] !== 0xff || buf[1] !== 0xd8) return null;
+    let offset = 2;
+    while (offset + 4 <= buf.length) {
+      if (buf[offset] !== 0xff) {
+        offset++;
+        continue;
+      }
+      const marker = buf[offset + 1];
+      if (marker === 0xd8 || marker === 0xd9) {
+        offset += 2;
+        continue;
+      }
+      if (marker >= 0xd0 && marker <= 0xd7) {
+        offset += 2;
+        continue;
+      }
+      const segLen = buf.readUInt16BE(offset + 2);
+      const isSof =
+        marker >= 0xc0 &&
+        marker <= 0xcf &&
+        marker !== 0xc4 &&
+        marker !== 0xc8 &&
+        marker !== 0xcc;
+      if (isSof) {
+        if (offset + 9 > buf.length) return null;
+        return {
+          height: buf.readUInt16BE(offset + 5),
+          width: buf.readUInt16BE(offset + 7),
+        };
+      }
+      offset += 2 + segLen;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fits image dimensions into a maxW×maxH box (mm, for jsPDF addImage) while preserving
+ * aspect ratio. Without this, a fixed box distorts extreme aspect ratios — e.g. a
+ * 1264×19 element screenshot stretched into a fixed box becomes an unrecognizable smear.
+ */
+function fitImageBoxPdf(
+  dims: { width: number; height: number } | null,
+  maxW: number,
+  maxH: number,
+): { width: number; height: number } {
+  if (!dims || dims.width <= 0 || dims.height <= 0) {
+    return { width: maxW, height: Math.round(maxW * 0.24 * 10) / 10 };
+  }
+  const scale = Math.min(maxW / dims.width, maxH / dims.height, 4);
+  return {
+    width: Math.max(8, dims.width * scale),
+    height: Math.max(4, dims.height * scale),
+  };
+}
+
+/** Decodes the small set of HTML entities that show up in scraped selectors/URLs (e.g. "&amp;" in a query string). */
+function decodeHtmlEntitiesPdf(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'");
 }
 
 function sevColor(s: string): [number, number, number] {
@@ -401,10 +503,21 @@ function drawManagementResponse(
     return y + boxH + 6;
   }
 
-  // Full response block — only shown when the client has entered data
+  // Full response block — only shown when the client has entered data.
+  // Content height is measured from the actual wrapped notes text (rather than a
+  // fixed constant) so multi-line notes never draw past the footer.
   const headerHeight = 8;
-  const contentHeight = 10;
-  const totalBlockHeight = headerHeight + 5;
+  const notesLineHeight = 3.8;
+  const notesLines = notes
+    ? (doc.splitTextToSize(String(notes), w - 12) as string[])
+    : [];
+  const ownerLineHeight = owner || target ? 6 : 0;
+  const notesBlockHeight = notesLines.length * notesLineHeight;
+  const contentHeight = Math.max(
+    10,
+    ownerLineHeight + notesBlockHeight + 6,
+  );
+  const totalBlockHeight = headerHeight + contentHeight;
 
   if (y + totalBlockHeight > ph - 18) {
     doc.addPage("a4", "landscape");
@@ -447,8 +560,7 @@ function drawManagementResponse(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(...K.darkGrey);
-    const lines = doc.splitTextToSize(String(notes), w - 12);
-    doc.text(lines, x + 6, cy);
+    doc.text(notesLines, x + 6, cy);
   }
 
   doc.setDrawColor(...K.midGrey);
@@ -526,23 +638,11 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
   const pw = 297; // A4 Landscape (all pages rendered landscape)
   const ph = 210;
 
-  // ── Dynamic pillar-aware report title ──────────────────────
+  // ── Dynamic pillar-aware report title/score/badge ───────────
+  // Derived from the pillars actually selected for this audit — never a generic bucket name.
+  const displayInfo = getReportDisplayInfo(audit);
   const pillars = (config as any).enabledPillars as string[] | undefined;
-  const reportTitle =
-    !pillars || pillars.length === 0
-      ? "Accessibility Audit"
-      : pillars.length === 1
-        ? (
-            {
-              accessibility: "Accessibility Audit",
-              darkpatterns: "Dark Pattern Audit",
-              performance: "Performance Audit",
-              privacy: "Privacy Compliance Audit",
-            } as Record<string, string>
-          )[pillars[0]] || "Digital Trust Audit"
-        : pillars.length === 4
-          ? "TrustLens 4-Pillar Audit"
-          : "TrustLens Multi-Pillar Audit";
+  const reportTitle = displayInfo.reportTitle;
   // const footerLabel = `KPMG ${reportTitle} — Confidential`;
   const footerLabel = `DIGITAL TRUST AUDIT`;
   const isA11y =
@@ -600,7 +700,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
   // Re-map localized variable contexts from your existing architecture safely
   const totalFindings = score.totalIssues || 0;
   const dateStr = auditDate || "January 2026";
-  const targetUrlString = reportTitle || "://kpmg.com";
+  const targetUrlString = projectName || "://kpmg.com";
   const auditType = "Single Page Audit";
   const sampleNote = "Single-page asset audit · sub-pages not evaluated.";
 
@@ -641,7 +741,8 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(28);
   doc.setTextColor(255, 255, 255);
-  doc.text("UX Dark Pattern\nCompliance\nAudit Report", 20, 72);
+  const headlineLines = doc.splitTextToSize(displayInfo.headline, 95);
+  doc.text(headlineLines, 20, 72);
 
   // Left Panel Typography: Targeted Destination URL Address String
   doc.setFont("helvetica", "bold");
@@ -710,9 +811,23 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
 
   // ── FLOATING RISK BADGE OVERLAY CARD ──────────────
   const badgeX = leftPanelWidth;
-  const badgeY = phCover - 65;
   const badgeW = 34;
-  const badgeH = 26;
+
+  // Badge label is audit-specific (e.g. "ACCESSIBILITY SCORE" or
+  // "ACCESSIBILITY + DARK PATTERNS SCORE") and may need to wrap —
+  // measure it first so the card can grow to fit instead of clipping.
+  doc.setFont("helvetica", "bold");
+  const badgeLabelFontSize = displayInfo.badgeLabel.length > 18 ? 5.5 : 7;
+  doc.setFontSize(badgeLabelFontSize);
+  const badgeLabelLines = doc.splitTextToSize(
+    displayInfo.badgeLabel,
+    badgeW - 4,
+  ) as string[];
+  const labelLineHeight = badgeLabelFontSize * 0.42;
+  const extraLabelHeight =
+    (badgeLabelLines.length - 1) * labelLineHeight;
+  const badgeH = 26 + extraLabelHeight;
+  const badgeY = phCover - 65 - extraLabelHeight;
 
   // Draw Shadow / Boundary accent bounding frame block
   doc.setFillColor(255, 255, 255);
@@ -725,22 +840,25 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
 
   // Badge Text Elements Layer
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
+  doc.setFontSize(badgeLabelFontSize);
   doc.setTextColor(...K.darkGrey);
-  doc.text("RISK SCORE", badgeX, badgeY + 5, { align: "center" });
+  badgeLabelLines.forEach((line, i) => {
+    doc.text(line, badgeX, badgeY + 5 + i * labelLineHeight, {
+      align: "center",
+    });
+  });
 
   // Pull active numerical scores directly from your metric variables cleanly
-  const coverScore = score.overall != null ? score.overall : 0;
+  const coverScore = displayInfo.score != null ? displayInfo.score : 0;
   const scoreColor =
     coverScore >= 75 ? K.teal : coverScore >= 50 ? K.medium : K.critical;
-  const scoreLabelStr = compLabel
-    ? compLabel(score.complianceLevel)
-    : "EVALUATED";
+  const scoreLabelStr = displayInfo.statusLabel;
 
+  const scoreY = badgeY + 14 + extraLabelHeight;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(26);
   doc.setTextColor(...scoreColor);
-  doc.text(String(coverScore), badgeX - 2, badgeY + 14, { align: "center" });
+  doc.text(String(coverScore), badgeX - 2, scoreY, { align: "center" });
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
@@ -748,16 +866,16 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
   doc.text(
     "/100",
     badgeX + doc.getTextWidth(String(coverScore)) - 1,
-    badgeY + 14,
+    scoreY,
   );
 
   // Tiny lower status status pill indicator box
   doc.setFillColor(...scoreColor);
-  doc.rect(badgeX - 12, badgeY + 18, 24, 4, "F");
+  doc.rect(badgeX - 12, scoreY + 4, 24, 4, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(5.5);
   doc.setTextColor(255, 255, 255);
-  doc.text(scoreLabelStr.toUpperCase(), badgeX, badgeY + 21, {
+  doc.text(scoreLabelStr.toUpperCase(), badgeX, scoreY + 7, {
     align: "center",
   });
 
@@ -850,16 +968,16 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     const p1c = (perfResultCover.recommendations || []).filter(
       (r: any) => r.priority === "P1",
     ).length;
-    const pgs = perfResultCover.pages?.length ?? audit.pages.length;
+    const pgs = formatPageCount(perfResultCover);
     const grade = perfGradeStr(perfResultCover.overallScore ?? 0).replace(
       " - ",
       ": ",
     );
     summaryParas.push(
-      `KPMG conducted a comprehensive Performance Audit of ${projectName}, evaluating Core Web Vitals, resource efficiency, rendering performance, and network resilience across ${pgs} page(s).`,
+      `KPMG conducted a comprehensive Performance Audit of ${projectName}, evaluating Core Web Vitals, resource efficiency, rendering performance, and network resilience across ${pgs}.`,
     );
     summaryParas.push(
-      `Overall Performance Score: ${perfResultCover.overallScore ?? "N/A"}/100 (${grade}). ${perfResultCover.totalResourceIssues ?? 0} resource issue(s) identified across ${pgs} page(s). ${p0c} critical issue(s) require immediate action; ${p1c} high-priority issue(s) are scheduled for the next sprint.`,
+      `Overall Performance Score: ${perfResultCover.overallScore ?? "N/A"}/100 (${grade}). ${perfResultCover.totalResourceIssues ?? 0} resource issue(s) identified across ${pgs}. ${p0c} critical issue(s) require immediate action; ${p1c} high-priority issue(s) are scheduled for the next sprint.`,
     );
     const vitalsLines: string[] = [];
     if (avg.lcp != null) {
@@ -912,33 +1030,55 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       summaryParas.push(
         `CRITICAL ALERT: ${p0c} P0 issue(s) must be resolved before the next production release to prevent significant user experience degradation.`,
       );
-  } else if (isA11y) {
+  } else if (isA11y && (pillars?.length ?? 0) <= 1) {
     summaryParas = [
-      `This KPMG ${reportTitle} evaluated ${projectName} against ${standard} Level ${testedLevel}. The overall score is ${score.overall}/100 (${compLabel(score.complianceLevel)}). ${score.uniqueIssues} unique violations identified (${score.totalIssues} total instances) across ${audit.pages.length} page(s).`,
+      `This KPMG ${reportTitle} evaluated ${projectName} against ${standard} Level ${testedLevel}. The overall score is ${displayInfo.score}/100 (${displayInfo.statusLabel}). ${score.uniqueIssues} unique violations identified (${score.totalIssues} total instances) across ${audit.pages.length} page(s).`,
     ];
   } else {
     summaryParas = [
-      `This KPMG ${reportTitle} audited ${projectName} across: ${(pillars || []).join(", ")}. Overall score: ${score.overall}/100 (${compLabel(score.complianceLevel)}). ${score.totalIssues} issue(s) identified.`,
+      `This KPMG ${reportTitle} audited ${projectName} across: ${(pillars || []).join(", ")}. Overall score: ${displayInfo.score}/100 (${displayInfo.statusLabel}). ${score.uniqueIssues} unique issue(s) identified (${score.totalIssues} total instances).`,
     ];
   }
 
   // ── EXECUTIVE SUMMARY: KPI METRIC TILES ──
   {
     const exCritCount = groupedIssues.filter((g) => g.severity === "critical").length;
+    const isA11yOnly = isA11y && (pillars?.length ?? 0) <= 1;
+    const dpResultCover = (audit as any).pillarResults?.darkpatterns as any;
+    const privResultCover = (audit as any).pillarResults?.privacy as any;
+
+    // For DP-only / Privacy-only / multi-pillar audits, "unique violations" and
+    // "critical issues" must reflect ALL enabled pillars, not just accessibility.
+    const combinedUniqueCount = isA11yOnly
+      ? (score.uniqueIssues ?? groupedIssues.length)
+      : [
+          isA11y ? (score.uniqueIssues ?? groupedIssues.length) : 0,
+          isDP ? (dpResultCover?.totalFindings ?? 0) : 0,
+          isPriv2 ? (privResultCover?.findings?.length ?? 0) : 0,
+          isPerf ? (perfResultCover?.totalResourceIssues ?? 0) : 0,
+        ].reduce((a, b) => a + b, 0);
+    const combinedCriticalCount = isA11yOnly
+      ? exCritCount
+      : [
+          isA11y ? exCritCount : 0,
+          isDP ? (dpResultCover?.findingsBySeverity?.critical ?? 0) : 0,
+          isPriv2 ? (privResultCover?.findingsBySeverity?.critical ?? 0) : 0,
+        ].reduce((a, b) => a + b, 0);
+
     const tiles = perfOnly && perfResultCover
       ? [
           { label: "PERFORMANCE SCORE", value: `${perfResultCover.overallScore ?? 0}`, sub: "out of 100", col: K.navy as [number, number, number] },
           { label: "GRADE", value: perfGradeStr(perfResultCover.overallScore ?? 0).charAt(0), sub: perfGradeStr(perfResultCover.overallScore ?? 0).split("—")[1]?.trim() ?? "", col: [0, 91, 130] as [number, number, number] },
           { label: "RESOURCE ISSUES", value: `${perfResultCover.totalResourceIssues ?? 0}`, sub: "Identified", col: [180, 90, 0] as [number, number, number] },
           { label: "P0 CRITICAL", value: `${(perfResultCover.recommendations || []).filter((r: any) => r.priority === "P0").length}`, sub: "Immediate Action", col: [200, 35, 35] as [number, number, number] },
-          { label: "PAGES AUDITED", value: `${perfResultCover.pages?.length ?? audit.pages.length}`, sub: "Evaluated", col: [0, 100, 90] as [number, number, number] },
+          { label: "PAGES AUDITED", value: `${perfResultCover.pages?.length ?? audit.pages.length}`, sub: perfResultCover.targetedPagesAudited ? `${perfResultCover.basePagesAudited ?? 0} crawled + ${perfResultCover.targetedPagesAudited} targeted` : "Evaluated", col: [0, 100, 90] as [number, number, number] },
         ]
       : [
-          { label: "OVERALL SCORE", value: `${score.overall ?? 0}`, sub: "out of 100", col: K.navy as [number, number, number] },
-          { label: "GRADE", value: `${(score as any).grade ?? "—"}`, sub: compLabel(score.complianceLevel), col: [0, 91, 130] as [number, number, number] },
-          { label: "UNIQUE VIOLATIONS", value: `${score.uniqueIssues ?? groupedIssues.length}`, sub: "Distinct Issues", col: [180, 90, 0] as [number, number, number] },
-          { label: "CRITICAL ISSUES", value: `${exCritCount}`, sub: "Need Immediate Fix", col: [200, 35, 35] as [number, number, number] },
-          { label: "PAGES AUDITED", value: `${audit.pages.length}`, sub: "Evaluated", col: [0, 100, 90] as [number, number, number] },
+          { label: displayInfo.badgeLabel, value: `${displayInfo.score ?? 0}`, sub: "out of 100", col: K.navy as [number, number, number] },
+          { label: "STATUS", value: isA11yOnly ? `${(score as any).grade ?? "—"}` : displayInfo.statusLabel.charAt(0).toUpperCase(), sub: displayInfo.statusLabel, col: [0, 91, 130] as [number, number, number] },
+          { label: "UNIQUE VIOLATIONS", value: `${combinedUniqueCount}`, sub: "Distinct Issues", col: [180, 90, 0] as [number, number, number] },
+          { label: "CRITICAL ISSUES", value: `${combinedCriticalCount}`, sub: "Need Immediate Fix", col: [200, 35, 35] as [number, number, number] },
+          { label: "PAGES AUDITED", value: `${audit.pages.length}`, sub: perfResultCover?.targetedPagesAudited ? `${perfResultCover.basePagesAudited ?? 0} crawled + ${perfResultCover.targetedPagesAudited} targeted` : "Evaluated", col: [0, 100, 90] as [number, number, number] },
         ];
 
     if (y + 34 > ph - 40) {
@@ -956,10 +1096,22 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(6.5);
       doc.setTextColor(200, 220, 255);
-      doc.text(tile.label, tx + tileW / 2, y + 5.5, { align: "center" });
-      doc.setFontSize(22);
+      // Wrap long multi-pillar labels (e.g. "ACCESSIBILITY + DARK PATTERNS
+      // + PERFORMANCE SCORE") onto up to 2 lines instead of letting them
+      // clip/fade past the tile edge.
+      const labelLines = (
+        doc.splitTextToSize(tile.label, tileW - 4) as string[]
+      ).slice(0, 2);
+      const labelLineH = 2.8;
+      labelLines.forEach((line, li) => {
+        doc.text(line, tx + tileW / 2, y + 4.5 + li * labelLineH, {
+          align: "center",
+        });
+      });
+      const valueY = labelLines.length > 1 ? y + 19.5 : y + 18;
+      doc.setFontSize(labelLines.length > 1 ? 18 : 22);
       doc.setTextColor(...K.white);
-      doc.text(tile.value, tx + tileW / 2, y + 18, { align: "center" });
+      doc.text(tile.value, tx + tileW / 2, valueY, { align: "center" });
       doc.setFont("helvetica", "normal");
       doc.setFontSize(6.5);
       doc.setTextColor(190, 210, 240);
@@ -968,16 +1120,17 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     }
     y += tileH + 6;
 
-    // Critical alert bar
-    if (!perfOnly && exCritCount > 0) {
+    // Critical alert bar — pillar-aware count so this fires for Dark Patterns /
+    // Privacy / multi-pillar audits too, not just accessibility-only ones.
+    if (!perfOnly && combinedCriticalCount > 0) {
       doc.setFillColor(200, 35, 35);
       doc.roundedRect(20, y, pw - 40, 9, 1, 1, "F");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8);
       doc.setTextColor(...K.white);
       doc.text(
-        `CRITICAL ALERT: ${exCritCount} critical violation${exCritCount !== 1 ? "s" : ""} require immediate remediation before next release.`,
-        pw / 2, y + 6.5, { align: "center" },
+        `CRITICAL ALERT: ${combinedCriticalCount} critical violation${combinedCriticalCount !== 1 ? "s" : ""} require immediate remediation before next release.`,
+        pw / 2, y + 4.5, { align: "center", baseline: "middle" },
       );
       y += 13;
     }
@@ -1183,12 +1336,14 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       const displayVal = val != null ? m.fmt(val) : "—";
       const statusText =
         val == null
-          ? "—"
+          ? m.key === "inp"
+            ? "Not measured (field data only)"
+            : "—"
           : val <= m.good
-            ? "Good"
+            ? `Good (≤${m.fmt(m.good)})`
             : val <= m.poor
-              ? "Needs Impr."
-              : "Poor";
+              ? `Needs Impr. (≤${m.fmt(m.poor)})`
+              : `Poor (>${m.fmt(m.poor)})`;
       doc.setFillColor(...K.offWhite);
       doc.roundedRect(cx, cy, cardW, 26, 2, 2, "F");
       doc.setDrawColor(...color);
@@ -1201,7 +1356,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.setFontSize(13);
       doc.setTextColor(...color);
       doc.text(displayVal, cx + cardW / 2, cy + 16, { align: "center" });
-      doc.setFontSize(6.5);
+      doc.setFontSize(6);
       doc.setTextColor(...color);
       doc.text(statusText, cx + cardW / 2, cy + 22, { align: "center" });
     });
@@ -1220,6 +1375,10 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       robust: "Robust",
     };
     const cardW = (pw - 40 - 15) / 4;
+    if (y + 22 > ph - 20) {
+      doc.addPage("a4", "landscape");
+      y = 18;
+    }
     cats.forEach((cat, i) => {
       const x = 20 + i * (cardW + 5);
       const v = score.categoryScores[cat] || 0;
@@ -1409,7 +1568,9 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
 
       // ── TWO-COLUMN BODY ──
       const obsText = issue.description || "";
-      const recText = issue.recommendation ? String(issue.recommendation).trim() : "";
+      const recText = issue.recommendation
+        ? String(issue.recommendation).trim()
+        : "Recommendation not available — review the issue description and applicable WCAG criterion.";
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
       const obsLines = doc.splitTextToSize(obsText.substring(0, 400), colW - 8);
@@ -1488,6 +1649,150 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.setTextColor(...K.darkGrey);
       doc.text(effort, cardX + 214, y);
       y += 8;
+
+      // ── DEVELOPER LOCATION ──
+      const withScreenshot = (issue.instances || []).find(
+        (i) => i.elementScreenshot,
+      );
+      {
+        const instances = issue.instances || [];
+        const distinctElements = new Set(
+          instances.map((i) => i.element),
+        ).size;
+        const isComponentFix =
+          distinctElements === 1 && instances.length > 1;
+
+        let locLines: string[];
+        let locHeading: string;
+        if (isComponentFix) {
+          const first = instances[0];
+          const cmd = first ? buildDevToolsCommandPdf(first) : null;
+          locHeading = "COMPONENT FIX — DEVELOPER LOCATION";
+          locLines = [
+            `Same element reused on ${issue.affectedPages.length} page(s) — ${instances.length} instance(s) total. Fixing it once resolves every instance.`,
+            `Selector: ${decodeHtmlEntitiesPdf(first?.element || "--")}`,
+            ...(first?.xpath
+              ? [`XPath: ${decodeHtmlEntitiesPdf(first.xpath)}`]
+              : []),
+            ...(cmd ? [`DevTools: ${decodeHtmlEntitiesPdf(cmd)}`] : []),
+          ];
+        } else {
+          locHeading = "DEVELOPER LOCATION — PER INSTANCE";
+          locLines = instances.map((inst) => {
+            const page =
+              decodeHtmlEntitiesPdf(
+                inst.pageUrl.replace(/^https?:\/\/[^/]+/, ""),
+              ) || "/";
+            const el = decodeHtmlEntitiesPdf(inst.element || "--");
+            return `${page}  ->  ${el}`;
+          });
+          if (locLines.length === 0) locLines.push("--");
+        }
+
+        // Measure at the SAME font used to render (courier) — measuring with
+        // one font and rendering with another produces lines that no longer
+        // fit the box once drawn, since Courier's monospace glyphs are wider
+        // per-character than Helvetica's.
+        doc.setFont("courier", "normal");
+        doc.setFontSize(7);
+        const wrappedLocLines = locLines.flatMap((line) =>
+          doc.splitTextToSize(line, cardW - 10),
+        );
+
+        // A single-check "does the whole box fit, else start one new page" is not
+        // enough here: with every instance now listed (no "...and N more" cap), the
+        // box can be taller than an entire page's content area, so it would still
+        // overflow past the footer even on a fresh page. Paginate the line list
+        // instead — draw as many lines as fit per page, then continue on the next.
+        const LOC_LINE_H = 3.3;
+        const LOC_BOX_PAD = 12;
+        const LOC_MIN_LINES = 4;
+        let remainingLocLines = wrappedLocLines;
+        let locContinued = false;
+        while (remainingLocLines.length > 0) {
+          const available = ph - 30 - y;
+          const linesThatFit = Math.floor((available - LOC_BOX_PAD) / LOC_LINE_H);
+
+          if (linesThatFit < Math.min(LOC_MIN_LINES, remainingLocLines.length)) {
+            doc.addPage("a4", "landscape");
+            y = 18;
+            continue;
+          }
+
+          const chunk = remainingLocLines.slice(0, Math.max(linesThatFit, 1));
+          remainingLocLines = remainingLocLines.slice(chunk.length);
+          const chunkBoxH = chunk.length * LOC_LINE_H + LOC_BOX_PAD;
+
+          doc.setFillColor(240, 248, 250);
+          doc.setDrawColor(0, 145, 218);
+          doc.setLineWidth(0.4);
+          doc.roundedRect(cardX, y, cardW, chunkBoxH, 2, 2, "FD");
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(7.5);
+          doc.setTextColor(0, 91, 130);
+          doc.text(
+            locContinued ? `${locHeading} (continued)` : locHeading,
+            cardX + 4,
+            y + 6,
+          );
+          doc.setFont("courier", "normal");
+          doc.setFontSize(7);
+          doc.setTextColor(...K.nearBlack);
+          doc.text(chunk, cardX + 4, y + 11);
+
+          y += chunkBoxH + 4;
+          locContinued = true;
+        }
+      }
+
+      // ── VISUAL EVIDENCE CAPTURE (separate card from Developer Location) ──
+      if (withScreenshot?.elementScreenshot) {
+        const imgBox = fitImageBoxPdf(
+          getImageDimensionsFromBase64(withScreenshot.elementScreenshot, "PNG"),
+          cardW - 8,
+          50,
+        );
+
+        if (y + imgBox.height + 18 > ph - 20) {
+          doc.addPage("a4", "landscape");
+          y = 18;
+        }
+
+        doc.setFillColor(0, 91, 130);
+        doc.roundedRect(cardX, y, cardW, 8, 1, 1, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.5);
+        doc.setTextColor(...K.white);
+        doc.text("VISUAL EVIDENCE CAPTURE", cardX + 4, y + 5.5);
+        const evUrlLabel = decodeHtmlEntitiesPdf(
+          withScreenshot.pageUrl.replace(/^https?:\/\//, ""),
+        ).substring(0, 70);
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(6.5);
+        doc.text(evUrlLabel, cardX + cardW - 4, y + 5.5, { align: "right" });
+        y += 10;
+
+        const frameX = cardX + 2;
+        const frameW = cardW - 4;
+        doc.setFillColor(...K.offWhite);
+        doc.setDrawColor(0, 145, 218);
+        doc.setLineWidth(0.6);
+        doc.roundedRect(frameX, y, frameW, imgBox.height + 2, 0, 0, "FD");
+        try {
+          const imgX = frameX + 1 + (frameW - 2 - imgBox.width) / 2;
+          doc.addImage(
+            `data:image/png;base64,${withScreenshot.elementScreenshot}`,
+            "PNG",
+            imgX,
+            y + 1,
+            imgBox.width,
+            imgBox.height,
+          );
+        } catch {
+          /* skip if image data is invalid */
+        }
+        y += imgBox.height + 2 + 4;
+      }
 
       // ── REFERENCE BOXES ──
       if (y > ph - 35) {
@@ -1936,7 +2241,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     if (!isA11y) {
       doc.addPage("a4", "landscape");
       y = 18;
-      y = startSection(doc, tocEntries, "2", "Journey Audit Map", y);
+      y = startSection(doc, tocEntries, "2", "Dark Pattern Taxonomy Map", y);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
@@ -2519,9 +2824,16 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       // ── VISUAL EVIDENCE CAPTURE ──
       if ((f.evidence as any)?.screenshotDataUrl) {
         const imgData: string = (f.evidence as any).screenshotDataUrl;
+        const match = imgData.match(/^data:image\/(\w+);base64,(.+)$/);
+        const imgFormat: "PNG" | "JPEG" =
+          match?.[1]?.toLowerCase() === "png" ? "PNG" : "JPEG";
+        const imgDims = match
+          ? getImageDimensionsFromBase64(match[2], imgFormat)
+          : null;
         const maxImgH = 50;
-        const imgW = cardW - 4;
-        const imgH = Math.min(Math.round(imgW * 0.45), maxImgH);
+        const fitted = fitImageBoxPdf(imgDims, cardW - 4, maxImgH);
+        const imgW = fitted.width;
+        const imgH = fitted.height;
 
         if (y + imgH + 18 > ph - 20) {
           doc.addPage("a4", "landscape");
@@ -2549,7 +2861,8 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         doc.setLineWidth(0.6);
         doc.roundedRect(frameX, y, frameW, imgH + 2, 0, 0, "FD");
         try {
-          doc.addImage(imgData, "JPEG", frameX + 1, y + 1, frameW - 2, imgH, undefined, "MEDIUM");
+          const imgX = frameX + 1 + (frameW - 2 - imgW) / 2;
+          doc.addImage(imgData, imgFormat, imgX, y + 1, imgW, imgH, undefined, "MEDIUM");
         } catch (_) { /* skip invalid image */ }
 
         doc.setFont("helvetica", "italic");
@@ -2618,7 +2931,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.setFontSize(11);
       doc.setTextColor(...K.darkGrey);
       doc.text(
-        `Core Web Vitals across ${perfPages.length} page(s). Overall performance score: ${perfResult.overallScore ?? "N/A"}/100.`,
+        `Core Web Vitals across ${formatPageCount(perfResult)}. Overall performance score: ${perfResult.overallScore ?? "N/A"}/100.`,
         20,
         y,
       );
@@ -2965,7 +3278,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       }
 
       // Auth flow
-      if (perfResult.authFlow && perfResult.authFlow.status !== "skipped") {
+      if (perfResult.authFlow) {
         if (y > ph - 60) {
           doc.addPage("a4", "landscape");
           y = 18;
@@ -2976,6 +3289,29 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         doc.text(`${perfSectionNum}.3 Authentication Flow Timing`, 20, y);
         y += 8;
         const af = perfResult.authFlow;
+
+        if (af.status === "skipped" || af.status === "failed") {
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(9);
+          doc.setTextColor(...K.midGrey);
+          doc.text(
+            af.status === "skipped"
+              ? "Not tested — no login credentials were provided for this audit. Only the login page's own load time (Time to Form) could be measured; submit-to-response and round-trip timing require test credentials."
+              : "Login submission failed — verify the supplied test credentials and form field selectors are correct, then re-run the audit.",
+            20,
+            y,
+            { maxWidth: pw - 40 },
+          );
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(...K.darkGrey);
+          doc.text(
+            `Time to Form (ms): ${af.timeToFormMs != null ? String(Math.round(af.timeToFormMs)) : "—"}`,
+            20,
+            y + 10,
+          );
+          y += 20;
+        } else {
         autoTable(doc, {
           startY: y,
           head: [["Metric", "Value"]],
@@ -3018,6 +3354,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
           theme: "grid",
         });
         y = (doc as any).lastAutoTable.finalY + 10;
+        }
       }
 
       // Network simulation
@@ -3030,25 +3367,58 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         doc.setFontSize(13);
         doc.setTextColor(...K.blue);
         doc.text(`${perfSectionNum}.4 Network Simulation`, 20, y);
-        y += 8;
+        y += 5;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(...K.midGrey);
+        doc.text(
+          `Industry benchmark — LCP: Good ≤${CWV_THRESHOLDS.lcp.good}ms, Needs Work ≤${CWV_THRESHOLDS.lcp.poor}ms, Poor >${CWV_THRESHOLDS.lcp.poor}ms. Score: Good ≥75, Needs Work ≥50, Poor <50.`,
+          20,
+          y,
+        );
+        y += 6;
         autoTable(doc, {
           startY: y,
-          head: [["Condition", "LCP (ms)", "FCP (ms)", "TTFB (ms)", "Score"]],
-          body: (perfResult.networkSimulation as any[]).map((sim: any) => [
-            sim.label || sim.preset,
-            sim.lcp != null ? String(Math.round(sim.lcp)) : "—",
-            sim.fcp != null ? String(Math.round(sim.fcp)) : "—",
-            sim.ttfb != null ? String(Math.round(sim.ttfb)) : "—",
-            sim.score != null ? String(sim.score) : "—",
-          ]),
+          head: [["Condition", "LCP (ms)", "FCP (ms)", "TTFB (ms)", "Score", "Recommendation"]],
+          body: (perfResult.networkSimulation as any[]).map((sim: any) => {
+            const lcpStatus =
+              sim.lcp == null ? null
+              : sim.lcp <= CWV_THRESHOLDS.lcp.good ? "Good"
+              : sim.lcp <= CWV_THRESHOLDS.lcp.poor ? "Needs Work"
+              : "Poor";
+            const recommendation =
+              lcpStatus === "Poor"
+                ? `LCP exceeds the ${CWV_THRESHOLDS.lcp.poor}ms Poor threshold under ${sim.label || sim.preset} — compress hero images, defer non-critical JS, and enable a CDN.`
+                : lcpStatus === "Needs Work"
+                  ? `LCP is in the Needs Work range under ${sim.label || sim.preset} — preload the LCP element to reach the ${CWV_THRESHOLDS.lcp.good}ms Good threshold.`
+                  : lcpStatus === "Good"
+                    ? "No action needed — meets the Good threshold under this condition."
+                    : "—";
+            return [
+              sim.label || sim.preset,
+              sim.lcp != null ? String(Math.round(sim.lcp)) : "—",
+              sim.fcp != null ? String(Math.round(sim.fcp)) : "—",
+              sim.ttfb != null ? String(Math.round(sim.ttfb)) : "—",
+              sim.score != null ? String(sim.score) : "—",
+              recommendation,
+            ];
+          }),
           headStyles: {
             fillColor: K.navy,
             textColor: 255,
             fontStyle: "bold",
             fontSize: 9,
           },
-          bodyStyles: { fontSize: 9, textColor: K.nearBlack },
+          bodyStyles: { fontSize: 8, textColor: K.nearBlack },
           alternateRowStyles: { fillColor: K.offWhite },
+          columnStyles: {
+            0: { cellWidth: 30 },
+            1: { cellWidth: 22 },
+            2: { cellWidth: 22 },
+            3: { cellWidth: 24 },
+            4: { cellWidth: 18 },
+            5: { cellWidth: 97 },
+          },
           margin: { left: 20, right: 20 },
           theme: "grid",
         });
@@ -3072,12 +3442,15 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         y += 8;
         autoTable(doc, {
           startY: y,
-          head: [["Reported Issue", "Status", "Summary", "Evidence"]],
+          head: [
+            ["Reported Issue", "Status", "Summary", "Evidence", "Recommendation"],
+          ],
           body: (perfResult.confirmedClientIssues as any[]).map((ci: any) => [
             ci.flagLabel || ci.flag,
             (ci.status || "").toUpperCase(),
-            (ci.summary || "").substring(0, 60),
-            (ci.evidence || "").substring(0, 60),
+            (ci.summary || "").substring(0, 45),
+            (ci.evidence || "").substring(0, 30),
+            (ci.recommendation || "—").substring(0, 75),
           ]),
           headStyles: {
             fillColor: K.navy,
@@ -3085,8 +3458,15 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
             fontStyle: "bold",
             fontSize: 9,
           },
-          bodyStyles: { fontSize: 8, textColor: K.nearBlack },
+          bodyStyles: { fontSize: 7.5, textColor: K.nearBlack },
           alternateRowStyles: { fillColor: K.offWhite },
+          columnStyles: {
+            0: { cellWidth: 38 },
+            1: { cellWidth: 20 },
+            2: { cellWidth: 55 },
+            3: { cellWidth: 40 },
+            4: { cellWidth: 84 },
+          },
           margin: { left: 20, right: 20 },
           theme: "grid",
         });
