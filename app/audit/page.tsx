@@ -2791,12 +2791,8 @@ export default function AuditPage() {
                     padding: "6px 12px",
                     borderRadius: 99,
                     border: `1.5px solid ${active ? "var(--kpmg-dynamic)" : "var(--border)"}`,
-                    // background: active
-                    //   ? "color-mix(in srgb, var(--pillar-perf) 15%, transparent)"
-                    //   : "var(--bg-secondary)",
-                    color: active
-                      ? "var(--kpmg-dynamic)"
-                      : "var(--kpmg-dynamic)",
+                    background: `var(--border)`,
+                    color: "var(--kpmg-dynamic)",
                     fontSize: 12,
                     fontWeight: active ? 700 : 400,
                     cursor: "pointer",
