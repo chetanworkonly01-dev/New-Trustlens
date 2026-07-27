@@ -212,7 +212,9 @@ export default function AuditHistoryPage() {
 
         <div style={{ display: "grid", gap: 12 }}>
           {(showAllCompleted ? completed : completed.slice(0, 3)).map((a) => {
-            const pillars = a.config?.enabledPillars || [];
+            let pillars =
+              a.config?.enabledPillars ?? Object.keys(a.pillarScores ?? {});
+            if (pillars.length === 0) pillars = ["accessibility"];
             const isPerfOnly =
               pillars.length === 1 && pillars[0] === "performance";
             const isA11yOnly =
@@ -381,61 +383,53 @@ export default function AuditHistoryPage() {
                         )}
                       </div>
 
-                      {/* Pillar badges */}
-                      {/* {pillars.length > 0 && (
+                      {/* Meta row */}
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 18,
+                          fontSize: 13,
+                          color: "var(--offshade-text)",
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                        }}
+                      >
+                        {/* Pillar badges */}
+                        {pillars.length > 0 && (
                           <div
                             style={{
                               display: "flex",
-                              gap: 14,
+                              gap: 8,
                               flexWrap: "wrap",
-                              marginBottom: 8,
                             }}
                           >
                             {pillars.map((p) => {
                               const m = PILLAR_META[p];
                               if (!m) return null;
-                              const ps = pillarScores[p];
-                              const pColor =
-                                ps != null
-                                  ? ps >= 75
-                                    ? "#00BA8C"
-                                    : ps >= 50
-                                      ? "#F0AB00"
-                                      : "#FF3356"
-                                  : m.color;
                               return (
                                 <span
                                   key={p}
                                   style={{
-                                    fontSize: 13,
-                                    // padding: "2px 8px",
+                                    fontSize: 12,
+                                    padding: "2px 10px",
                                     borderRadius: 99,
-                                    background: `${m.color}15`,
+                                    background: `${m.color}18`,
                                     color: m.color,
-                                    border: `1px solid ${m.color}35`,
-                                    fontWeight: 700,
-                                    display: "flex",
+                                    border: `1px solid var(--kpmg-dynamic)`,
+                                    fontWeight: 600,
+                                    display: "inline-flex",
                                     alignItems: "center",
-                                    gap: 3,
+                                    gap: 5,
+                                    lineHeight: "1.4",
                                   }}
                                 >
-                                  {m.icon} {m.label}
-                                  {ps != null && (
-                                    <span
-                                      style={{
-                                        color: pColor,
-                                        fontWeight: 700,
-                                        marginLeft: 3,
-                                      }}
-                                    >
-                                      {ps}/100
-                                    </span>
-                                  )}
+                                  {m.label}
                                 </span>
                               );
                             })}
                           </div>
-                        )} */}
+                        )}
+                      </div>
 
                       {/* Meta row */}
                       <div
@@ -446,6 +440,7 @@ export default function AuditHistoryPage() {
                           color: "var(--offshade-text)",
                           flexWrap: "wrap",
                           alignItems: "center",
+                          marginTop: 8,
                         }}
                       >
                         <span

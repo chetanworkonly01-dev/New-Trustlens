@@ -1235,11 +1235,11 @@ export default function FinalReportPage() {
         { id: "executive", label: "Executive Summary" },
         ...(isA11y
           ? [
-              { id: "backlog", label: "Issue Backlog" },
+              // { id: "backlog", label: "Issue Backlog" },
               { id: "components", label: "Components" },
               { id: "remediation", label: "Remediation Guide" },
               { id: "priority", label: "Priority Matrix" },
-              { id: "acceptance", label: "Acceptance / QA" },
+              // { id: "acceptance", label: "Acceptance / QA" },
             ]
           : []),
         ...(isPerf ? [{ id: "performance", label: "Performance" }] : []),

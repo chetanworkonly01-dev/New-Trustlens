@@ -2855,7 +2855,7 @@ export default function AuditPage() {
                 borderRadius: "var(--radius-md)",
                 border: "1px solid var(--border)",
                 background: "var(--bg-secondary)",
-                color: "var(--text-primary)",
+                color: "var(--textarea-text)",
                 fontFamily: "inherit",
                 boxSizing: "border-box",
               }}
@@ -3180,10 +3180,7 @@ export default function AuditPage() {
                     padding: "8px 18px",
                     borderRadius: "var(--radius-md)",
                     border: `2px solid ${scopeMode === m.id ? "var(--kpmg-dynamic)" : "var(--border)"}`,
-                    // background:
-                    //   scopeMode === m.id
-                    //     ? "rgba(254,113,65,0.06)"
-                    //     : "transparent",
+                    background: "var(--bg-glass)",
                     cursor: "pointer",
                     transition: "var(--transition)",
                     position: "relative",
@@ -3295,7 +3292,7 @@ export default function AuditPage() {
                       style={{
                         width: 16,
                         height: 16,
-                        accentColor: "var(--accent-primary)",
+                        accentColor: "var(--kpmg-dynamic)",
                       }}
                     />
                     <span
@@ -4346,7 +4343,7 @@ export default function AuditPage() {
                                   alignItems: "start",
                                   padding: "8px 10px",
                                   borderRadius: "var(--radius-md)",
-                                  background: "var(--bg-secondary)",
+                                  background: "var(--bg-card)",
                                   border: "1px solid var(--border)",
                                 }}
                               >
@@ -4397,7 +4394,7 @@ export default function AuditPage() {
                                       fontSize: 11,
                                       padding: "6px 10px",
                                       color: "var(--offshade-text)",
-                                      // background: `${pillarColor}04`,
+                                      background: `var(--bg-card)`,
                                       borderColor: `var(--offshade-text)`,
                                     }}
                                   />

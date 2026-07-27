@@ -24,6 +24,7 @@
   --dynamic-border: #7a7373;
   --alternate-text: #000;
   --progress-background: #d5d5d5;
+  --textarea-text: #000;
 
   /* Background */
   --bg-primary: #020d1f;
@@ -112,6 +113,7 @@
   --text-primary: #0a0a0a;
   --text-secondary: #374151;
   --text-muted: #6b7280;
+  --textarea-text: #5c5c5c;
 
   --accent-primary: #fe7141;
   --accent-orange: #fe7141;
@@ -209,6 +211,9 @@ pre,
   background: #003087;
   border-radius: var(--radius-full);
   opacity: 0.5;
+}
+textarea::placeholder {
+  color: var(--textarea-text);
 }
 
 /* ===== GLASS CARD ===== */

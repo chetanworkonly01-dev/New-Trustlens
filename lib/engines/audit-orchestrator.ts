@@ -477,7 +477,12 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
 
         // axe-core + custom rules — using new return type
         try {
-          const axeResult = await scanWithAxe(crawlResult.context, pg, undefined, wcagLevels);
+          const axeResult = await scanWithAxe(
+            crawlResult.context,
+            pg,
+            undefined,
+            wcagLevels,
+          );
           allIssues.push(...axeResult.issues);
 
           // Merge N/A and pass data
@@ -497,8 +502,12 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
           const customIssues = await runCustomRules(pg);
           // Deduplicate: drop custom rules whose WCAG criterion is already covered by axe-core
           // on this page. axe-core is DOM-based and higher confidence for shared criteria.
-          const axeCriteriaOnPage = new Set(axeResult.issues.map(i => i.wcagCriterion));
-          const deduplicatedCustom = customIssues.filter(ci => !axeCriteriaOnPage.has(ci.wcagCriterion));
+          const axeCriteriaOnPage = new Set(
+            axeResult.issues.map((i) => i.wcagCriterion),
+          );
+          const deduplicatedCustom = customIssues.filter(
+            (ci) => !axeCriteriaOnPage.has(ci.wcagCriterion),
+          );
           allIssues.push(...deduplicatedCustom);
         } catch (err) {
           console.error(`Scanner error for ${pg.url}:`, err);
@@ -1130,7 +1139,7 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
     // are best-effort; this guarantees the final issue list matches the config.
     const dedupedRaw = deduplicateIssues(allIssues);
     const wcagLevelSet = new Set(wcagLevels);
-    const deduped = dedupedRaw.filter(i => wcagLevelSet.has(i.wcagLevel));
+    const deduped = dedupedRaw.filter((i) => wcagLevelSet.has(i.wcagLevel));
 
     // Store collected N/A criteria (exclude any that ended up having violations)
     const failedCriteria = new Set(deduped.map((i) => i.wcagCriterion));
