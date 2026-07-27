@@ -1,9 +1,26 @@
 "use client";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useTheme } from "./ThemeProvider";
+import { Audit } from "../lib/types";
 
 export default function ThemeNavbar() {
   const { isDark, toggleTheme } = useTheme();
+  const [audits, setAudits] = useState<Audit[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAudits = async () => {
+      try {
+        const res = await fetch("/api/audit/list");
+        if (res.ok) setAudits(await res.json());
+      } catch {
+        /* ignore */
+      }
+      setLoading(false);
+    };
+    fetchAudits();
+  }, []);
 
   return (
     <nav className="navbar" aria-label="Main navigation">
@@ -38,32 +55,11 @@ export default function ThemeNavbar() {
           <a href="/audit" className="navbar-link">
             New Audit
           </a>
-
-          {/* <div
-            className="trustlens-pillars-badge"
-            aria-label="Active audit pillars"
-          >
-            <span
-              className="pillar-dot"
-              title="Accessibility"
-              aria-hidden="true"
-            >
-              ♿
-            </span>
-            <span
-              className="pillar-dot"
-              title="Dark Patterns"
-              aria-hidden="true"
-            >
-              🕵️
-            </span>
-            <span className="pillar-dot" title="Performance" aria-hidden="true">
-              ⚡
-            </span>
-            <span className="pillar-dot" title="Privacy" aria-hidden="true">
-              🔒
-            </span>
-          </div> */}
+          {audits.length > 0 && (
+            <a href="/audit-history" className="navbar-link">
+              View Audit History
+            </a>
+          )}
 
           {/* Theme Toggle */}
           <button

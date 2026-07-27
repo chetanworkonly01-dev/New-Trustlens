@@ -991,7 +991,8 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
               testName: "Engine",
               wcag: "",
               status: result.overallScore >= 80 ? "pass" : "fail",
-              pillar: `${result.totalTrackers} trackers`,
+              pillar: "privacy",
+              message: `Privacy: ${result.overallScore}/100 | ${result.totalTrackers} trackers found`,
             });
           })
           .catch((err) => {

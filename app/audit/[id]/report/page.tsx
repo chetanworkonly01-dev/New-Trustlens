@@ -4578,11 +4578,11 @@ export default function FinalReportPage() {
                   color: "#00BA8C",
                   // bg: "rgba(0,186,140,0.05)",
                 },
-              ].map(({ label, desc, emoji, items, color, bg, border }) => (
+              ].map(({ label, desc, emoji, items, color, border }) => (
                 <div
                   key={label}
                   style={{
-                    background: bg,
+                    // background: bg,
                     border: `1px solid var(--dynamic-border)`,
                     // borderRadius: "var(--radius-md)",
                     padding: 18,

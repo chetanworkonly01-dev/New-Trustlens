@@ -23,6 +23,7 @@
   --bg-darkcard: #00173a;
   --dynamic-border: #7a7373;
   --alternate-text: #000;
+  --progress-background: #d5d5d5;
 
   /* Background */
   --bg-primary: #020d1f;
@@ -106,6 +107,7 @@
   --offshade-text: #000;
   --bg-darkcard: transparent;
   --dynamic-border: #dadada;
+  --progress-background: #d5d5d5;
 
   --text-primary: #0a0a0a;
   --text-secondary: #374151;
@@ -301,25 +303,25 @@ pre,
   transition: var(--transition);
   background: #003087;
   color: white;
-  box-shadow: 0 2px 12px rgba(254, 113, 65, 0.3);
+  /* box-shadow: 0 2px 12px rgba(254, 113, 65, 0.3); */
 }
 .btn-report:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 18px rgba(254, 113, 65, 0.5);
+  /* box-shadow: 0 4px 18px rgba(254, 113, 65, 0.5); */
   color: white;
 }
 
 /* ===== INPUTS ===== */
 .input-field {
   width: 100%;
-  padding: 11px 14px;
+  padding: 16px 10px;
   background: var(--bg-glass);
   border: 1px solid var(--border);
   /* border-radius: var(--radius-md); */
   color: var(--text-primary);
-  padding-right: 8px;
-  font-family: "Inter", sans-serif;
-  font-size: 16px;
+  /* padding-right: 8px; */
+  /* font-family: "Inter", sans-serif; */
+  font-size: 11px;
   text-transform: capitalize;
   transition: var(--transition);
   outline: none;
@@ -544,13 +546,14 @@ pre,
 /* ===== PROGRESS BAR ===== */
 .progress-bar {
   height: 5px;
-  background: var(--bg-secondary);
+  background: var(--progress-background);
   border-radius: var(--radius-full);
   overflow: hidden;
 }
 .progress-fill {
   height: 100%;
-  background: var(--gradient-primary);
+  /* background: var(--gradient-primary); */
+  background: var(--kpmg-navy);
   border-radius: var(--radius-full);
   transition: width 0.6s ease;
 }
@@ -1382,10 +1385,10 @@ pre,
 .pillar-score-card.pillar-privacy::before {
   background: var(--pillar-priv);
 }
-.pillar-score-card:hover {
+/* .pillar-score-card:hover {
   border-color: var(--border-hover);
   box-shadow: var(--shadow-glow);
-}
+} */
 .pillar-score-value {
   font-size: 28px;
   font-weight: 300;
@@ -1490,9 +1493,9 @@ pre,
   height: 3px;
   background: #e8002d;
 }
-.pipeline-pillar.status-queued {
+/* .pipeline-pillar.status-queued {
   opacity: 0.5;
-}
+} */
 .pipeline-pillar-icon {
   font-size: 18px;
   margin-bottom: 4px;
@@ -1502,8 +1505,8 @@ pre,
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-secondary);
-  font-family: "Geist Mono", monospace;
+  color: var(--text-primary);
+  /* font-family: "Geist Mono", monospace; */
   margin-bottom: 6px;
 }
 .pipeline-pillar-bar {
@@ -1532,7 +1535,7 @@ pre,
   color: var(--accent-primary);
 }
 .pipeline-status-queued {
-  color: var(--text-muted);
+  color: var(--offshade-text);
 }
 .pipeline-status-error {
   color: #e8002d;
