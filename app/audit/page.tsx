@@ -2346,6 +2346,7 @@ export default function AuditPage() {
     try {
       const form = new FormData();
       form.append("file", pdfFile);
+      form.append("enabledPillars", getEnabledPillars().join(",")); // <-- include selected pillars
       const res = await fetch("/api/audit/pdf", { method: "POST", body: form });
       const data = await res.json();
       if (data.auditId) router.push(`/audit/${data.auditId}`);
@@ -2588,7 +2589,9 @@ export default function AuditPage() {
                 {p.desc}
               </span>
               <span
-                style={{display: "inline-flex", alignItems: "center", 
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
                   fontSize: 10,
                   fontWeight: 700,
                   textTransform: "uppercase",
@@ -2653,7 +2656,9 @@ export default function AuditPage() {
               CWV · Auth Flows · Network Sim
             </span>
             <span
-              style={{display: "inline-flex", alignItems: "center", 
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
                 fontSize: 10,
                 fontWeight: 700,
                 textTransform: "uppercase",
@@ -2745,7 +2750,9 @@ export default function AuditPage() {
               What has the client reported?
             </span>
             <span
-              style={{display: "inline-flex", alignItems: "center", 
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
                 fontSize: 10,
                 color: "var(--text-secondary)",
                 background: "rgba(255,255,255,0.06)",
@@ -3188,7 +3195,9 @@ export default function AuditPage() {
                 >
                   {m.rec && (
                     <span
-                      style={{display: "inline-flex", alignItems: "center", 
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
                         position: "absolute",
                         top: 8,
                         right: 8,
@@ -3580,7 +3589,9 @@ export default function AuditPage() {
                               </span>
                             </div>
                             <span
-                              style={{display: "inline-flex", alignItems: "center", 
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
                                 fontSize: 12,
                                 fontWeight: 700,
                                 padding: "2px 7px",
@@ -4862,7 +4873,7 @@ export default function AuditPage() {
                 Analyzing PDF...
               </>
             ) : (
-              "Analyze PDF Accessibility"
+              "Analyze PDF "
             )}
           </button>
         </div>

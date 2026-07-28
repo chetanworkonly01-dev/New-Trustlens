@@ -3,9 +3,26 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import {
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, Legend, PieChart, Pie, Cell, RadialBarChart, RadialBar,
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  RadialBarChart,
+  RadialBar,
 } from "recharts";
 
 // ── Accessibility types ──────────────────────────────────────
@@ -120,7 +137,12 @@ interface SeoData {
   metaTitleLength: number | null;
   metaDescriptionLength: number | null;
   brokenLinks: string[];
-  issues: Array<{ type: string; severity: string; detail: string; recommendation: string }>;
+  issues: Array<{
+    type: string;
+    severity: string;
+    detail: string;
+    recommendation: string;
+  }>;
 }
 interface UXPainPoint {
   area: string;
@@ -136,10 +158,32 @@ interface UXImprovement {
 }
 interface UXResult {
   score: number;
-  initialLoadExperience: { score: number; hasLoadingIndicator: boolean; hasSkeletonScreens: boolean; hasProgressiveLoading: boolean; timeToInteractiveMs: number | null };
-  visualStability: { score: number; clsDuringInteractionMs: number | null; layoutJankScore: string };
-  responsiveness: { score: number; mobileUsabilityScore: number | null; navigationResponseMs: number | null; formResponseMs: number | null; searchResponseMs: number | null };
-  animationPerformance: { score: number; scrollJank: boolean; animationFps: number | null; pageTransitionMs: number | null; smoothnessScore: string };
+  initialLoadExperience: {
+    score: number;
+    hasLoadingIndicator: boolean;
+    hasSkeletonScreens: boolean;
+    hasProgressiveLoading: boolean;
+    timeToInteractiveMs: number | null;
+  };
+  visualStability: {
+    score: number;
+    clsDuringInteractionMs: number | null;
+    layoutJankScore: string;
+  };
+  responsiveness: {
+    score: number;
+    mobileUsabilityScore: number | null;
+    navigationResponseMs: number | null;
+    formResponseMs: number | null;
+    searchResponseMs: number | null;
+  };
+  animationPerformance: {
+    score: number;
+    scrollJank: boolean;
+    animationFps: number | null;
+    pageTransitionMs: number | null;
+    smoothnessScore: string;
+  };
   painPoints: UXPainPoint[];
   improvementOpportunities: UXImprovement[];
 }
@@ -163,7 +207,14 @@ interface AIReportData {
   businessImpactNarrative: string;
   overallROI: string;
   recommendations: AIRec[];
-  devTickets: Array<{ title: string; description: string; acceptanceCriteria: string[]; labels: string[]; storyPoints: number; priority: string }>;
+  devTickets: Array<{
+    title: string;
+    description: string;
+    acceptanceCriteria: string[];
+    labels: string[];
+    storyPoints: number;
+    priority: string;
+  }>;
   generatedAt: string;
 }
 interface PerfResult {
@@ -304,7 +355,16 @@ interface AuditData {
   trustScore?: {
     overall: number;
     trustLevel: "trusted" | "moderate" | "at-risk" | "critical";
-    pillarScores: Record<string, { pillar: string; score: number; weight: number; totalFindings: number; status: string }>;
+    pillarScores: Record<
+      string,
+      {
+        pillar: string;
+        score: number;
+        weight: number;
+        totalFindings: number;
+        status: string;
+      }
+    >;
   };
   startedAt: string;
   completedAt?: string;
@@ -866,7 +926,9 @@ function GroupedIssueCard({
           </span>
         </div>
         <span
-          style={{display: "inline-flex", alignItems: "center", 
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
             padding: "2px 8px",
             borderRadius: 99,
             fontSize: 12,
@@ -880,7 +942,9 @@ function GroupedIssueCard({
           {group.severity}
         </span>
         <span
-          style={{display: "inline-flex", alignItems: "center", 
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
             padding: "2px 8px",
             borderRadius: 99,
             fontSize: 12,
@@ -973,12 +1037,11 @@ function groupDPFindings(items: DPFinding[]): DPFindingGroup[] {
 function DPFindingCard({ finding, idx }: { finding: DPFinding; idx: number }) {
   const [open, setOpen] = useState(false);
   const elementIsSelector = looksLikeSelector(finding.element || "");
-  const devToolsCmd =
-    finding.xpath
-      ? `$x('${finding.xpath.replace(/'/g, "\\'")}')[0]`
-      : elementIsSelector
-        ? `document.querySelector('${finding.element.replace(/'/g, "\\'")}')`
-        : null;
+  const devToolsCmd = finding.xpath
+    ? `$x('${finding.xpath.replace(/'/g, "\\'")}')[0]`
+    : elementIsSelector
+      ? `document.querySelector('${finding.element.replace(/'/g, "\\'")}')`
+      : null;
 
   return (
     <div
@@ -1013,9 +1076,7 @@ function DPFindingCard({ finding, idx }: { finding: DPFinding; idx: number }) {
           #{String(idx).padStart(3, "0")}
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ fontWeight: 700, fontSize: 13 }}>
-            {finding.title}
-          </span>
+          <span style={{ fontWeight: 700, fontSize: 13 }}>{finding.title}</span>
           <span
             style={{ marginLeft: 8, fontSize: 13, color: "var(--text-muted)" }}
           >
@@ -1023,7 +1084,9 @@ function DPFindingCard({ finding, idx }: { finding: DPFinding; idx: number }) {
           </span>
         </div>
         <span
-          style={{display: "inline-flex", alignItems: "center", 
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
             padding: "2px 8px",
             borderRadius: 99,
             fontSize: 13,
@@ -1038,7 +1101,9 @@ function DPFindingCard({ finding, idx }: { finding: DPFinding; idx: number }) {
         </span>
         {finding.brignullPattern && (
           <span
-            style={{display: "inline-flex", alignItems: "center", 
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
               padding: "2px 7px",
               borderRadius: 99,
               fontSize: 12,
@@ -1051,7 +1116,9 @@ function DPFindingCard({ finding, idx }: { finding: DPFinding; idx: number }) {
           </span>
         )}
         <span
-          style={{display: "inline-flex", alignItems: "center", 
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
             padding: "2px 7px",
             borderRadius: 99,
             fontSize: 12,
@@ -1257,7 +1324,9 @@ function DPFindingGroupCard({ group }: { group: DPFindingGroup }) {
           </span>
         </div>
         <span
-          style={{display: "inline-flex", alignItems: "center", 
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
             padding: "2px 8px",
             borderRadius: 99,
             fontSize: 12,
@@ -1271,7 +1340,9 @@ function DPFindingGroupCard({ group }: { group: DPFindingGroup }) {
           {group.severity}
         </span>
         <span
-          style={{display: "inline-flex", alignItems: "center", 
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
             padding: "2px 8px",
             borderRadius: 99,
             fontSize: 12,
@@ -1399,7 +1470,9 @@ function IssueCard({
           }}
         >
           <span
-            style={{display: "inline-flex", alignItems: "center", 
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
               padding: "2px 8px",
               borderRadius: 99,
               fontSize: 13,
@@ -1413,7 +1486,9 @@ function IssueCard({
             {issue.severity}
           </span>
           <span
-            style={{display: "inline-flex", alignItems: "center", 
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
               padding: "2px 8px",
               borderRadius: 99,
               fontSize: 12,
@@ -1426,7 +1501,9 @@ function IssueCard({
             {team}
           </span>
           <span
-            style={{display: "inline-flex", alignItems: "center", 
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
               padding: "2px 8px",
               borderRadius: 99,
               fontSize: 12,
@@ -1439,7 +1516,9 @@ function IssueCard({
             {effort}
           </span>
           <span
-            style={{display: "inline-flex", alignItems: "center", 
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
               padding: "2px 7px",
               borderRadius: 99,
               fontSize: 12,
@@ -1512,7 +1591,9 @@ function IssueCard({
                 <div style={{ fontSize: 13 }}>
                   <strong>{issue.wcagCriterion}</strong> — {issue.wcagName}{" "}
                   <span
-                    style={{display: "inline-flex", alignItems: "center", 
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
                       padding: "1px 6px",
                       borderRadius: 99,
                       fontSize: 12,
@@ -1572,8 +1653,8 @@ function IssueCard({
                     )}
                   </li>
                   <li>
-                    The element will be selected and highlighted in the
-                    Elements panel
+                    The element will be selected and highlighted in the Elements
+                    panel
                   </li>
                   <li>Attempt keyboard-only interaction (Tab, Enter, Space)</li>
                   <li>
@@ -1671,9 +1752,7 @@ function IssueCard({
                   >
                     {Object.entries(issue.checkData).map(([k, v]) => (
                       <div key={k} style={{ display: "flex", gap: 6 }}>
-                        <span style={{ color: "var(--text-muted)" }}>
-                          {k}:
-                        </span>
+                        <span style={{ color: "var(--text-muted)" }}>{k}:</span>
                         <span style={{ fontFamily: "monospace" }}>
                           {typeof v === "object"
                             ? JSON.stringify(v)
@@ -1922,7 +2001,9 @@ function CwvGauge({
 function ResourceIssueBadge({ severity }: { severity: string }) {
   return (
     <span
-      style={{display: "inline-flex", alignItems: "center", 
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
         padding: "1px 7px",
         borderRadius: 99,
         fontSize: 12,
@@ -1954,7 +2035,9 @@ export default function FinalReportPage() {
   const [expandedPage, setExpandedPage] = useState<string | null>(null);
   const [showAllBacklog, setShowAllBacklog] = useState(false);
   const [showAllAcceptance, setShowAllAcceptance] = useState(false);
-  const [aiPersona, setAiPersona] = useState<"executive" | "developer" | "pm" | "consultant">("executive");
+  const [aiPersona, setAiPersona] = useState<
+    "executive" | "developer" | "pm" | "consultant"
+  >("executive");
   const [aiGenerating, setAiGenerating] = useState(false);
   const [expandedTicket, setExpandedTicket] = useState<number | null>(null);
   const [expandedRec, setExpandedRec] = useState<number | null>(null);
@@ -2043,7 +2126,8 @@ export default function FinalReportPage() {
   const groupedBacklog = groupIssuesByType(filtered);
 
   // ── Dark Pattern derived data ───────────────────────────────────
-  const dpFindings: DPFinding[] = data.pillarResults?.darkpatterns?.findings || [];
+  const dpFindings: DPFinding[] =
+    data.pillarResults?.darkpatterns?.findings || [];
   const dpGroupedFindings = groupDPFindings(dpFindings);
   const compGroups: Record<string, typeof augmented> = {};
   augmented.forEach((i) => {
@@ -2086,21 +2170,57 @@ export default function FinalReportPage() {
   const aiReport = perfResult?.aiReport;
 
   // Recharts data builders
-  const uxRadarData = uxPerf ? [
-    { subject: "Loading", value: uxPerf.initialLoadExperience.score, fullMark: 100 },
-    { subject: "Stability", value: uxPerf.visualStability.score, fullMark: 100 },
-    { subject: "Responsiveness", value: uxPerf.responsiveness.score, fullMark: 100 },
-    { subject: "Animation", value: uxPerf.animationPerformance.score, fullMark: 100 },
-    { subject: "Mobile", value: uxPerf.responsiveness.mobileUsabilityScore ?? 75, fullMark: 100 },
-  ] : [];
+  const uxRadarData = uxPerf
+    ? [
+        {
+          subject: "Loading",
+          value: uxPerf.initialLoadExperience.score,
+          fullMark: 100,
+        },
+        {
+          subject: "Stability",
+          value: uxPerf.visualStability.score,
+          fullMark: 100,
+        },
+        {
+          subject: "Responsiveness",
+          value: uxPerf.responsiveness.score,
+          fullMark: 100,
+        },
+        {
+          subject: "Animation",
+          value: uxPerf.animationPerformance.score,
+          fullMark: 100,
+        },
+        {
+          subject: "Mobile",
+          value: uxPerf.responsiveness.mobileUsabilityScore ?? 75,
+          fullMark: 100,
+        },
+      ]
+    : [];
 
-  const uxResponsivenessData = uxPerf ? [
-    { name: "Navigation", ms: uxPerf.responsiveness.navigationResponseMs ?? 0, target: 300 },
-    { name: "Form Input", ms: uxPerf.responsiveness.formResponseMs ?? 0, target: 100 },
-    { name: "Search", ms: uxPerf.responsiveness.searchResponseMs ?? 0, target: 300 },
-  ].filter(d => d.ms > 0) : [];
+  const uxResponsivenessData = uxPerf
+    ? [
+        {
+          name: "Navigation",
+          ms: uxPerf.responsiveness.navigationResponseMs ?? 0,
+          target: 300,
+        },
+        {
+          name: "Form Input",
+          ms: uxPerf.responsiveness.formResponseMs ?? 0,
+          target: 100,
+        },
+        {
+          name: "Search",
+          ms: uxPerf.responsiveness.searchResponseMs ?? 0,
+          target: 300,
+        },
+      ].filter((d) => d.ms > 0)
+    : [];
 
-  const networkSimData = (perfResult?.networkSimulation || []).map(s => ({
+  const networkSimData = (perfResult?.networkSimulation || []).map((s) => ({
     name: s.label,
     LCP: s.lcp ?? 0,
     Score: s.score ?? 0,
@@ -2109,9 +2229,18 @@ export default function FinalReportPage() {
   const riPieData = Object.entries(perfResult?.resourceIssuesByType || {})
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
-    .map(([name, value]) => ({ name: name.replace(/-/g, ' '), value }));
+    .map(([name, value]) => ({ name: name.replace(/-/g, " "), value }));
 
-  const PIE_COLORS = ["#E8002D", "#FF6B00", "#F0AB00", "#0091DA", "#00B2A9", "#00BA8C", "#CDABFE", "#FE7141"];
+  const PIE_COLORS = [
+    "#E8002D",
+    "#FF6B00",
+    "#F0AB00",
+    "#0091DA",
+    "#00B2A9",
+    "#00BA8C",
+    "#CDABFE",
+    "#FE7141",
+  ];
 
   const triggerAIAnalysis = async () => {
     if (!data?.id || aiGenerating) return;
@@ -2133,14 +2262,40 @@ export default function FinalReportPage() {
   };
 
   const exportPerfCSV = () => {
-    const rows = [["Page URL", "Issue Type", "Severity", "Description", "Recommendation", "Effort", "Priority"]];
-    recs.forEach(r => {
-      rows.push([`"${data.config?.url || ''}"`, r.issueType || r.title, r.impact, `"${r.detail.replace(/"/g, '""')}"`, `"${r.detail.replace(/"/g, '""')}"`, r.effort, r.priority]);
+    const rows = [
+      [
+        "Page URL",
+        "Issue Type",
+        "Severity",
+        "Description",
+        "Recommendation",
+        "Effort",
+        "Priority",
+      ],
+    ];
+    recs.forEach((r) => {
+      rows.push([
+        `"${data.config?.url || ""}"`,
+        r.issueType || r.title,
+        r.impact,
+        `"${r.detail.replace(/"/g, '""')}"`,
+        `"${r.detail.replace(/"/g, '""')}"`,
+        r.effort,
+        r.priority,
+      ]);
     });
-    allResourceIssues.forEach(ri => {
-      rows.push([`"${ri.pageUrl}"`, ri.type, ri.severity, `"${ri.description.replace(/"/g, '""')}"`, `"${ri.recommendation.replace(/"/g, '""')}"`, "", ""]);
+    allResourceIssues.forEach((ri) => {
+      rows.push([
+        `"${ri.pageUrl}"`,
+        ri.type,
+        ri.severity,
+        `"${ri.description.replace(/"/g, '""')}"`,
+        `"${ri.recommendation.replace(/"/g, '""')}"`,
+        "",
+        "",
+      ]);
     });
-    const csv = rows.map(r => r.join(",")).join("\n");
+    const csv = rows.map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url2 = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -2160,7 +2315,11 @@ export default function FinalReportPage() {
   const pillarNames = enabledPillars.map((p) => PILLAR_LABEL[p] ?? p);
   const isMultiPillar = enabledPillars.length > 1;
   const joinedPillarNames =
-    enabledPillars.length === 4 ? null : pillarNames.join(" + ");
+    enabledPillars.length === 4
+      ? null
+      : pillarNames.length === 3
+        ? null
+        : pillarNames.join(" & ");
   const displayScore = isMultiPillar
     ? (data.trustScore?.overall ?? score.overall)
     : perfOnly
@@ -2172,11 +2331,12 @@ export default function FinalReportPage() {
           : score.overall;
   const scoreColor =
     displayScore >= 75 ? "#00BA8C" : displayScore >= 50 ? "#F0AB00" : "#FF3356";
-  const reportTitle = isMultiPillar
-    ? joinedPillarNames
-      ? `${joinedPillarNames} Audit`
-      : "TrustLens 4-Pillar Audit"
-    : `${pillarNames[0]} Audit`;
+  // const reportTitle = isMultiPillar
+  //   ? joinedPillarNames
+  //     ? `${joinedPillarNames} Audit`
+  //     : "TrustLens 3-Pillar Audit"
+  //   : `${pillarNames[0]} Audit`;
+  const reportTitle = "TrustLens Audit";
   const headerSub = perfOnly
     ? `${data.config?.url || ""} · Performance Score: ${perfScore}/100 · ${reportDate}`
     : `${data.config?.url || ""} · ${isA11y && !isMultiPillar ? `${standard} Level ${testedLevel}` : enabledPillars.join(", ")} · ${reportDate}`;
@@ -2991,7 +3151,9 @@ export default function FinalReportPage() {
                           }}
                         >
                           <span
-                            style={{display: "inline-flex", alignItems: "center", 
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
                               padding: "2px 8px",
                               borderRadius: 99,
                               fontSize: 10,
@@ -3003,7 +3165,9 @@ export default function FinalReportPage() {
                             {r.impact} Impact
                           </span>
                           <span
-                            style={{display: "inline-flex", alignItems: "center", 
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
                               padding: "2px 8px",
                               borderRadius: 99,
                               fontSize: 10,
@@ -3074,7 +3238,9 @@ export default function FinalReportPage() {
                             {ci.flagLabel || ci.flag}
                           </div>
                           <span
-                            style={{display: "inline-flex", alignItems: "center", 
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
                               padding: "2px 8px",
                               borderRadius: 99,
                               fontSize: 10,
@@ -3468,7 +3634,9 @@ export default function FinalReportPage() {
                           </div>
                         </div>
                         <span
-                          style={{display: "inline-flex", alignItems: "center", 
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
                             marginLeft: "auto",
                             padding: "2px 8px",
                             borderRadius: 99,
@@ -4344,7 +4512,8 @@ export default function FinalReportPage() {
                         </div>
                         {r.clientReported && (
                           <span
-                            style={{alignItems: "center", 
+                            style={{
+                              alignItems: "center",
                               display: "inline-block",
                               marginTop: 4,
                               padding: "1px 7px",
@@ -4368,7 +4537,9 @@ export default function FinalReportPage() {
                         }}
                       >
                         <span
-                          style={{display: "inline-flex", alignItems: "center", 
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
                             padding: "2px 8px",
                             borderRadius: 99,
                             fontSize: 10,
@@ -4380,7 +4551,9 @@ export default function FinalReportPage() {
                           {r.impact} Impact
                         </span>
                         <span
-                          style={{display: "inline-flex", alignItems: "center", 
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
                             padding: "2px 8px",
                             borderRadius: 99,
                             fontSize: 10,
@@ -4566,7 +4739,9 @@ export default function FinalReportPage() {
                             </td>
                             <td style={{ padding: "10px 14px" }}>
                               <span
-                                style={{display: "inline-flex", alignItems: "center", 
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
                                   padding: "2px 8px",
                                   borderRadius: 99,
                                   fontSize: 10,
@@ -4728,7 +4903,7 @@ export default function FinalReportPage() {
                         color: "#FF3356",
                       }}
                     >
-                      ⚠️ Auth Flow Issues
+                      Auth Flow Issues
                     </h3>
                     {(perfResult.authFlow.issues || []).map((issue, i) => (
                       <div
@@ -4783,9 +4958,8 @@ export default function FinalReportPage() {
                   color: "var(--text-muted)",
                 }}
               >
-                ℹ️ Authentication flow testing was not configured for this
-                audit. To enable, provide login credentials in the audit
-                configuration.
+                Authentication flow testing was not configured for this audit.
+                To enable, provide login credentials in the audit configuration.
               </div>
             ) : null}
           </div>
@@ -4797,18 +4971,74 @@ export default function FinalReportPage() {
             {uxPerf ? (
               <>
                 {/* UX Score Hero */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 28 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(5, 1fr)",
+                    gap: 12,
+                    marginBottom: 28,
+                  }}
+                >
                   {[
                     { label: "UX Score", val: uxPerf.score, icon: "🎯" },
-                    { label: "Loading Experience", val: uxPerf.initialLoadExperience.score, icon: "⏳" },
-                    { label: "Visual Stability", val: uxPerf.visualStability.score, icon: "🔒" },
-                    { label: "Responsiveness", val: uxPerf.responsiveness.score, icon: "⚡" },
-                    { label: "Animation Smoothness", val: uxPerf.animationPerformance.score, icon: "🎬" },
+                    {
+                      label: "Loading Experience",
+                      val: uxPerf.initialLoadExperience.score,
+                      icon: "",
+                    },
+                    {
+                      label: "Visual Stability",
+                      val: uxPerf.visualStability.score,
+                      icon: "",
+                    },
+                    {
+                      label: "Responsiveness",
+                      val: uxPerf.responsiveness.score,
+                      icon: "",
+                    },
+                    {
+                      label: "Animation Smoothness",
+                      val: uxPerf.animationPerformance.score,
+                      icon: "",
+                    },
                   ].map(({ label, val, icon }) => (
-                    <div key={label} style={{ background: "var(--bg-darkcard)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", padding: "16px 14px", textAlign: "center" }}>
-                      <div style={{ fontSize: 20, marginBottom: 6 }}>{icon}</div>
-                      <div style={{ fontSize: 26, fontWeight: 800, color: val >= 75 ? "#00BA8C" : val >= 50 ? "#F0AB00" : "#E8002D", lineHeight: 1 }}>{val}</div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>{label}</div>
+                    <div
+                      key={label}
+                      style={{
+                        background: "var(--bg-darkcard)",
+                        border: "1px solid var(--border-subtle)",
+                        borderRadius: "var(--radius-md)",
+                        padding: "16px 14px",
+                        textAlign: "center",
+                      }}
+                    >
+                      <div style={{ fontSize: 20, marginBottom: 6 }}>
+                        {icon}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 26,
+                          fontWeight: 800,
+                          color:
+                            val >= 75
+                              ? "#00BA8C"
+                              : val >= 50
+                                ? "#F0AB00"
+                                : "#E8002D",
+                          lineHeight: 1,
+                        }}
+                      >
+                        {val}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "var(--text-muted)",
+                          marginTop: 4,
+                        }}
+                      >
+                        {label}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -4816,13 +5046,34 @@ export default function FinalReportPage() {
                 {/* Radar Chart */}
                 {uxRadarData.length > 0 && (
                   <Card style={{ marginBottom: 24 }}>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>📊 UX Performance Dimensions</h3>
+                    <h3
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        marginBottom: 16,
+                      }}
+                    >
+                      UX Performance Dimensions
+                    </h3>
                     <ResponsiveContainer width="100%" height={280}>
                       <RadarChart data={uxRadarData}>
                         <PolarGrid stroke="rgba(255,255,255,0.1)" />
-                        <PolarAngleAxis dataKey="subject" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
-                        <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "var(--text-muted)", fontSize: 10 }} />
-                        <Radar name="Score" dataKey="value" stroke="#0091DA" fill="#0091DA" fillOpacity={0.3} />
+                        <PolarAngleAxis
+                          dataKey="subject"
+                          tick={{ fill: "var(--text-muted)", fontSize: 12 }}
+                        />
+                        <PolarRadiusAxis
+                          angle={90}
+                          domain={[0, 100]}
+                          tick={{ fill: "var(--text-muted)", fontSize: 10 }}
+                        />
+                        <Radar
+                          name="Score"
+                          dataKey="value"
+                          stroke="#0091DA"
+                          fill="#0091DA"
+                          fillOpacity={0.3}
+                        />
                       </RadarChart>
                     </ResponsiveContainer>
                   </Card>
@@ -4831,16 +5082,52 @@ export default function FinalReportPage() {
                 {/* Responsiveness Chart */}
                 {uxResponsivenessData.length > 0 && (
                   <Card style={{ marginBottom: 24 }}>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>⚡ Responsiveness: Measured vs Target (ms)</h3>
+                    <h3
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        marginBottom: 16,
+                      }}
+                    >
+                      ⚡ Responsiveness: Measured vs Target (ms)
+                    </h3>
                     <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={uxResponsivenessData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
-                        <XAxis dataKey="name" tick={{ fill: "var(--text-muted)", fontSize: 12 }} />
-                        <YAxis tick={{ fill: "var(--text-muted)", fontSize: 11 }} />
-                        <Tooltip contentStyle={{ background: "var(--bg-darkcard)", border: "1px solid var(--border-subtle)", borderRadius: 8, fontSize: 12 }} />
+                      <BarChart
+                        data={uxResponsivenessData}
+                        margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="rgba(255,255,255,0.07)"
+                        />
+                        <XAxis
+                          dataKey="name"
+                          tick={{ fill: "var(--text-muted)", fontSize: 12 }}
+                        />
+                        <YAxis
+                          tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: "var(--bg-darkcard)",
+                            border: "1px solid var(--border-subtle)",
+                            borderRadius: 8,
+                            fontSize: 12,
+                          }}
+                        />
                         <Legend />
-                        <Bar dataKey="ms" name="Measured (ms)" fill="#0091DA" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="target" name="Target (ms)" fill="rgba(0,186,140,0.4)" radius={[4, 4, 0, 0]} />
+                        <Bar
+                          dataKey="ms"
+                          name="Measured (ms)"
+                          fill="#0091DA"
+                          radius={[4, 4, 0, 0]}
+                        />
+                        <Bar
+                          dataKey="target"
+                          name="Target (ms)"
+                          fill="rgba(0,186,140,0.4)"
+                          radius={[4, 4, 0, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </Card>
@@ -4848,25 +5135,102 @@ export default function FinalReportPage() {
 
                 {/* Loading Experience Details */}
                 <Card style={{ marginBottom: 20 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>⏳ Initial Load Experience</h3>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+                  <h3
+                    style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}
+                  >
+                    Initial Load Experience
+                  </h3>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(2, 1fr)",
+                      gap: 10,
+                    }}
+                  >
                     {[
-                      { label: "Loading Indicator", ok: uxPerf.initialLoadExperience.hasLoadingIndicator, pass: "Detected", fail: "Not found — users see blank content during load" },
-                      { label: "Skeleton Screens", ok: uxPerf.initialLoadExperience.hasSkeletonScreens, pass: "Detected", fail: "Not found — add skeleton placeholders for perceived speed" },
-                      { label: "Progressive Loading", ok: uxPerf.initialLoadExperience.hasProgressiveLoading, pass: "Content loads progressively", fail: "Single paint event — consider chunked loading" },
+                      {
+                        label: "Loading Indicator",
+                        ok: uxPerf.initialLoadExperience.hasLoadingIndicator,
+                        pass: "Detected",
+                        fail: "Not found — users see blank content during load",
+                      },
+                      {
+                        label: "Skeleton Screens",
+                        ok: uxPerf.initialLoadExperience.hasSkeletonScreens,
+                        pass: "Detected",
+                        fail: "Not found — add skeleton placeholders for perceived speed",
+                      },
+                      {
+                        label: "Progressive Loading",
+                        ok: uxPerf.initialLoadExperience.hasProgressiveLoading,
+                        pass: "Content loads progressively",
+                        fail: "Single paint event — consider chunked loading",
+                      },
                     ].map(({ label, ok, pass, fail }) => (
-                      <div key={label} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", background: ok ? "rgba(0,186,140,0.06)" : "rgba(232,0,45,0.06)", borderRadius: 8, border: `1px solid ${ok ? "rgba(0,186,140,0.2)" : "rgba(232,0,45,0.2)"}` }}>
-                        <span style={{ fontSize: 16, flexShrink: 0 }}>{ok ? "✅" : "❌"}</span>
+                      <div
+                        key={label}
+                        style={{
+                          display: "flex",
+                          gap: 10,
+                          alignItems: "flex-start",
+                          padding: "10px 12px",
+                          background: ok
+                            ? "rgba(0,186,140,0.06)"
+                            : "rgba(232,0,45,0.06)",
+                          borderRadius: 8,
+                          border: `1px solid ${ok ? "rgba(0,186,140,0.2)" : "rgba(232,0,45,0.2)"}`,
+                        }}
+                      >
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>
+                          {ok ? "Pass" : "Fail"}
+                        </span>
                         <div>
-                          <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
-                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{ok ? pass : fail}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>
+                            {label}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "var(--text-muted)",
+                              marginTop: 2,
+                            }}
+                          >
+                            {ok ? pass : fail}
+                          </div>
                         </div>
                       </div>
                     ))}
-                    {uxPerf.initialLoadExperience.timeToInteractiveMs !== null && (
-                      <div style={{ padding: "10px 12px", background: "var(--bg-darkcard)", borderRadius: 8, border: "1px solid var(--border-subtle)" }}>
-                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Time to Interactive</div>
-                        <div style={{ fontSize: 18, fontWeight: 700, color: uxPerf.initialLoadExperience.timeToInteractiveMs <= 3800 ? "#00BA8C" : "#F0AB00" }}>{Math.round(uxPerf.initialLoadExperience.timeToInteractiveMs)}ms</div>
+                    {uxPerf.initialLoadExperience.timeToInteractiveMs !==
+                      null && (
+                      <div
+                        style={{
+                          padding: "10px 12px",
+                          background: "var(--bg-darkcard)",
+                          borderRadius: 8,
+                          border: "1px solid var(--border-subtle)",
+                        }}
+                      >
+                        <div
+                          style={{ fontSize: 12, color: "var(--text-muted)" }}
+                        >
+                          Time to Interactive
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 18,
+                            fontWeight: 700,
+                            color:
+                              uxPerf.initialLoadExperience
+                                .timeToInteractiveMs <= 3800
+                                ? "#00BA8C"
+                                : "#F0AB00",
+                          }}
+                        >
+                          {Math.round(
+                            uxPerf.initialLoadExperience.timeToInteractiveMs,
+                          )}
+                          ms
+                        </div>
                       </div>
                     )}
                   </div>
@@ -4875,14 +5239,72 @@ export default function FinalReportPage() {
                 {/* Pain Points */}
                 {uxPerf.painPoints.length > 0 && (
                   <Card style={{ marginBottom: 20 }}>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>🚨 UX Pain Points</h3>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <h3
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        marginBottom: 14,
+                      }}
+                    >
+                      UX Pain Points
+                    </h3>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                      }}
+                    >
                       {uxPerf.painPoints.map((pp, i) => (
-                        <div key={i} style={{ padding: "12px 14px", borderRadius: 8, background: "var(--bg-darkcard)", border: `1px solid ${pp.severity === "critical" ? "#E8002D40" : pp.severity === "high" ? "#FF6B0040" : "var(--border-subtle)"}`, display: "flex", gap: 12 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: "white", background: pp.severity === "critical" ? "#E8002D" : pp.severity === "high" ? "#FF6B00" : "#F0AB00", padding: "2px 8px", borderRadius: 4, height: "fit-content", flexShrink: 0, marginTop: 2 }}>{pp.severity.toUpperCase()}</span>
+                        <div
+                          key={i}
+                          style={{
+                            padding: "12px 14px",
+                            borderRadius: 8,
+                            background: "var(--bg-darkcard)",
+                            border: `1px solid ${pp.severity === "critical" ? "#E8002D40" : pp.severity === "high" ? "#FF6B0040" : "var(--border-subtle)"}`,
+                            display: "flex",
+                            gap: 12,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "white",
+                              background:
+                                pp.severity === "critical"
+                                  ? "#E8002D"
+                                  : pp.severity === "high"
+                                    ? "#FF6B00"
+                                    : "#F0AB00",
+                              padding: "2px 8px",
+                              borderRadius: 4,
+                              height: "fit-content",
+                              flexShrink: 0,
+                              marginTop: 2,
+                            }}
+                          >
+                            {pp.severity.toUpperCase()}
+                          </span>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{pp.description}</div>
-                            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>👤 {pp.userImpact}</div>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                marginBottom: 4,
+                              }}
+                            >
+                              {pp.description}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              {pp.userImpact}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -4893,17 +5315,78 @@ export default function FinalReportPage() {
                 {/* Improvement Opportunities */}
                 {uxPerf.improvementOpportunities.length > 0 && (
                   <Card>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>💡 Improvement Opportunities</h3>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <h3
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        marginBottom: 14,
+                      }}
+                    >
+                      Improvement Opportunities
+                    </h3>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                      }}
+                    >
                       {uxPerf.improvementOpportunities.map((opp, i) => (
-                        <div key={i} style={{ padding: "12px 14px", borderRadius: 8, background: "rgba(0,145,218,0.06)", border: "1px solid rgba(0,145,218,0.2)", display: "flex", gap: 12, alignItems: "flex-start" }}>
-                          <span style={{ fontSize: 18, flexShrink: 0 }}>🚀</span>
+                        <div
+                          key={i}
+                          style={{
+                            padding: "12px 14px",
+                            borderRadius: 8,
+                            background: "rgba(0,145,218,0.06)",
+                            border: "1px solid rgba(0,145,218,0.2)",
+                            display: "flex",
+                            gap: 12,
+                            alignItems: "flex-start",
+                          }}
+                        >
+                          <span style={{ fontSize: 18, flexShrink: 0 }}></span>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>{opp.area}</div>
-                            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>{opp.recommendation}</div>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                marginBottom: 3,
+                              }}
+                            >
+                              {opp.area}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "var(--text-secondary)",
+                                marginBottom: 4,
+                              }}
+                            >
+                              {opp.recommendation}
+                            </div>
                             <div style={{ display: "flex", gap: 8 }}>
-                              <span style={{ fontSize: 11, color: "#00BA8C", background: "rgba(0,186,140,0.1)", padding: "2px 8px", borderRadius: 4 }}>↑ {opp.expectedUplift}</span>
-                              <span style={{ fontSize: 11, color: "var(--text-muted)", background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: 4 }}>🕐 {opp.effort}</span>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: "#00BA8C",
+                                  background: "rgba(0,186,140,0.1)",
+                                  padding: "2px 8px",
+                                  borderRadius: 4,
+                                }}
+                              >
+                                {opp.expectedUplift}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: "var(--text-muted)",
+                                  background: "rgba(255,255,255,0.06)",
+                                  padding: "2px 8px",
+                                  borderRadius: 4,
+                                }}
+                              >
+                                {opp.effort}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -4913,10 +5396,23 @@ export default function FinalReportPage() {
                 )}
               </>
             ) : (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)" }}>
+              <div
+                style={{
+                  padding: 32,
+                  textAlign: "center",
+                  color: "var(--text-muted)",
+                  background: "var(--bg-darkcard)",
+                  borderRadius: "var(--radius-md)",
+                }}
+              >
                 <div style={{ fontSize: 36, marginBottom: 12 }}>🎯</div>
-                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>UX Performance data not available</div>
-                <div style={{ fontSize: 13 }}>UX Performance analysis (Layer M) requires a complete audit. Re-run the audit to capture UX metrics.</div>
+                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
+                  UX Performance data not available
+                </div>
+                <div style={{ fontSize: 13 }}>
+                  UX Performance analysis (Layer M) requires a complete audit.
+                  Re-run the audit to capture UX metrics.
+                </div>
               </div>
             )}
           </div>
@@ -4927,25 +5423,102 @@ export default function FinalReportPage() {
           <div className="animate-fade-in">
             {thirdParty.length > 0 ? (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
-                  <Tile val={thirdParty.length} label="Third-Party Resources" color="#0091DA" />
-                  <Tile val={thirdParty.filter(t => t.blocking).length} label="Blocking Scripts" color={thirdParty.filter(t => t.blocking).length > 0 ? "#E8002D" : "#00BA8C"} />
-                  <Tile val={thirdParty.filter(t => (t.loadTimeMs ?? 0) > 500).length} label="Slow Scripts (>500ms)" color={thirdParty.filter(t => (t.loadTimeMs ?? 0) > 500).length > 0 ? "#F0AB00" : "#00BA8C"} />
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gap: 12,
+                    marginBottom: 24,
+                  }}
+                >
+                  <Tile
+                    val={thirdParty.length}
+                    label="Third-Party Resources"
+                    color="#0091DA"
+                  />
+                  <Tile
+                    val={thirdParty.filter((t) => t.blocking).length}
+                    label="Blocking Scripts"
+                    color={
+                      thirdParty.filter((t) => t.blocking).length > 0
+                        ? "#E8002D"
+                        : "#00BA8C"
+                    }
+                  />
+                  <Tile
+                    val={
+                      thirdParty.filter((t) => (t.loadTimeMs ?? 0) > 500).length
+                    }
+                    label="Slow Scripts (>500ms)"
+                    color={
+                      thirdParty.filter((t) => (t.loadTimeMs ?? 0) > 500)
+                        .length > 0
+                        ? "#F0AB00"
+                        : "#00BA8C"
+                    }
+                  />
                 </div>
 
                 {/* Bar chart of third-party load times */}
                 {thirdParty.slice(0, 8).length > 0 && (
                   <Card style={{ marginBottom: 24 }}>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>📊 Third-Party Load Times (ms)</h3>
+                    <h3
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        marginBottom: 16,
+                      }}
+                    >
+                      Third-Party Load Times (ms)
+                    </h3>
                     <ResponsiveContainer width="100%" height={240}>
-                      <BarChart data={thirdParty.slice(0, 8).map(t => ({ name: t.label, ms: t.loadTimeMs ?? 0, blocking: t.blocking }))} layout="vertical" margin={{ top: 5, right: 30, left: 80, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
-                        <XAxis type="number" tick={{ fill: "var(--text-muted)", fontSize: 11 }} />
-                        <YAxis type="category" dataKey="name" tick={{ fill: "var(--text-muted)", fontSize: 11 }} width={80} />
-                        <Tooltip contentStyle={{ background: "var(--bg-darkcard)", border: "1px solid var(--border-subtle)", borderRadius: 8, fontSize: 12 }} />
-                        <Bar dataKey="ms" name="Load time (ms)" radius={[0, 4, 4, 0]}>
+                      <BarChart
+                        data={thirdParty.slice(0, 8).map((t) => ({
+                          name: t.label,
+                          ms: t.loadTimeMs ?? 0,
+                          blocking: t.blocking,
+                        }))}
+                        layout="vertical"
+                        margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="rgba(255,255,255,0.07)"
+                        />
+                        <XAxis
+                          type="number"
+                          tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                          width={80}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: "var(--bg-darkcard)",
+                            border: "1px solid var(--border-subtle)",
+                            borderRadius: 8,
+                            fontSize: 12,
+                          }}
+                        />
+                        <Bar
+                          dataKey="ms"
+                          name="Load time (ms)"
+                          radius={[0, 4, 4, 0]}
+                        >
                           {thirdParty.slice(0, 8).map((t, i) => (
-                            <Cell key={i} fill={t.blocking ? "#E8002D" : (t.loadTimeMs ?? 0) > 500 ? "#F0AB00" : "#00BA8C"} />
+                            <Cell
+                              key={i}
+                              fill={
+                                t.blocking
+                                  ? "#E8002D"
+                                  : (t.loadTimeMs ?? 0) > 500
+                                    ? "#F0AB00"
+                                    : "#00BA8C"
+                              }
+                            />
                           ))}
                         </Bar>
                       </BarChart>
@@ -4954,26 +5527,137 @@ export default function FinalReportPage() {
                 )}
 
                 <Card>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>🌐 Third-Party Script Inventory</h3>
+                  <h3
+                    style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}
+                  >
+                    Third-Party Script Inventory
+                  </h3>
                   <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontSize: 12,
+                      }}
+                    >
                       <thead>
-                        <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                          {["Script / Service", "Category", "Load Time", "Size", "Blocking", "Recommendation"].map(h => (
-                            <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600, color: "var(--text-muted)", fontSize: 11 }}>{h}</th>
+                        <tr
+                          style={{
+                            borderBottom: "1px solid var(--border-subtle)",
+                          }}
+                        >
+                          {[
+                            "Script / Service",
+                            "Category",
+                            "Load Time",
+                            "Size",
+                            "Blocking",
+                            "Recommendation",
+                          ].map((h) => (
+                            <th
+                              key={h}
+                              style={{
+                                padding: "8px 10px",
+                                textAlign: "left",
+                                fontWeight: 600,
+                                color: "var(--text-muted)",
+                                fontSize: 11,
+                              }}
+                            >
+                              {h}
+                            </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {thirdParty.map((t, i) => (
-                          <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                            <td style={{ padding: "10px 10px", fontWeight: 600, color: "var(--text-primary)" }}>{t.label}</td>
-                            <td style={{ padding: "10px 10px" }}><span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "rgba(0,145,218,0.12)", color: "#0091DA" }}>{t.category}</span></td>
-                            <td style={{ padding: "10px 10px", color: (t.loadTimeMs ?? 0) > 500 ? "#F0AB00" : "var(--text-secondary)" }}>{t.loadTimeMs !== null ? `${t.loadTimeMs}ms` : "—"}</td>
-                            <td style={{ padding: "10px 10px", color: "var(--text-muted)" }}>{t.transferSize > 0 ? `${Math.round(t.transferSize / 1024)}KB` : "—"}</td>
-                            <td style={{ padding: "10px 10px" }}>{t.blocking ? <span style={{ color: "#E8002D", fontWeight: 700 }}>⚠ Blocking</span> : <span style={{ color: "#00BA8C" }}>✓ Non-blocking</span>}</td>
+                          <tr
+                            key={i}
+                            style={{
+                              borderBottom: "1px solid rgba(255,255,255,0.04)",
+                            }}
+                          >
+                            <td
+                              style={{
+                                padding: "10px 10px",
+                                fontWeight: 600,
+                                color: "var(--text-primary)",
+                              }}
+                            >
+                              {t.label}
+                            </td>
                             <td style={{ padding: "10px 10px" }}>
-                              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, fontWeight: 600, background: t.recommendation === "remove" ? "rgba(232,0,45,0.15)" : t.recommendation === "defer" ? "rgba(240,171,0,0.15)" : "rgba(0,186,140,0.15)", color: t.recommendation === "remove" ? "#E8002D" : t.recommendation === "defer" ? "#F0AB00" : "#00BA8C" }}>{t.recommendation.toUpperCase()}</span>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  padding: "2px 8px",
+                                  borderRadius: 4,
+                                  background: "rgba(0,145,218,0.12)",
+                                  color: "#0091DA",
+                                }}
+                              >
+                                {t.category}
+                              </span>
+                            </td>
+                            <td
+                              style={{
+                                padding: "10px 10px",
+                                color:
+                                  (t.loadTimeMs ?? 0) > 500
+                                    ? "#F0AB00"
+                                    : "var(--text-secondary)",
+                              }}
+                            >
+                              {t.loadTimeMs !== null
+                                ? `${t.loadTimeMs}ms`
+                                : "—"}
+                            </td>
+                            <td
+                              style={{
+                                padding: "10px 10px",
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              {t.transferSize > 0
+                                ? `${Math.round(t.transferSize / 1024)}KB`
+                                : "—"}
+                            </td>
+                            <td style={{ padding: "10px 10px" }}>
+                              {t.blocking ? (
+                                <span
+                                  style={{ color: "#E8002D", fontWeight: 700 }}
+                                >
+                                  ⚠ Blocking
+                                </span>
+                              ) : (
+                                <span style={{ color: "#00BA8C" }}>
+                                  ✓ Non-blocking
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: "10px 10px" }}>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  padding: "2px 8px",
+                                  borderRadius: 4,
+                                  fontWeight: 600,
+                                  background:
+                                    t.recommendation === "remove"
+                                      ? "rgba(232,0,45,0.15)"
+                                      : t.recommendation === "defer"
+                                        ? "rgba(240,171,0,0.15)"
+                                        : "rgba(0,186,140,0.15)",
+                                  color:
+                                    t.recommendation === "remove"
+                                      ? "#E8002D"
+                                      : t.recommendation === "defer"
+                                        ? "#F0AB00"
+                                        : "#00BA8C",
+                                }}
+                              >
+                                {t.recommendation.toUpperCase()}
+                              </span>
                             </td>
                           </tr>
                         ))}
@@ -4983,9 +5667,19 @@ export default function FinalReportPage() {
                 </Card>
               </>
             ) : (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)" }}>
+              <div
+                style={{
+                  padding: 32,
+                  textAlign: "center",
+                  color: "var(--text-muted)",
+                  background: "var(--bg-darkcard)",
+                  borderRadius: "var(--radius-md)",
+                }}
+              >
                 <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
-                <div style={{ fontSize: 15, fontWeight: 600 }}>No significant third-party scripts detected</div>
+                <div style={{ fontSize: 15, fontWeight: 600 }}>
+                  No significant third-party scripts detected
+                </div>
               </div>
             )}
           </div>
@@ -4996,30 +5690,133 @@ export default function FinalReportPage() {
           <div className="animate-fade-in">
             {architecture ? (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 24 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(2, 1fr)",
+                    gap: 16,
+                    marginBottom: 24,
+                  }}
+                >
                   {[
-                    { icon: "⚛️", label: "JavaScript Framework", value: architecture.framework ?? "Not detected", highlight: !!architecture.framework },
-                    { icon: "📝", label: "CMS Platform", value: architecture.cms ?? "Not detected", highlight: !!architecture.cms },
-                    { icon: "🌐", label: "CDN Provider", value: architecture.cdn ?? "No CDN detected ⚠️", highlight: !!architecture.cdn, warnIfFalsy: true },
-                    { icon: "🔗", label: "HTTP Protocol", value: architecture.httpVersion ?? "Unknown", highlight: architecture.httpVersion !== "HTTP/1.1", warnIfFalsy: true },
-                    { icon: "☁️", label: "Hosting Platform", value: architecture.hostingPlatform ?? "Unknown", highlight: !!architecture.hostingPlatform },
-                    { icon: "⚙️", label: "Service Worker", value: architecture.hasServiceWorker ? "Active ✓" : "Not found", highlight: architecture.hasServiceWorker },
-                    { icon: "📱", label: "PWA Manifest", value: architecture.hasPwaManifest ? "Present ✓" : "Not found", highlight: architecture.hasPwaManifest },
-                    { icon: "⚡", label: "Resource Hints", value: architecture.hasResourceHints ? "Preload/Prefetch present ✓" : "Not found", highlight: architecture.hasResourceHints },
+                    {
+                      icon: "⚛️",
+                      label: "JavaScript Framework",
+                      value: architecture.framework ?? "Not detected",
+                      highlight: !!architecture.framework,
+                    },
+                    {
+                      icon: "📝",
+                      label: "CMS Platform",
+                      value: architecture.cms ?? "Not detected",
+                      highlight: !!architecture.cms,
+                    },
+                    {
+                      icon: "🌐",
+                      label: "CDN Provider",
+                      value: architecture.cdn ?? "No CDN detected ⚠️",
+                      highlight: !!architecture.cdn,
+                      warnIfFalsy: true,
+                    },
+                    {
+                      icon: "🔗",
+                      label: "HTTP Protocol",
+                      value: architecture.httpVersion ?? "Unknown",
+                      highlight: architecture.httpVersion !== "HTTP/1.1",
+                      warnIfFalsy: true,
+                    },
+                    {
+                      icon: "☁️",
+                      label: "Hosting Platform",
+                      value: architecture.hostingPlatform ?? "Unknown",
+                      highlight: !!architecture.hostingPlatform,
+                    },
+                    {
+                      icon: "⚙️",
+                      label: "Service Worker",
+                      value: architecture.hasServiceWorker
+                        ? "Active ✓"
+                        : "Not found",
+                      highlight: architecture.hasServiceWorker,
+                    },
+                    {
+                      icon: "📱",
+                      label: "PWA Manifest",
+                      value: architecture.hasPwaManifest
+                        ? "Present ✓"
+                        : "Not found",
+                      highlight: architecture.hasPwaManifest,
+                    },
+                    {
+                      icon: "⚡",
+                      label: "Resource Hints",
+                      value: architecture.hasResourceHints
+                        ? "Preload/Prefetch present ✓"
+                        : "Not found",
+                      highlight: architecture.hasResourceHints,
+                    },
                   ].map(({ icon, label, value, highlight, warnIfFalsy }) => (
-                    <div key={label} style={{ padding: "16px", background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)", border: `1px solid ${highlight ? "rgba(0,145,218,0.25)" : warnIfFalsy && !highlight ? "rgba(240,171,0,0.3)" : "var(--border-subtle)"}` }}>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>{icon} {label}</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: highlight ? "#0091DA" : warnIfFalsy ? "#F0AB00" : "var(--text-primary)" }}>{value}</div>
+                    <div
+                      key={label}
+                      style={{
+                        padding: "16px",
+                        background: "var(--bg-darkcard)",
+                        borderRadius: "var(--radius-md)",
+                        border: `1px solid ${highlight ? "rgba(0,145,218,0.25)" : warnIfFalsy && !highlight ? "rgba(240,171,0,0.3)" : "var(--border-subtle)"}`,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "var(--text-muted)",
+                          marginBottom: 4,
+                        }}
+                      >
+                        {label}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 700,
+                          color: highlight
+                            ? "#0091DA"
+                            : warnIfFalsy
+                              ? "#F0AB00"
+                              : "var(--text-primary)",
+                        }}
+                      >
+                        {value}
+                      </div>
                     </div>
                   ))}
                 </div>
 
                 {architecture.jsLibraries.length > 0 && (
                   <Card style={{ marginBottom: 16 }}>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📦 Detected JavaScript Libraries</h3>
+                    <h3
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        marginBottom: 12,
+                      }}
+                    >
+                      Detected JavaScript Libraries
+                    </h3>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       {architecture.jsLibraries.map((lib, i) => (
-                        <span key={i} style={{ fontSize: 12, padding: "4px 12px", background: "rgba(0,145,218,0.1)", border: "1px solid rgba(0,145,218,0.2)", borderRadius: 20, color: "#0091DA" }}>{lib}</span>
+                        <span
+                          key={i}
+                          style={{
+                            fontSize: 12,
+                            padding: "4px 12px",
+                            background: "rgba(0,145,218,0.1)",
+                            border: "1px solid rgba(0,145,218,0.2)",
+                            borderRadius: 20,
+                            color: "#0091DA",
+                          }}
+                        >
+                          {lib}
+                        </span>
                       ))}
                     </div>
                   </Card>
@@ -5027,17 +5824,48 @@ export default function FinalReportPage() {
 
                 {architecture.cssFrameworks.length > 0 && (
                   <Card>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>🎨 Detected CSS Frameworks</h3>
+                    <h3
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        marginBottom: 12,
+                      }}
+                    >
+                      Detected CSS Frameworks
+                    </h3>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       {architecture.cssFrameworks.map((fw, i) => (
-                        <span key={i} style={{ fontSize: 12, padding: "4px 12px", background: "rgba(205,171,254,0.1)", border: "1px solid rgba(205,171,254,0.2)", borderRadius: 20, color: "#CDABFE" }}>{fw}</span>
+                        <span
+                          key={i}
+                          style={{
+                            fontSize: 12,
+                            padding: "4px 12px",
+                            background: "rgba(205,171,254,0.1)",
+                            border: "1px solid rgba(205,171,254,0.2)",
+                            borderRadius: 20,
+                            color: "#CDABFE",
+                          }}
+                        >
+                          {fw}
+                        </span>
                       ))}
                     </div>
                   </Card>
                 )}
               </>
             ) : (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)" }}>Architecture detection data not available. Re-run the audit to capture architecture information.</div>
+              <div
+                style={{
+                  padding: 32,
+                  textAlign: "center",
+                  color: "var(--text-muted)",
+                  background: "var(--bg-darkcard)",
+                  borderRadius: "var(--radius-md)",
+                }}
+              >
+                Architecture detection data not available. Re-run the audit to
+                capture architecture information.
+              </div>
             )}
           </div>
         )}
@@ -5049,23 +5877,94 @@ export default function FinalReportPage() {
               <>
                 {/* SEO Checklist */}
                 <Card style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>✅ SEO Readiness Checklist</h3>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+                  <h3
+                    style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}
+                  >
+                    SEO Readiness Checklist
+                  </h3>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(2, 1fr)",
+                      gap: 10,
+                    }}
+                  >
                     {[
-                      { label: "Meta Title", ok: seoReadiness.hasMetaTitle, detail: seoReadiness.metaTitleLength ? `${seoReadiness.metaTitleLength} chars` : undefined },
-                      { label: "Meta Description", ok: seoReadiness.hasMetaDescription, detail: seoReadiness.metaDescriptionLength ? `${seoReadiness.metaDescriptionLength} chars` : undefined },
+                      {
+                        label: "Meta Title",
+                        ok: seoReadiness.hasMetaTitle,
+                        detail: seoReadiness.metaTitleLength
+                          ? `${seoReadiness.metaTitleLength} chars`
+                          : undefined,
+                      },
+                      {
+                        label: "Meta Description",
+                        ok: seoReadiness.hasMetaDescription,
+                        detail: seoReadiness.metaDescriptionLength
+                          ? `${seoReadiness.metaDescriptionLength} chars`
+                          : undefined,
+                      },
                       { label: "Canonical URL", ok: seoReadiness.hasCanonical },
-                      { label: "Structured Data (JSON-LD)", ok: seoReadiness.hasStructuredData },
-                      { label: "Open Graph Tags", ok: seoReadiness.hasOpenGraph },
-                      { label: "robots.txt", ok: seoReadiness.hasRobotsTxt === true, warn: seoReadiness.hasRobotsTxt === null },
-                      { label: "XML Sitemap", ok: seoReadiness.hasSitemap === true, warn: seoReadiness.hasSitemap === null },
-                      { label: "No Broken Links", ok: seoReadiness.brokenLinks.length === 0, detail: seoReadiness.brokenLinks.length > 0 ? `${seoReadiness.brokenLinks.length} broken` : undefined },
+                      {
+                        label: "Structured Data (JSON-LD)",
+                        ok: seoReadiness.hasStructuredData,
+                      },
+                      {
+                        label: "Open Graph Tags",
+                        ok: seoReadiness.hasOpenGraph,
+                      },
+                      {
+                        label: "robots.txt",
+                        ok: seoReadiness.hasRobotsTxt === true,
+                        warn: seoReadiness.hasRobotsTxt === null,
+                      },
+                      {
+                        label: "XML Sitemap",
+                        ok: seoReadiness.hasSitemap === true,
+                        warn: seoReadiness.hasSitemap === null,
+                      },
+                      {
+                        label: "No Broken Links",
+                        ok: seoReadiness.brokenLinks.length === 0,
+                        detail:
+                          seoReadiness.brokenLinks.length > 0
+                            ? `${seoReadiness.brokenLinks.length} broken`
+                            : undefined,
+                      },
                     ].map(({ label, ok, detail, warn }) => (
-                      <div key={label} style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", background: ok ? "rgba(0,186,140,0.06)" : warn ? "rgba(240,171,0,0.06)" : "rgba(232,0,45,0.06)", borderRadius: 8, border: `1px solid ${ok ? "rgba(0,186,140,0.2)" : warn ? "rgba(240,171,0,0.2)" : "rgba(232,0,45,0.2)"}` }}>
-                        <span style={{ fontSize: 16, flexShrink: 0 }}>{ok ? "✅" : warn ? "⚠️" : "❌"}</span>
+                      <div
+                        key={label}
+                        style={{
+                          display: "flex",
+                          gap: 10,
+                          alignItems: "center",
+                          padding: "10px 12px",
+                          background: ok
+                            ? "rgba(0,186,140,0.06)"
+                            : warn
+                              ? "rgba(240,171,0,0.06)"
+                              : "rgba(232,0,45,0.06)",
+                          borderRadius: 8,
+                          border: `1px solid ${ok ? "rgba(0,186,140,0.2)" : warn ? "rgba(240,171,0,0.2)" : "rgba(232,0,45,0.2)"}`,
+                        }}
+                      >
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>
+                          {ok ? "Pass" : warn ? "Warn" : "Fail"}
+                        </span>
                         <div>
-                          <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
-                          {detail && <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{detail}</div>}
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>
+                            {label}
+                          </div>
+                          {detail && (
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              {detail}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -5075,15 +5974,75 @@ export default function FinalReportPage() {
                 {/* SEO Issues */}
                 {seoReadiness.issues.length > 0 && (
                   <Card style={{ marginBottom: 20 }}>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>🔍 SEO Issues Found</h3>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <h3
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        marginBottom: 14,
+                      }}
+                    >
+                      SEO Issues Found
+                    </h3>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                      }}
+                    >
                       {seoReadiness.issues.map((issue, i) => (
-                        <div key={i} style={{ padding: "12px 14px", borderRadius: 8, background: "var(--bg-darkcard)", border: `1px solid ${issue.severity === "critical" ? "#E8002D40" : issue.severity === "high" ? "#FF6B0040" : "var(--border-subtle)"}` }}>
-                          <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: "white", background: issue.severity === "critical" ? "#E8002D" : issue.severity === "high" ? "#FF6B00" : "#F0AB00", padding: "2px 8px", borderRadius: 4, flexShrink: 0 }}>{issue.severity.toUpperCase()}</span>
+                        <div
+                          key={i}
+                          style={{
+                            padding: "12px 14px",
+                            borderRadius: 8,
+                            background: "var(--bg-darkcard)",
+                            border: `1px solid ${issue.severity === "critical" ? "#E8002D40" : issue.severity === "high" ? "#FF6B0040" : "var(--border-subtle)"}`,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              alignItems: "flex-start",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: "white",
+                                background:
+                                  issue.severity === "critical"
+                                    ? "#E8002D"
+                                    : issue.severity === "high"
+                                      ? "#FF6B00"
+                                      : "#F0AB00",
+                                padding: "2px 8px",
+                                borderRadius: 4,
+                                flexShrink: 0,
+                              }}
+                            >
+                              {issue.severity.toUpperCase()}
+                            </span>
                             <div>
-                              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{issue.detail}</div>
-                              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>→ {issue.recommendation}</div>
+                              <div
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  marginBottom: 4,
+                                }}
+                              >
+                                {issue.detail}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: "var(--text-muted)",
+                                }}
+                              >
+                                → {issue.recommendation}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -5095,17 +6054,56 @@ export default function FinalReportPage() {
                 {/* Broken Links */}
                 {seoReadiness.brokenLinks.length > 0 && (
                   <Card>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: "#E8002D" }}>🔗 Broken Links (404)</h3>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <h3
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        marginBottom: 14,
+                        color: "#E8002D",
+                      }}
+                    >
+                      Broken Links (404)
+                    </h3>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 6,
+                      }}
+                    >
                       {seoReadiness.brokenLinks.map((link, i) => (
-                        <div key={i} style={{ fontSize: 12, padding: "8px 12px", background: "rgba(232,0,45,0.06)", borderRadius: 6, fontFamily: "monospace", color: "var(--text-muted)", wordBreak: "break-all" }}>{link}</div>
+                        <div
+                          key={i}
+                          style={{
+                            fontSize: 12,
+                            padding: "8px 12px",
+                            background: "rgba(232,0,45,0.06)",
+                            borderRadius: 6,
+                            fontFamily: "monospace",
+                            color: "var(--text-muted)",
+                            wordBreak: "break-all",
+                          }}
+                        >
+                          {link}
+                        </div>
                       ))}
                     </div>
                   </Card>
                 )}
               </>
             ) : (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)" }}>SEO readiness data not available. Re-run the audit to capture SEO signals.</div>
+              <div
+                style={{
+                  padding: 32,
+                  textAlign: "center",
+                  color: "var(--text-muted)",
+                  background: "var(--bg-darkcard)",
+                  borderRadius: "var(--radius-md)",
+                }}
+              >
+                SEO readiness data not available. Re-run the audit to capture
+                SEO signals.
+              </div>
             )}
           </div>
         )}
@@ -5114,25 +6112,122 @@ export default function FinalReportPage() {
         {activeTab === "best-practices" && perfOnly && (
           <div className="animate-fade-in">
             <Card>
-              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>⚡ Front-End Performance Best Practices</h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>
+                ⚡ Front-End Performance Best Practices
+              </h3>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 10 }}
+              >
                 {[
-                  { label: "Resource Preloading (preload/prefetch/preconnect)", ok: architecture?.hasResourceHints ?? false, recommendation: "Add <link rel='preload'> for critical fonts and LCP images. Add <link rel='prefetch'> for next-page resources." },
-                  { label: "Service Worker / Offline Support", ok: architecture?.hasServiceWorker ?? false, recommendation: "Implement a service worker for offline caching. Use Workbox for easy setup." },
-                  { label: "PWA Web App Manifest", ok: architecture?.hasPwaManifest ?? false, recommendation: "Add a web app manifest (manifest.json) for installability and improved mobile UX." },
-                  { label: "CDN for Static Assets", ok: !!architecture?.cdn, recommendation: "Deploy all static assets (JS, CSS, images) via a CDN. Reduces latency by 50-80% globally." },
-                  { label: "HTTP/2 or HTTP/3 Protocol", ok: architecture?.httpVersion !== "HTTP/1.1" && !!architecture?.httpVersion, recommendation: "Upgrade to HTTP/2 for request multiplexing. HTTP/3 (QUIC) reduces connection overhead on mobile." },
-                  { label: "Gzip / Brotli Compression", ok: !allResourceIssues.some(r => r.type === "missing-compression"), recommendation: "Enable brotli compression for 15-25% better compression than gzip." },
-                  { label: "Browser Caching (Cache-Control)", ok: !allResourceIssues.some(r => r.type === "missing-cache-headers"), recommendation: "Set Cache-Control: max-age=31536000, immutable on versioned assets." },
-                  { label: "Image Optimization (WebP/AVIF)", ok: !allResourceIssues.some(r => r.type === "unoptimized-image"), recommendation: "Serve images in WebP or AVIF format. Use srcset for responsive images." },
-                  { label: "Code Splitting / Lazy Loading", ok: !allResourceIssues.some(r => r.type === "large-bundle"), recommendation: "Split JS bundles by route. Lazy-load non-critical components and third-party scripts." },
-                  { label: "Async/Defer Script Loading", ok: !allResourceIssues.some(r => r.type === "sync-scripts"), recommendation: "Add async or defer attribute to all non-critical <script> tags in <head>." },
+                  {
+                    label: "Resource Preloading (preload/prefetch/preconnect)",
+                    ok: architecture?.hasResourceHints ?? false,
+                    recommendation:
+                      "Add <link rel='preload'> for critical fonts and LCP images. Add <link rel='prefetch'> for next-page resources.",
+                  },
+                  {
+                    label: "Service Worker / Offline Support",
+                    ok: architecture?.hasServiceWorker ?? false,
+                    recommendation:
+                      "Implement a service worker for offline caching. Use Workbox for easy setup.",
+                  },
+                  {
+                    label: "PWA Web App Manifest",
+                    ok: architecture?.hasPwaManifest ?? false,
+                    recommendation:
+                      "Add a web app manifest (manifest.json) for installability and improved mobile UX.",
+                  },
+                  {
+                    label: "CDN for Static Assets",
+                    ok: !!architecture?.cdn,
+                    recommendation:
+                      "Deploy all static assets (JS, CSS, images) via a CDN. Reduces latency by 50-80% globally.",
+                  },
+                  {
+                    label: "HTTP/2 or HTTP/3 Protocol",
+                    ok:
+                      architecture?.httpVersion !== "HTTP/1.1" &&
+                      !!architecture?.httpVersion,
+                    recommendation:
+                      "Upgrade to HTTP/2 for request multiplexing. HTTP/3 (QUIC) reduces connection overhead on mobile.",
+                  },
+                  {
+                    label: "Gzip / Brotli Compression",
+                    ok: !allResourceIssues.some(
+                      (r) => r.type === "missing-compression",
+                    ),
+                    recommendation:
+                      "Enable brotli compression for 15-25% better compression than gzip.",
+                  },
+                  {
+                    label: "Browser Caching (Cache-Control)",
+                    ok: !allResourceIssues.some(
+                      (r) => r.type === "missing-cache-headers",
+                    ),
+                    recommendation:
+                      "Set Cache-Control: max-age=31536000, immutable on versioned assets.",
+                  },
+                  {
+                    label: "Image Optimization (WebP/AVIF)",
+                    ok: !allResourceIssues.some(
+                      (r) => r.type === "unoptimized-image",
+                    ),
+                    recommendation:
+                      "Serve images in WebP or AVIF format. Use srcset for responsive images.",
+                  },
+                  {
+                    label: "Code Splitting / Lazy Loading",
+                    ok: !allResourceIssues.some(
+                      (r) => r.type === "large-bundle",
+                    ),
+                    recommendation:
+                      "Split JS bundles by route. Lazy-load non-critical components and third-party scripts.",
+                  },
+                  {
+                    label: "Async/Defer Script Loading",
+                    ok: !allResourceIssues.some(
+                      (r) => r.type === "sync-scripts",
+                    ),
+                    recommendation:
+                      "Add async or defer attribute to all non-critical <script> tags in <head>.",
+                  },
                 ].map(({ label, ok, recommendation }) => (
-                  <div key={label} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", background: ok ? "rgba(0,186,140,0.05)" : "rgba(232,0,45,0.04)", borderRadius: 8, border: `1px solid ${ok ? "rgba(0,186,140,0.18)" : "rgba(232,0,45,0.18)"}` }}>
-                    <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1 }}>{ok ? "✅" : "❌"}</span>
+                  <div
+                    key={label}
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "flex-start",
+                      padding: "12px 14px",
+                      background: ok
+                        ? "rgba(0,186,140,0.05)"
+                        : "rgba(232,0,45,0.04)",
+                      borderRadius: 8,
+                      border: `1px solid ${ok ? "rgba(0,186,140,0.18)" : "rgba(232,0,45,0.18)"}`,
+                    }}
+                  >
+                    <span
+                      style={{ fontSize: 18, flexShrink: 0, lineHeight: 1 }}
+                    >
+                      {ok ? "Pass" : "Fail"}
+                    </span>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: ok ? 0 : 4 }}>{label}</div>
-                      {!ok && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>→ {recommendation}</div>}
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          marginBottom: ok ? 0 : 4,
+                        }}
+                      >
+                        {label}
+                      </div>
+                      {!ok && (
+                        <div
+                          style={{ fontSize: 12, color: "var(--text-muted)" }}
+                        >
+                          → {recommendation}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -5147,84 +6242,338 @@ export default function FinalReportPage() {
             {!aiReport ? (
               <div style={{ textAlign: "center", padding: "48px 32px" }}>
                 <div style={{ fontSize: 48, marginBottom: 16 }}>🤖</div>
-                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>AI Performance Analysis</h3>
-                <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 24, maxWidth: 480, margin: "0 auto 24px" }}>
-                  Generate deep AI insights powered by Claude: executive summaries, root cause analysis, business impact narrative, ROI estimates, and Jira/ADO tickets.
+                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
+                  AI Performance Analysis
+                </h3>
+                <p
+                  style={{
+                    fontSize: 14,
+                    color: "var(--text-muted)",
+                    marginBottom: 24,
+                    maxWidth: 480,
+                    margin: "0 auto 24px",
+                  }}
+                >
+                  Generate deep AI insights powered by Claude: executive
+                  summaries, root cause analysis, business impact narrative, ROI
+                  estimates, and Jira/ADO tickets.
                 </p>
                 <button
                   onClick={triggerAIAnalysis}
                   disabled={aiGenerating}
                   className="btn btn-primary"
-                  style={{ fontSize: 14, padding: "12px 28px", opacity: aiGenerating ? 0.7 : 1 }}
+                  style={{
+                    fontSize: 14,
+                    padding: "12px 28px",
+                    opacity: aiGenerating ? 0.7 : 1,
+                  }}
                 >
-                  {aiGenerating ? "⏳ Generating AI Report..." : "✨ Generate AI Report"}
+                  {aiGenerating
+                    ? " Generating AI Report..."
+                    : " Generate AI Report"}
                 </button>
               </div>
             ) : (
               <>
                 {/* Persona Selector */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-                  {(["executive", "developer", "pm", "consultant"] as const).map(p => (
-                    <button key={p} onClick={() => setAiPersona(p)} style={{ fontSize: 12, padding: "6px 16px", borderRadius: 20, border: `1px solid ${aiPersona === p ? "#0091DA" : "var(--border-subtle)"}`, background: aiPersona === p ? "rgba(0,145,218,0.15)" : "transparent", color: aiPersona === p ? "#0091DA" : "var(--text-muted)", cursor: "pointer", fontWeight: aiPersona === p ? 700 : 400 }}>
-                      {p === "executive" ? "👔 Executive" : p === "developer" ? "💻 Developer" : p === "pm" ? "📋 Product Manager" : "🎯 Consultant"}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    marginBottom: 24,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {(
+                    ["executive", "developer", "pm", "consultant"] as const
+                  ).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setAiPersona(p)}
+                      style={{
+                        fontSize: 12,
+                        padding: "6px 16px",
+                        borderRadius: 20,
+                        border: `1px solid ${aiPersona === p ? "#0091DA" : "var(--border-subtle)"}`,
+                        background:
+                          aiPersona === p
+                            ? "rgba(0,145,218,0.15)"
+                            : "transparent",
+                        color:
+                          aiPersona === p ? "#0091DA" : "var(--text-muted)",
+                        cursor: "pointer",
+                        fontWeight: aiPersona === p ? 700 : 400,
+                      }}
+                    >
+                      {p === "executive"
+                        ? " Executive"
+                        : p === "developer"
+                          ? " Developer"
+                          : p === "pm"
+                            ? " Product Manager"
+                            : " Consultant"}
                     </button>
                   ))}
                 </div>
 
                 {/* Persona-specific content */}
                 <Card style={{ marginBottom: 20 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: "flex", gap: 8, alignItems: "center" }}>
-                    <span>{aiPersona === "executive" ? "👔 Executive Summary" : aiPersona === "developer" ? "💻 Technical Analysis" : aiPersona === "pm" ? "📋 Product Manager View" : "🎯 Consultant View"}</span>
+                  <h3
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      marginBottom: 12,
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "center",
+                    }}
+                  >
+                    <span>
+                      {aiPersona === "executive"
+                        ? " Executive Summary"
+                        : aiPersona === "developer"
+                          ? " Technical Analysis"
+                          : aiPersona === "pm"
+                            ? " Product Manager View"
+                            : " Consultant View"}
+                    </span>
                   </h3>
-                  <p style={{ fontSize: 14, lineHeight: 1.7, color: "var(--text-secondary)" }}>
-                    {aiPersona === "executive" ? aiReport.executiveSummary
-                     : aiPersona === "developer" ? aiReport.developerSummary
-                     : aiPersona === "pm" ? aiReport.uxNarrative
-                     : `${aiReport.businessImpactNarrative}\n\nROI Estimate: ${aiReport.overallROI}`}
+                  <p
+                    style={{
+                      fontSize: 14,
+                      lineHeight: 1.7,
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    {aiPersona === "executive"
+                      ? aiReport.executiveSummary
+                      : aiPersona === "developer"
+                        ? aiReport.developerSummary
+                        : aiPersona === "pm"
+                          ? aiReport.uxNarrative
+                          : `${aiReport.businessImpactNarrative}\n\nROI Estimate: ${aiReport.overallROI}`}
                   </p>
                   {aiPersona === "consultant" && (
-                    <div style={{ marginTop: 12, padding: "10px 14px", background: "rgba(0,186,140,0.08)", borderRadius: 8, border: "1px solid rgba(0,186,140,0.2)", fontSize: 13, color: "#00BA8C" }}>
-                      💰 {aiReport.overallROI}
+                    <div
+                      style={{
+                        marginTop: 12,
+                        padding: "10px 14px",
+                        background: "rgba(0,186,140,0.08)",
+                        borderRadius: 8,
+                        border: "1px solid rgba(0,186,140,0.2)",
+                        fontSize: 13,
+                        color: "#00BA8C",
+                      }}
+                    >
+                      {aiReport.overallROI}
                     </div>
                   )}
                 </Card>
 
                 {/* AI Recommendations */}
-                <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>🎯 AI-Enriched Recommendations</h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>
+                  AI-Enriched Recommendations
+                </h3>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                    marginBottom: 28,
+                  }}
+                >
                   {aiReport.recommendations.map((rec, i) => (
-                    <div key={i} style={{ background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)", overflow: "hidden" }}>
-                      <button onClick={() => setExpandedRec(expandedRec === i ? null : i)} style={{ width: "100%", textAlign: "left", padding: "14px 16px", background: "none", border: "none", cursor: "pointer", display: "flex", gap: 12, alignItems: "center" }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 4, background: rec.priority === "P0" ? "#E8002D" : rec.priority === "P1" ? "#FF6B00" : rec.priority === "P2" ? "#F0AB00" : "#0091DA", color: "white", flexShrink: 0 }}>{rec.priority}</span>
-                        <span style={{ fontSize: 13, fontWeight: 600, flex: 1, color: "var(--text-primary)" }}>{rec.title}</span>
-                        <span style={{ fontSize: 11, color: "var(--text-muted)", padding: "2px 8px", background: "rgba(255,255,255,0.06)", borderRadius: 4, flexShrink: 0 }}>{rec.estimatedEffort}</span>
-                        <span style={{ color: "var(--text-muted)", fontSize: 14, flexShrink: 0 }}>{expandedRec === i ? "▲" : "▼"}</span>
+                    <div
+                      key={i}
+                      style={{
+                        background: "var(--bg-darkcard)",
+                        borderRadius: "var(--radius-md)",
+                        border: "1px solid var(--border-subtle)",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <button
+                        onClick={() =>
+                          setExpandedRec(expandedRec === i ? null : i)
+                        }
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "14px 16px",
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          display: "flex",
+                          gap: 12,
+                          alignItems: "center",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: "3px 8px",
+                            borderRadius: 4,
+                            background:
+                              rec.priority === "P0"
+                                ? "#E8002D"
+                                : rec.priority === "P1"
+                                  ? "#FF6B00"
+                                  : rec.priority === "P2"
+                                    ? "#F0AB00"
+                                    : "#0091DA",
+                            color: "white",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {rec.priority}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            flex: 1,
+                            color: "var(--text-primary)",
+                          }}
+                        >
+                          {rec.title}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-muted)",
+                            padding: "2px 8px",
+                            background: "rgba(255,255,255,0.06)",
+                            borderRadius: 4,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {rec.estimatedEffort}
+                        </span>
+                        <span
+                          style={{
+                            color: "var(--text-muted)",
+                            fontSize: 14,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {expandedRec === i ? "▲" : "▼"}
+                        </span>
                       </button>
                       {expandedRec === i && (
-                        <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border-subtle)" }}>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                        <div
+                          style={{
+                            padding: "0 16px 16px",
+                            borderTop: "1px solid var(--border-subtle)",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr",
+                              gap: 12,
+                              marginTop: 12,
+                            }}
+                          >
                             {[
-                              { label: "📋 Description", value: rec.description },
-                              { label: "🔍 Root Cause", value: rec.rootCause },
-                              { label: "❓ Why It Matters", value: rec.whyItMatters },
-                              { label: "💼 Business Impact", value: rec.businessImpact },
-                              { label: "🔧 Recommendation", value: rec.recommendation },
-                              { label: "📈 Expected Improvement", value: rec.expectedImprovement },
+                              {
+                                label: " Description",
+                                value: rec.description,
+                              },
+                              { label: " Root Cause", value: rec.rootCause },
+                              {
+                                label: " Why It Matters",
+                                value: rec.whyItMatters,
+                              },
+                              {
+                                label: " Business Impact",
+                                value: rec.businessImpact,
+                              },
+                              {
+                                label: " Recommendation",
+                                value: rec.recommendation,
+                              },
+                              {
+                                label: " Expected Improvement",
+                                value: rec.expectedImprovement,
+                              },
                             ].map(({ label, value }) => (
-                              <div key={label} style={{ padding: "10px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 8 }}>
-                                <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, marginBottom: 4 }}>{label}</div>
-                                <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>{value}</div>
+                              <div
+                                key={label}
+                                style={{
+                                  padding: "10px 12px",
+                                  background: "rgba(255,255,255,0.03)",
+                                  borderRadius: 8,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: 11,
+                                    color: "var(--text-muted)",
+                                    fontWeight: 600,
+                                    marginBottom: 4,
+                                  }}
+                                >
+                                  {label}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: 13,
+                                    color: "var(--text-secondary)",
+                                    lineHeight: 1.5,
+                                  }}
+                                >
+                                  {value}
+                                </div>
                               </div>
                             ))}
                           </div>
                           {rec.sampleCode && (
-                            <div style={{ marginTop: 12, padding: "10px 12px", background: "#0d1117", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)" }}>
-                              <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>💡 Sample Implementation</div>
-                              <pre style={{ fontSize: 12, color: "#a8ff78", margin: 0, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{rec.sampleCode}</pre>
+                            <div
+                              style={{
+                                marginTop: 12,
+                                padding: "10px 12px",
+                                background: "#0d1117",
+                                borderRadius: 8,
+                                border: "1px solid rgba(255,255,255,0.1)",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: "var(--text-muted)",
+                                  marginBottom: 6,
+                                }}
+                              >
+                                Sample Implementation
+                              </div>
+                              <pre
+                                style={{
+                                  fontSize: 12,
+                                  color: "#a8ff78",
+                                  margin: 0,
+                                  fontFamily: "monospace",
+                                  whiteSpace: "pre-wrap",
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                {rec.sampleCode}
+                              </pre>
                             </div>
                           )}
                           {rec.estimatedROI && (
-                            <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(0,186,140,0.08)", borderRadius: 8, fontSize: 12, color: "#00BA8C" }}>💰 ROI: {rec.estimatedROI}</div>
+                            <div
+                              style={{
+                                marginTop: 10,
+                                padding: "8px 12px",
+                                background: "rgba(0,186,140,0.08)",
+                                borderRadius: 8,
+                                fontSize: 12,
+                                color: "#00BA8C",
+                              }}
+                            >
+                              ROI: {rec.estimatedROI}
+                            </div>
                           )}
                         </div>
                       )}
@@ -5235,28 +6584,163 @@ export default function FinalReportPage() {
                 {/* Dev Tickets */}
                 {aiReport.devTickets.length > 0 && (
                   <>
-                    <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>🎫 Jira / Azure DevOps Tickets</h3>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <h3
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 700,
+                        marginBottom: 14,
+                      }}
+                    >
+                      🎫 Jira / Azure DevOps Tickets
+                    </h3>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                      }}
+                    >
                       {aiReport.devTickets.map((ticket, i) => (
-                        <div key={i} style={{ background: "var(--bg-darkcard)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)", overflow: "hidden" }}>
-                          <button onClick={() => setExpandedTicket(expandedTicket === i ? null : i)} style={{ width: "100%", textAlign: "left", padding: "12px 16px", background: "none", border: "none", cursor: "pointer", display: "flex", gap: 10, alignItems: "center" }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: ticket.priority === "Critical" ? "#E8002D" : ticket.priority === "High" ? "#FF6B00" : ticket.priority === "Medium" ? "#F0AB00" : "#0091DA", color: "white", flexShrink: 0 }}>{ticket.priority}</span>
-                            <span style={{ fontSize: 13, fontWeight: 600, flex: 1, color: "var(--text-primary)" }}>{ticket.title}</span>
-                            <span style={{ fontSize: 11, color: "var(--text-muted)", padding: "2px 7px", background: "rgba(255,255,255,0.06)", borderRadius: 4 }}>{ticket.storyPoints} pts</span>
-                            <span style={{ color: "var(--text-muted)", fontSize: 14 }}>{expandedTicket === i ? "▲" : "▼"}</span>
+                        <div
+                          key={i}
+                          style={{
+                            background: "var(--bg-darkcard)",
+                            borderRadius: "var(--radius-md)",
+                            border: "1px solid var(--border-subtle)",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <button
+                            onClick={() =>
+                              setExpandedTicket(expandedTicket === i ? null : i)
+                            }
+                            style={{
+                              width: "100%",
+                              textAlign: "left",
+                              padding: "12px 16px",
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              display: "flex",
+                              gap: 10,
+                              alignItems: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                padding: "2px 7px",
+                                borderRadius: 4,
+                                background:
+                                  ticket.priority === "Critical"
+                                    ? "#E8002D"
+                                    : ticket.priority === "High"
+                                      ? "#FF6B00"
+                                      : ticket.priority === "Medium"
+                                        ? "#F0AB00"
+                                        : "#0091DA",
+                                color: "white",
+                                flexShrink: 0,
+                              }}
+                            >
+                              {ticket.priority}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                flex: 1,
+                                color: "var(--text-primary)",
+                              }}
+                            >
+                              {ticket.title}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: "var(--text-muted)",
+                                padding: "2px 7px",
+                                background: "rgba(255,255,255,0.06)",
+                                borderRadius: 4,
+                              }}
+                            >
+                              {ticket.storyPoints} pts
+                            </span>
+                            <span
+                              style={{
+                                color: "var(--text-muted)",
+                                fontSize: 14,
+                              }}
+                            >
+                              {expandedTicket === i ? "▲" : "▼"}
+                            </span>
                           </button>
                           {expandedTicket === i && (
-                            <div style={{ padding: "0 16px 14px", borderTop: "1px solid var(--border-subtle)" }}>
-                              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6, marginTop: 10, marginBottom: 12 }}>{ticket.description}</p>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 6 }}>Acceptance Criteria:</div>
+                            <div
+                              style={{
+                                padding: "0 16px 14px",
+                                borderTop: "1px solid var(--border-subtle)",
+                              }}
+                            >
+                              <p
+                                style={{
+                                  fontSize: 13,
+                                  color: "var(--text-secondary)",
+                                  lineHeight: 1.6,
+                                  marginTop: 10,
+                                  marginBottom: 12,
+                                }}
+                              >
+                                {ticket.description}
+                              </p>
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color: "var(--text-muted)",
+                                  marginBottom: 6,
+                                }}
+                              >
+                                Acceptance Criteria:
+                              </div>
                               <ul style={{ margin: 0, padding: "0 0 0 18px" }}>
                                 {ticket.acceptanceCriteria.map((ac, j) => (
-                                  <li key={j} style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4, lineHeight: 1.5 }}>{ac}</li>
+                                  <li
+                                    key={j}
+                                    style={{
+                                      fontSize: 12,
+                                      color: "var(--text-secondary)",
+                                      marginBottom: 4,
+                                      lineHeight: 1.5,
+                                    }}
+                                  >
+                                    {ac}
+                                  </li>
                                 ))}
                               </ul>
-                              <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 6,
+                                  marginTop: 10,
+                                  flexWrap: "wrap",
+                                }}
+                              >
                                 {ticket.labels.map((label, j) => (
-                                  <span key={j} style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "rgba(0,145,218,0.12)", color: "#0091DA", border: "1px solid rgba(0,145,218,0.2)" }}>{label}</span>
+                                  <span
+                                    key={j}
+                                    style={{
+                                      fontSize: 11,
+                                      padding: "2px 8px",
+                                      borderRadius: 10,
+                                      background: "rgba(0,145,218,0.12)",
+                                      color: "#0091DA",
+                                      border: "1px solid rgba(0,145,218,0.2)",
+                                    }}
+                                  >
+                                    {label}
+                                  </span>
                                 ))}
                               </div>
                             </div>
@@ -5267,9 +6751,30 @@ export default function FinalReportPage() {
                   </>
                 )}
 
-                <div style={{ marginTop: 20, fontSize: 11, color: "var(--text-muted)", textAlign: "right" }}>
-                  Generated by Claude AI · {new Date(aiReport.generatedAt).toLocaleString("en-GB")}
-                  <button onClick={triggerAIAnalysis} disabled={aiGenerating} style={{ marginLeft: 12, fontSize: 11, padding: "3px 10px", borderRadius: 4, background: "rgba(255,255,255,0.08)", border: "1px solid var(--border-subtle)", cursor: "pointer", color: "var(--text-muted)" }}>
+                <div
+                  style={{
+                    marginTop: 20,
+                    fontSize: 11,
+                    color: "var(--text-muted)",
+                    textAlign: "right",
+                  }}
+                >
+                  Generated by Claude AI ·{" "}
+                  {new Date(aiReport.generatedAt).toLocaleString("en-GB")}
+                  <button
+                    onClick={triggerAIAnalysis}
+                    disabled={aiGenerating}
+                    style={{
+                      marginLeft: 12,
+                      fontSize: 11,
+                      padding: "3px 10px",
+                      borderRadius: 4,
+                      background: "rgba(255,255,255,0.08)",
+                      border: "1px solid var(--border-subtle)",
+                      cursor: "pointer",
+                      color: "var(--text-muted)",
+                    }}
+                  >
                     {aiGenerating ? "Regenerating..." : "Regenerate"}
                   </button>
                 </div>
@@ -5281,39 +6786,145 @@ export default function FinalReportPage() {
         {/* ══ ROADMAP TAB ══ */}
         {activeTab === "roadmap" && perfOnly && (
           <div className="animate-fade-in">
-            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>
-              Prioritized implementation roadmap. Address Critical items immediately, High items in the next sprint, Medium in the next quarter, and Low as time permits.
+            <p
+              style={{
+                fontSize: 13,
+                color: "var(--text-muted)",
+                marginBottom: 20,
+              }}
+            >
+              Prioritized implementation roadmap. Address Critical items
+              immediately, High items in the next sprint, Medium in the next
+              quarter, and Low as time permits.
             </p>
 
             {/* Priority swimlanes */}
             {(["P0", "P1", "P2", "P3/P4"] as const).map((pLabel) => {
-              const labelMap: Record<string, { label: string; color: string; bg: string }> = {
-                "P0": { label: "🚨 Critical", color: "#E8002D", bg: "rgba(232,0,45,0.06)" },
-                "P1": { label: "🔴 High", color: "#FF6B00", bg: "rgba(255,107,0,0.06)" },
-                "P2": { label: "🟡 Medium", color: "#F0AB00", bg: "rgba(240,171,0,0.06)" },
-                "P3/P4": { label: "🔵 Low", color: "#0091DA", bg: "rgba(0,145,218,0.06)" },
+              const labelMap: Record<
+                string,
+                { label: string; color: string; bg: string }
+              > = {
+                P0: {
+                  label: "🚨 Critical",
+                  color: "#E8002D",
+                  bg: "rgba(232,0,45,0.06)",
+                },
+                P1: {
+                  label: "🔴 High",
+                  color: "#FF6B00",
+                  bg: "rgba(255,107,0,0.06)",
+                },
+                P2: {
+                  label: "🟡 Medium",
+                  color: "#F0AB00",
+                  bg: "rgba(240,171,0,0.06)",
+                },
+                "P3/P4": {
+                  label: "🔵 Low",
+                  color: "#0091DA",
+                  bg: "rgba(0,145,218,0.06)",
+                },
               };
               const style = labelMap[pLabel];
-              const items = (aiReport?.recommendations || recs).filter(r => {
-                if (pLabel === "P3/P4") return r.priority === "P3" || r.priority === "P4";
+              const items = (aiReport?.recommendations || recs).filter((r) => {
+                if (pLabel === "P3/P4")
+                  return r.priority === "P3" || r.priority === "P4";
                 return r.priority === pLabel;
               });
               if (items.length === 0) return null;
               return (
                 <div key={pLabel} style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: style.color }}>{style.label}</h3>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                  <h3
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      marginBottom: 12,
+                      color: style.color,
+                    }}
+                  >
+                    {style.label}
+                  </h3>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fill, minmax(280px, 1fr))",
+                      gap: 12,
+                    }}
+                  >
                     {items.map((item, i) => {
-                      const effort = "estimatedEffort" in item ? item.estimatedEffort : item.effort;
-                      const desc = "description" in item ? item.description : item.detail;
-                      const improvement = "expectedImprovement" in item ? item.expectedImprovement : undefined;
+                      const effort =
+                        "estimatedEffort" in item
+                          ? item.estimatedEffort
+                          : item.effort;
+                      const desc =
+                        "description" in item ? item.description : item.detail;
+                      const improvement =
+                        "expectedImprovement" in item
+                          ? item.expectedImprovement
+                          : undefined;
                       return (
-                        <div key={i} style={{ padding: "14px 16px", borderRadius: "var(--radius-md)", background: style.bg, border: `1px solid ${style.color}30` }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: "var(--text-primary)", lineHeight: 1.4 }}>{item.title}</div>
-                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10, lineHeight: 1.5 }}>{desc}</div>
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "rgba(255,255,255,0.08)", color: "var(--text-muted)" }}>🕐 {effort}</span>
-                            {improvement && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "rgba(0,186,140,0.1)", color: "#00BA8C" }}>↑ {improvement}</span>}
+                        <div
+                          key={i}
+                          style={{
+                            padding: "14px 16px",
+                            borderRadius: "var(--radius-md)",
+                            background: style.bg,
+                            border: `1px solid ${style.color}30`,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              marginBottom: 8,
+                              color: "var(--text-primary)",
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {item.title}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "var(--text-muted)",
+                              marginBottom: 10,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {desc}
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 6,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 11,
+                                padding: "2px 8px",
+                                borderRadius: 4,
+                                background: "rgba(255,255,255,0.08)",
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              {effort}
+                            </span>
+                            {improvement && (
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  padding: "2px 8px",
+                                  borderRadius: 4,
+                                  background: "rgba(0,186,140,0.1)",
+                                  color: "#00BA8C",
+                                }}
+                              >
+                                ↑ {improvement}
+                              </span>
+                            )}
                           </div>
                         </div>
                       );
@@ -5326,16 +6937,37 @@ export default function FinalReportPage() {
             {/* Effort vs Impact chart */}
             {recs.length > 0 && (
               <Card style={{ marginTop: 16 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>📊 Issue Type Distribution</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>
+                  Issue Type Distribution
+                </h3>
                 {riPieData.length > 0 && (
                   <ResponsiveContainer width="100%" height={260}>
                     <PieChart>
-                      <Pie data={riPieData} cx="50%" cy="50%" outerRadius={100} dataKey="value" nameKey="name" label={({ name, value }) => `${name}: ${value}`} labelLine={false}>
+                      <Pie
+                        data={riPieData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        dataKey="value"
+                        nameKey="name"
+                        label={({ name, value }) => `${name}: ${value}`}
+                        labelLine={false}
+                      >
                         {riPieData.map((_, idx) => (
-                          <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                          <Cell
+                            key={idx}
+                            fill={PIE_COLORS[idx % PIE_COLORS.length]}
+                          />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={{ background: "var(--bg-darkcard)", border: "1px solid var(--border-subtle)", borderRadius: 8, fontSize: 12 }} />
+                      <Tooltip
+                        contentStyle={{
+                          background: "var(--bg-darkcard)",
+                          border: "1px solid var(--border-subtle)",
+                          borderRadius: 8,
+                          fontSize: 12,
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -5363,8 +6995,8 @@ export default function FinalReportPage() {
                       color: "var(--text-muted)",
                     }}
                   >
-                    Showing <strong>{dpGroupedFindings.length}</strong>{" "}
-                    finding{dpGroupedFindings.length !== 1 ? "s" : ""} (
+                    Showing <strong>{dpGroupedFindings.length}</strong> finding
+                    {dpGroupedFindings.length !== 1 ? "s" : ""} (
                     {dpFindings.length} instance
                     {dpFindings.length !== 1 ? "s" : ""})
                   </span>
@@ -5378,11 +7010,11 @@ export default function FinalReportPage() {
                 style={{
                   textAlign: "center",
                   padding: 56,
-                  color: "var(--text-muted)",
+                  color: "var(--offshade-text)",
                 }}
               >
-                <div style={{ fontSize: 36, marginBottom: 10 }}>✅</div>
-                <div>No dark pattern findings detected.</div>
+                <div style={{ fontSize: 36, marginBottom: 10 }}></div>
+                <p>No dark pattern findings detected.</p>
               </div>
             )}
           </div>
@@ -5891,7 +7523,9 @@ export default function FinalReportPage() {
                           .map((s) => (
                             <span
                               key={s}
-                              style={{display: "inline-flex", alignItems: "center", 
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
                                 padding: "2px 8px",
                                 borderRadius: 99,
                                 fontSize: 13,
@@ -6000,7 +7634,9 @@ export default function FinalReportPage() {
                     <div style={{ display: "flex", gap: 6 }}>
                       {critCount > 0 && (
                         <span
-                          style={{display: "inline-flex", alignItems: "center", 
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
                             padding: "2px 8px",
                             borderRadius: 99,
                             fontSize: 10,
@@ -6013,7 +7649,9 @@ export default function FinalReportPage() {
                         </span>
                       )}
                       <span
-                        style={{display: "inline-flex", alignItems: "center", 
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
                           padding: "2px 8px",
                           borderRadius: 99,
                           fontSize: 10,
@@ -6084,7 +7722,9 @@ export default function FinalReportPage() {
                           WCAG {issue.wcagCriterion}
                         </span>
                         <span
-                          style={{display: "inline-flex", alignItems: "center", 
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
                             padding: "2px 7px",
                             borderRadius: 99,
                             fontSize: 12,
@@ -6310,7 +7950,9 @@ export default function FinalReportPage() {
                           {issue.title}
                         </span>
                         <span
-                          style={{display: "inline-flex", alignItems: "center", 
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
                             padding: "2px 8px",
                             borderRadius: 99,
                             fontSize: 13,
@@ -6323,7 +7965,9 @@ export default function FinalReportPage() {
                           {issue.severity}
                         </span>
                         <span
-                          style={{display: "inline-flex", alignItems: "center", 
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
                             padding: "2px 7px",
                             borderRadius: 99,
                             fontSize: 13,
