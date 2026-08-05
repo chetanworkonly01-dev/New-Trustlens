@@ -1,8 +1,35 @@
 ﻿import { AccessibilityIssue } from "../types/audit";
+import type {
+  DarkPatternFinding,
+  DarkPatternResult,
+  DarkPatternCategory,
+  EthicalPrinciple,
+  DarkPatternEvidence,
+  DarkPatternRegulation,
+  DarkPatternResult as DarkPatternResultType,
+} from "../types/darkpattern";
+import { PRINCIPLE_WEIGHTS } from "../types/darkpattern";
+import {
+  URGENCY_PATTERNS,
+  CONFIRMSHAMING_PATTERNS,
+  SOCIAL_PRESSURE_PATTERNS,
+  FEAR_LANGUAGE_PATTERNS,
+  TRICK_QUESTION_PATTERNS,
+  AUTO_RENEWAL_PATTERNS,
+  DRIP_PRICING_PATTERNS,
+  SUBSCRIPTION_TRAP_PATTERNS,
+  PLAN_ANCHORING_PATTERNS,
+  ASTERISK_PROMO_PATTERNS,
+  COOKIE_CONSENT_PATTERNS,
+  CRORE_TRUST_PATTERNS,
+  FAMILY_GUILT_PATTERNS,
+  DARK_PATTERN_RULES,
+} from "./darkpattern-rules";
 const uuidv4 = (): string => crypto.randomUUID();
 
 interface PdfAnalysisResult {
   issues: AccessibilityIssue[];
+  text: string;
   metadata: {
     title?: string;
     author?: string;
@@ -537,6 +564,7 @@ export async function analyzePdf(
   );
   return {
     issues,
+    text,
     metadata: {
       title: info.Title,
       author: info.Author,
@@ -581,3 +609,559 @@ function createIssue(
     confidence: "high",
   };
 }
+
+/**
+ * Simple text-based dark pattern detection for PDFs.
+ * Scans extracted text for common dark pattern indicators.
+ */
+export function detectDarkPatternsInPdfText(
+  text: string,
+  fileName: string,
+): AccessibilityIssue[] {
+  const issues: AccessibilityIssue[] = [];
+  const lowerText = text.toLowerCase();
+
+  const patterns: {
+    testId: string;
+    title: string;
+    description: string;
+    keywords: string[];
+    severity: "critical" | "high" | "medium" | "low";
+  }[] = [];
+  const foundPatterns: typeof patterns = [];
+
+  for (const pattern of patterns) {
+    if (pattern.keywords.some((kw) => lowerText.includes(kw))) {
+      foundPatterns.push(pattern);
+    }
+  }
+
+  if (foundPatterns.length === 0) return issues;
+
+  for (const pattern of foundPatterns) {
+    const matchingKeyword = pattern.keywords.find((kw) =>
+      lowerText.includes(kw),
+    );
+    issues.push(
+      createIssue(
+        pattern.testId,
+        pattern.title,
+        `${pattern.description} Keyword found: "${matchingKeyword}".`,
+        "document text",
+        fileName,
+        pattern.testId.startsWith("DP-SN") ? "dark-pattern" : "dark-pattern",
+        `Dark Pattern: ${pattern.title}`,
+        "AA",
+        pattern.severity,
+        "Potential dark pattern detected in document text. Manual review recommended.",
+        "Ensure transparency and easy opt-out. If pre-selected, change to opt-in. If auto-renewal, disclose clearly with easy cancellation. If urgency, ensure it is genuine and verifiable.",
+      ),
+    );
+  }
+
+  return issues;
+}
+
+/**
+ * Proper static-text + NLP rule scan for PDFs, mirroring
+ * `runDarkPatternAudit`'s text/NLP branch (DOM/visual/journey skipped).
+ */
+export function analyzePdfDarkPatterns(
+  text: string,
+  fileName: string,
+): DarkPatternResult {
+  const findings: DarkPatternFinding[] = [];
+  const lines = text
+    .split(/[\n\r]+/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 4);
+
+  const textElements = lines.map((line) => ({
+    text: line.substring(0, 200),
+    tag: "text" as const,
+    html: line.substring(0, 200),
+    isButton: false,
+    isLink: false,
+  }));
+
+  const seenTexts = new Set<string>();
+
+  const pushFinding = (
+    ruleId: string,
+    el: { text: string; html: string },
+    evidence: DarkPatternEvidence,
+  ) => {
+    const rule = DARK_PATTERN_RULES.find((r) => r.id === ruleId);
+    if (!rule) return;
+
+    const detectToBasis: Record<string, "structural" | "visual" | "textual"> = {
+      dom: "structural",
+      visual: "visual",
+      journey: "structural",
+      ai: "textual",
+      flow: "structural",
+    };
+    const detectionBasis = detectToBasis[rule.detect] || "textual";
+    const isVerdict =
+      detectionBasis === "structural" || detectionBasis === "visual";
+
+    const fixPriority: "P0" | "P1" | "P2" | "P3" =
+      rule.severity === "critical"
+        ? "P0"
+        : rule.severity === "high"
+          ? "P1"
+          : rule.severity === "medium"
+            ? "P2"
+            : "P3";
+
+    findings.push({
+      id: crypto.randomUUID(),
+      ruleId,
+      category: rule.category,
+      principle: rule.principle,
+      title: rule.title,
+      description: rule.description,
+      element: el.html.substring(0, 120),
+      elementHtml: el.html,
+      pageUrl: fileName,
+      severity: rule.severity,
+      regulation: rule.regulation,
+      confidence: rule.detect === "ai" ? "medium" : "high",
+      recommendation: rule.recommendation || getRecommendation(rule.category),
+      userImpact: getUserImpact(rule.principle),
+      evidence,
+      source:
+        rule.detect === "ai"
+          ? "ai"
+          : rule.detect === "journey"
+            ? "journey"
+            : "rule",
+      detectionBasis,
+      findingVerdict: isVerdict ? "verdict" : "signal",
+      verifiabilityNote: isVerdict
+        ? "DOM-proven: element structure or computed style confirms this pattern"
+        : "Content-based signal: flagged by text/AI analysis — manual review recommended",
+      fixPriority,
+    });
+  };
+
+  // DP-SU-02/03: Urgency/scarcity language
+  for (const el of textElements) {
+    for (const pattern of URGENCY_PATTERNS) {
+      if (pattern.test(el.text)) {
+        const ruleId = /\d+\s*(left|remaining|available)/i.test(el.text)
+          ? "DP-SU-02"
+          : "DP-SU-03";
+        pushFinding(ruleId, el, {
+          summary: `Urgency/scarcity language detected: "${el.text.substring(0, 80)}"`,
+          details: [`Text: "${el.text}"`, `Pattern matched: ${pattern.source}`],
+        });
+        seenTexts.add(el.text);
+        break;
+      }
+    }
+  }
+
+  // DP-SP-01/02: Social pressure
+  for (const el of textElements) {
+    if (seenTexts.has(el.text)) continue;
+    for (const pattern of SOCIAL_PRESSURE_PATTERNS) {
+      if (pattern.test(el.text)) {
+        pushFinding("DP-SP-01", el, {
+          summary: `Social pressure messaging: "${el.text.substring(0, 80)}"`,
+          details: [`Text: "${el.text}"`, `Pattern: ${pattern.source}`],
+        });
+        seenTexts.add(el.text);
+        break;
+      }
+    }
+  }
+
+  // DP-CS-05: Family/dependant protection guilt framing
+  for (const el of textElements) {
+    if (seenTexts.has(el.text)) continue;
+    for (const pattern of FAMILY_GUILT_PATTERNS) {
+      if (pattern.test(el.text)) {
+        pushFinding("DP-CS-05", el, {
+          summary: `Family protection guilt framing: "${el.text.substring(0, 100)}"`,
+          details: [
+            `Text: "${el.text}"`,
+            "Uses family safety as emotional lever to shame users who decline",
+            "India CPA Dark Pattern Guidelines 2023 (Confirmshaming): prohibited notified dark pattern",
+            "ASCI Guidelines: advertising must not exploit guilt or fear to deny rational choice",
+          ],
+        });
+        seenTexts.add(el.text);
+        break;
+      }
+    }
+  }
+
+  // DP-CS-01: Confirmshaming in text
+  for (const el of textElements) {
+    if (seenTexts.has(el.text)) continue;
+    for (const pattern of CONFIRMSHAMING_PATTERNS) {
+      if (pattern.test(el.text)) {
+        pushFinding("DP-CS-01", el, {
+          summary: `Confirmshaming language: "${el.text.substring(0, 80)}"`,
+          details: [
+            `Text: "${el.text}"`,
+            "This language shames users who choose to decline",
+          ],
+        });
+        seenTexts.add(el.text);
+        break;
+      }
+    }
+  }
+
+  // DP-CS-03: Fear-based language
+  for (const el of textElements) {
+    if (seenTexts.has(el.text)) continue;
+    for (const pattern of FEAR_LANGUAGE_PATTERNS) {
+      if (pattern.test(el.text)) {
+        pushFinding("DP-CS-03", el, {
+          summary: `Fear-based language: "${el.text.substring(0, 80)}"`,
+          details: [`Text: "${el.text}"`, `Pattern: ${pattern.source}`],
+        });
+        seenTexts.add(el.text);
+        break;
+      }
+    }
+  }
+
+  // DP-MD-04: Trick questions (length check)
+  for (const el of textElements) {
+    if (seenTexts.has(el.text)) continue;
+    if (el.text.length > 10) {
+      for (const pattern of TRICK_QUESTION_PATTERNS) {
+        if (pattern.test(el.text)) {
+          pushFinding("DP-MD-04", el, {
+            summary: `Confusing wording: "${el.text.substring(0, 80)}"`,
+            details: [`Text: "${el.text}"`, "Double-negative or trick wording"],
+          });
+          seenTexts.add(el.text);
+          break;
+        }
+      }
+    }
+  }
+
+  // DP-FA-04: Auto-renewal / forced continuity
+  for (const el of textElements) {
+    if (seenTexts.has(el.text)) continue;
+    for (const pattern of AUTO_RENEWAL_PATTERNS) {
+      if (pattern.test(el.text)) {
+        pushFinding("DP-FA-04", el, {
+          summary: `Auto-renewal / forced continuity language: "${el.text.substring(0, 80)}"`,
+          details: [
+            `Text: "${el.text}"`,
+            "Hidden auto-renewal detected",
+            "FTC Click-to-Cancel Rule 2024 and EU Consumer Rights Directive require clear disclosure of recurring charges",
+          ],
+        });
+        seenTexts.add(el.text);
+        break;
+      }
+    }
+  }
+
+  // DP-PM-04: Drip pricing / hidden costs
+  for (const el of textElements) {
+    if (seenTexts.has(el.text)) continue;
+    for (const pattern of DRIP_PRICING_PATTERNS) {
+      if (pattern.test(el.text)) {
+        pushFinding("DP-PM-04", el, {
+          summary: `Drip pricing / hidden fees: "${el.text.substring(0, 80)}"`,
+          details: [
+            `Text: "${el.text}"`,
+            "Mandatory fees or taxes not included in advertised price",
+            "FTC Act §5 and EU Omnibus Directive require all-in pricing",
+          ],
+        });
+        seenTexts.add(el.text);
+        break;
+      }
+    }
+  }
+
+  // DP-PM-05: Subscription cancellation friction
+  for (const el of textElements) {
+    if (seenTexts.has(el.text)) continue;
+    for (const pattern of SUBSCRIPTION_TRAP_PATTERNS) {
+      if (pattern.test(el.text)) {
+        pushFinding("DP-PM-05", el, {
+          summary: `Subscription trap language: "${el.text.substring(0, 80)}"`,
+          details: [
+            `Text: "${el.text}"`,
+            "Cancellation friction or phone-only cancel detected in text",
+            "FTC Click-to-Cancel Rule 2024 requires online cancel for online signups",
+          ],
+        });
+        seenTexts.add(el.text);
+        break;
+      }
+    }
+  }
+
+  // DP-PM-02: Plan anchoring
+  for (const el of textElements) {
+    if (seenTexts.has(el.text)) continue;
+    for (const pattern of PLAN_ANCHORING_PATTERNS) {
+      if (pattern.test(el.text)) {
+        pushFinding("DP-PM-02", el, {
+          summary: `Plan anchoring copy: "${el.text.substring(0, 80)}"`,
+          details: [
+            `Text: "${el.text}"`,
+            'Exploits decoy effect — "Most Popular" badge steers users toward premium options',
+            "EU DSA Art. 25(1)(a) prohibits biasing user choice through interface design",
+          ],
+        });
+        seenTexts.add(el.text);
+        break;
+      }
+    }
+  }
+
+  // DP-CC-05: Cookie consent by scrolling/browsing
+  for (const el of textElements) {
+    if (seenTexts.has(el.text)) continue;
+    for (const pattern of COOKIE_CONSENT_PATTERNS) {
+      if (pattern.test(el.text)) {
+        pushFinding("DP-CC-05", el, {
+          summary: `Implied consent language detected: "${el.text.substring(0, 80)}"`,
+          details: [
+            `Text: "${el.text}"`,
+            "Implies consent through continued browsing — requires explicit opt-in",
+            "CJEU Planet49 (Case C-673/17): scrolling/browsing does NOT constitute valid consent",
+          ],
+        });
+        seenTexts.add(el.text);
+        break;
+      }
+    }
+  }
+
+  // DP-MD-09: Asterisk/hash-qualified promotional claims
+  for (const el of textElements) {
+    if (seenTexts.has(el.text)) continue;
+    for (const pattern of ASTERISK_PROMO_PATTERNS) {
+      if (pattern.test(el.text)) {
+        pushFinding("DP-MD-09", el, {
+          summary: `Asterisk-qualified promotional claim: "${el.text.substring(0, 100)}"`,
+          details: [
+            `Text: "${el.text}"`,
+            "Headline discount/price is qualified by an asterisk or hash marker — conditions buried in fine print",
+            "India CPA Dark Pattern Guidelines 2023: bait advertising / misleading claims",
+            "ASCI Guidelines: unqualified superlatives and claims without substantiation are prohibited",
+          ],
+          measurements: { matchedPattern: pattern.source },
+        });
+        seenTexts.add(el.text);
+        break;
+      }
+    }
+  }
+
+  // DP-SP-05: Crore/lakh-scale unverifiable trust claims
+  for (const el of textElements) {
+    if (seenTexts.has(el.text)) continue;
+    for (const pattern of CRORE_TRUST_PATTERNS) {
+      if (pattern.test(el.text)) {
+        pushFinding("DP-SP-05", el, {
+          summary: `Unverifiable trust claim: "${el.text.substring(0, 100)}"`,
+          details: [
+            `Text: "${el.text}"`,
+            "Scale figure (crore/lakh customers) displayed without verifiable source, audit date, or methodology",
+            "ASCI Guidelines 2023: testimonials/statistics must be capable of substantiation",
+            "IN-CPA Dark Pattern Guidelines 2023: social proof used to manufacture artificial authority",
+          ],
+          measurements: { matchedPattern: pattern.source },
+        });
+        seenTexts.add(el.text);
+        break;
+      }
+    }
+  }
+
+  return buildResult(findings, 1);
+}
+
+/**
+ * Mirrors darkpattern-engine's buildResult so PDFs get a consistent
+ * DarkPatternResult without touching DOM/visual/journey engines.
+ */
+function buildResult(
+  findings: DarkPatternFinding[],
+  pagesScanned: number,
+): DarkPatternResult {
+  const categoryBreakdown = {} as Record<DarkPatternCategory, number>;
+  const findingsBySeverity: Record<string, number> = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+  };
+  const principleScores = {} as Record<EthicalPrinciple, number>;
+  const regulatorySet = new Set<string>();
+
+  for (const f of findings) {
+    categoryBreakdown[f.category] = (categoryBreakdown[f.category] || 0) + 1;
+    findingsBySeverity[f.severity] = (findingsBySeverity[f.severity] || 0) + 1;
+    f.regulation.forEach((r) => regulatorySet.add(r));
+  }
+
+  const allPrinciples: EthicalPrinciple[] = [
+    "informed-consent",
+    "symmetry-of-choice",
+    "transparency",
+    "user-autonomy",
+    "accessibility-clarity",
+  ];
+  const sevWeights = { critical: 15, high: 8, medium: 3, low: 1 };
+
+  for (const p of allPrinciples) {
+    const pFindings = findings.filter((f) => f.principle === p);
+    let deduction = 0;
+    for (const f of pFindings) {
+      const confidenceMult =
+        f.confidence === "high" ? 1 : f.confidence === "medium" ? 0.7 : 0.4;
+      deduction += sevWeights[f.severity] * confidenceMult;
+    }
+    principleScores[p] = Math.max(0, Math.round(100 - deduction));
+  }
+
+  let weightedSum = 0;
+  let totalWeight = 0;
+  for (const p of allPrinciples) {
+    const w = PRINCIPLE_WEIGHTS[p] || 1;
+    weightedSum += principleScores[p] * w;
+    totalWeight += w;
+  }
+  let ethicsScore =
+    totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 100;
+
+  const avgFindingsPerPage =
+    pagesScanned > 0 ? findings.length / pagesScanned : 0;
+  const coverageCapApplied = findings.length === 0 && pagesScanned >= 3;
+  if (coverageCapApplied) {
+    ethicsScore = Math.min(ethicsScore, 82);
+  }
+
+  const consentIntegrity = Math.round(
+    principleScores["informed-consent"] * 0.6 +
+      principleScores["symmetry-of-choice"] * 0.4,
+  );
+
+  const symmetryFindings = findings.filter(
+    (f) => f.principle === "symmetry-of-choice",
+  );
+  const choiceSymmetry =
+    symmetryFindings.length === 0
+      ? 100
+      : Math.max(0, 100 - symmetryFindings.length * 20);
+
+  const manipFindings = findings.filter(
+    (f) =>
+      f.category === "scarcity-urgency" ||
+      f.category === "social-pressure" ||
+      f.category === "confirmshaming" ||
+      f.category === "nagging",
+  );
+  const manipulationIndex =
+    manipFindings.length === 0 ? 0 : Math.min(100, manipFindings.length * 15);
+
+  const findingsBySource: Record<string, number> = {};
+  const findingsByPhase: Record<string, number> = {};
+  for (const f of findings) {
+    findingsBySource[f.source] = (findingsBySource[f.source] || 0) + 1;
+    const phase =
+      f.source === "ai-vision"
+        ? "Phase 8: Visual AI"
+        : f.source === "temporal"
+          ? "Gap 3: Temporal"
+          : f.source === "cta-scorer"
+            ? "Gap 4: CTA Prominence"
+            : /DP-CC/.test(f.ruleId)
+              ? "Phase 9: CMP Audit"
+              : /DP-PM/.test(f.ruleId)
+                ? "Phase 1: DOM Scan"
+                : /DP-SN|DP-OB|DP-FA|DP-NG|DP-PZ/.test(f.ruleId)
+                  ? "Phase 1: DOM Scan"
+                  : /DP-IF/.test(f.ruleId)
+                    ? "Phase 2: Visual Scan"
+                    : /DP-SU|DP-SP|DP-CS|DP-MD|DP-BS|DP-FA|DP-HC/.test(f.ruleId)
+                      ? "Phase 3: NLP Scan"
+                      : /DP-AX/.test(f.ruleId)
+                        ? "Phase 5: A11Y Cross-Map"
+                        : /DP-FLOW|DP-OB-04/.test(f.ruleId)
+                          ? "Phase 6: Flow Analysis"
+                          : "Other";
+    findingsByPhase[phase] = (findingsByPhase[phase] || 0) + 1;
+  }
+
+  return {
+    findings,
+    ethicsScore,
+    principleScores,
+    categoryBreakdown,
+    consentIntegrity,
+    choiceSymmetry,
+    manipulationIndex,
+    totalFindings: findings.length,
+    findingsBySeverity,
+    pagesScanned,
+    regulatoryRisks: [...regulatorySet] as DarkPatternRegulation[],
+    findingsBySource,
+    findingsByPhase,
+    complianceExemptions: 0,
+    complianceExemptionsByCategory: {},
+    coverageCapApplied,
+    funnelVerified: false,
+  };
+}
+
+const getRecommendation = (category: DarkPatternCategory): string => {
+  const recs: Record<DarkPatternCategory, string> = {
+    "interface-interference":
+      "Ensure all choice options (accept/reject) have equal visual prominence — same size, color contrast, and positioning.",
+    obstruction:
+      "Ensure opt-out/cancel flows have equal or fewer steps than opt-in/subscribe flows.",
+    sneaking:
+      "Remove all preselected opt-ins. All consent must be affirmative — require explicit user action.",
+    "forced-action":
+      "Remove forced account creation walls. Allow content access without mandatory registration.",
+    nagging:
+      "Limit interruptions to one modal/banner at a time. Respect user dismissals permanently.",
+    "scarcity-urgency":
+      "Remove or verify urgency messaging. Only display real-time availability data that is accurate and verifiable.",
+    "social-pressure":
+      "Remove or verify social proof metrics. Do not display fabricated or unverifiable activity data.",
+    "privacy-zuckering":
+      "Apply data minimization principle — only collect data necessary for the stated purpose.",
+    confirmshaming:
+      'Use neutral language for all options. "No thanks" is acceptable; guilt-inducing phrasing is not.',
+    misdirection:
+      "Ensure all options in pricing/plan comparisons have equal visual weight and clear labeling.",
+  };
+  return (
+    recs[category] ||
+    "Review and remediate this dark pattern to improve ethical design compliance."
+  );
+};
+
+const getUserImpact = (principle: EthicalPrinciple): string => {
+  const impacts: Record<EthicalPrinciple, string> = {
+    "informed-consent":
+      "Users may unknowingly agree to terms, data sharing, or subscriptions they do not want.",
+    "symmetry-of-choice":
+      "Users face unequal friction when trying to decline vs accept, biasing their decisions.",
+    transparency:
+      "Users cannot make informed decisions because costs, terms, or data practices are hidden.",
+    "user-autonomy":
+      "Users are emotionally pressured into decisions through shame, fear, or artificial urgency.",
+    "accessibility-clarity":
+      "Users with disabilities, low literacy, or elderly demographics cannot understand the flow.",
+  };
+  return impacts[principle];
+};

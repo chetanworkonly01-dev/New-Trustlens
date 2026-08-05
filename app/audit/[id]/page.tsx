@@ -619,7 +619,9 @@ function ScreenshotPanel({
                 {label}
               </span>
               <span
-                style={{display: "inline-flex", alignItems: "center", 
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
                   padding: "2px 8px",
                   borderRadius: 99,
                   background: "rgba(0,0,0,0.55)",
@@ -1023,7 +1025,6 @@ export default function AuditResultPage() {
                     // border: `1px solid ${m.color}40`,
                   }}
                 >
-                 
                   {m.label}
                 </span>
               );
@@ -1199,7 +1200,9 @@ export default function AuditResultPage() {
                     return (
                       <span
                         key={p}
-                        style={{display: "inline-flex", alignItems: "center", 
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
                           fontSize: 9,
                           padding: "2px 8px",
                           borderRadius: 99,
@@ -1291,7 +1294,9 @@ export default function AuditResultPage() {
                       </span>
                       {entry.methodology && (
                         <span
-                          style={{display: "inline-flex", alignItems: "center", 
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
                             fontSize: 9,
                             padding: "2px 8px",
                             borderRadius: 99,
@@ -1391,7 +1396,8 @@ export default function AuditResultPage() {
                       {/* methodology badge — shown on sub-steps & summaries */}
                       {entry.methodology && !isPhaseHeader && (
                         <span
-                          style={{alignItems: "center", 
+                          style={{
+                            alignItems: "center",
                             display: "inline-block",
                             marginLeft: 7,
                             verticalAlign: "middle",
@@ -1581,7 +1587,9 @@ export default function AuditResultPage() {
             )}
             {data.siteProfile && (
               <span
-                style={{display: "inline-flex", alignItems: "center", 
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
                   fontSize: 10,
                   padding: "3px 8px",
                   borderRadius: 99,
@@ -2603,15 +2611,16 @@ export default function AuditResultPage() {
                   fontWeight: 300,
                 }}
               >
-                {(a11yEnabled ? data.score.uniqueIssues ?? 0 : 0) +
+                {(a11yEnabled ? (data.score.uniqueIssues ?? 0) : 0) +
                   (dpEnabled
-                    ? data.pillarResults?.darkpatterns?.totalFindings ?? 0
+                    ? (data.pillarResults?.darkpatterns?.totalFindings ?? 0)
                     : 0) +
                   (perfEnabled
-                    ? data.pillarResults?.performance?.totalResourceIssues ?? 0
+                    ? (data.pillarResults?.performance?.totalResourceIssues ??
+                      0)
                     : 0) +
                   (privEnabled
-                    ? data.pillarResults?.privacy?.findings?.length ?? 0
+                    ? (data.pillarResults?.privacy?.findings?.length ?? 0)
                     : 0)}
               </div>
               <div
@@ -3416,7 +3425,9 @@ export default function AuditResultPage() {
                       >
                         {g.occurrenceCount > 1 && (
                           <span
-                            style={{display: "inline-flex", alignItems: "center", 
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
                               background: "rgba(123,79,187,0.12)",
                               color: "var(--offshade-text)",
                               fontSize: 10,
@@ -4373,7 +4384,9 @@ export default function AuditResultPage() {
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     <span
-                      style={{display: "inline-flex", alignItems: "center", 
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
                         fontSize: 10,
                         padding: "2px 8px",
                         borderRadius: 99,
@@ -4398,7 +4411,9 @@ export default function AuditResultPage() {
                       /{journeySteps.length} steps resolved
                     </span>
                     <span
-                      style={{display: "inline-flex", alignItems: "center", 
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
                         fontSize: 10,
                         padding: "2px 8px",
                         borderRadius: 99,
@@ -4483,7 +4498,9 @@ export default function AuditResultPage() {
                             }}
                           >
                             <span
-                              style={{display: "inline-flex", alignItems: "center", 
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
                                 fontSize: 10,
                                 fontWeight: 700,
                                 padding: "2px 8px",
@@ -4507,7 +4524,9 @@ export default function AuditResultPage() {
                             </span>
                             {wasAudited ? (
                               <span
-                                style={{display: "inline-flex", alignItems: "center", 
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
                                   fontSize: 9,
                                   padding: "2px 7px",
                                   borderRadius: 99,
@@ -4521,7 +4540,9 @@ export default function AuditResultPage() {
                               </span>
                             ) : isApproximate ? (
                               <span
-                                style={{display: "inline-flex", alignItems: "center", 
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
                                   fontSize: 9,
                                   padding: "2px 7px",
                                   borderRadius: 99,
@@ -4535,7 +4556,9 @@ export default function AuditResultPage() {
                               </span>
                             ) : (
                               <span
-                                style={{display: "inline-flex", alignItems: "center", 
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
                                   fontSize: 9,
                                   padding: "2px 7px",
                                   borderRadius: 99,
@@ -4787,9 +4810,33 @@ export default function AuditResultPage() {
            DARK PATTERNS TAB
          ══════════════════════════════════════════════════════ */}
       {activeTab === "dark-patterns" &&
-        data.pillarResults?.darkpatterns &&
         (() => {
-          const dp = data.pillarResults.darkpatterns!;
+          const dp = data.pillarResults?.darkpatterns;
+          if (!dp) {
+            return (
+              <div className="animate-fade-in">
+                <div
+                  className="glass-card"
+                  style={{ textAlign: "center", padding: 40 }}
+                >
+                  <div style={{ fontSize: 44, marginBottom: 10 }}></div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>
+                    No Dark Patterns Detected
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "var(--text-secondary)",
+                      marginTop: 6,
+                    }}
+                  >
+                    This interface appears to respect user autonomy and ethical
+                    design principles.
+                  </div>
+                </div>
+              </div>
+            );
+          }
           // Collapse duplicate findings (same ruleId on same page) into grouped entries with a count.
           const dpGroupMap = new Map<
             string,
@@ -5072,7 +5119,7 @@ export default function AuditResultPage() {
                   //       🔬 Detection Intelligence
                   //     </span>
                   //     <span
-                  //       style={{display: "inline-flex", alignItems: "center", 
+                  //       style={{display: "inline-flex", alignItems: "center",
                   //         fontSize: 10,
                   //         padding: "2px 7px",
                   //         borderRadius: 99,
@@ -5341,7 +5388,7 @@ export default function AuditResultPage() {
                   //                 )}
                   //                 <span>{pattern}</span>
                   //                 <span
-                  //                   style={{display: "inline-flex", alignItems: "center", 
+                  //                   style={{display: "inline-flex", alignItems: "center",
                   //                     background: "rgba(205,171,254,0.2)",
                   //                     borderRadius: 99,
                   //                     padding: "0 5px",
@@ -5390,7 +5437,9 @@ export default function AuditResultPage() {
                       Regulatory Compliance Context
                     </span>
                     <span
-                      style={{display: "inline-flex", alignItems: "center", 
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
                         fontSize: 10,
                         padding: "2px 7px",
                         borderRadius: 99,
@@ -5404,7 +5453,9 @@ export default function AuditResultPage() {
                       IRDAI / RBI / SEBI
                     </span>
                     <span
-                      style={{display: "inline-flex", alignItems: "center", 
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
                         marginLeft: "auto",
                         fontSize: 11,
                         fontWeight: 700,
@@ -5481,7 +5532,9 @@ export default function AuditResultPage() {
                           <span>{catIconMap[cat] || "📋"}</span>
                           <span>{catLabelMap[cat] || cat}</span>
                           <span
-                            style={{display: "inline-flex", alignItems: "center", 
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
                               background: "rgba(240,171,0,0.2)",
                               borderRadius: 99,
                               padding: "0 5px",
@@ -5637,7 +5690,7 @@ export default function AuditResultPage() {
                       background: "rgba(205,171,254,0.07)",
                       border: "1px solid rgba(205,171,254,0.2)",
                       fontSize: 11,
-                      color: "var(--pillar-dp)",
+                      color: "var(--offshade-text)",
                       display: "flex",
                       gap: 6,
                       alignItems: "center",
@@ -5656,10 +5709,10 @@ export default function AuditResultPage() {
                     style={{
                       padding: "6px 12px",
                       borderRadius: 8,
-                      background: "rgba(254,113,65,0.07)",
-                      border: "1px solid rgba(254,113,65,0.2)",
+                      background: "rgba(223, 223, 223, 0.71)",
+                      border: "1px solid rgba(236, 236, 236, 0.8)",
                       fontSize: 11,
-                      color: "#FE7141",
+                      color: "var(--offshade-text)",
                       display: "flex",
                       gap: 6,
                       alignItems: "center",
@@ -5987,7 +6040,9 @@ export default function AuditResultPage() {
                               Compliance Context
                             </span>
                             <span
-                              style={{display: "inline-flex", alignItems: "center", 
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
                                 fontSize: 9,
                                 padding: "1px 5px",
                                 borderRadius: 99,
@@ -6506,7 +6561,9 @@ export default function AuditResultPage() {
                             }}
                           >
                             <span
-                              style={{display: "inline-flex", alignItems: "center", 
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
                                 fontSize: 9,
                                 fontWeight: 700,
                                 padding: "2px 8px",
@@ -6642,7 +6699,9 @@ export default function AuditResultPage() {
                               </span>
                               {(f as any).estimatedEffort && (
                                 <span
-                                  style={{display: "inline-flex", alignItems: "center", 
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
                                     fontSize: 9,
                                     fontWeight: 700,
                                     padding: "2px 7px",
@@ -6669,7 +6728,7 @@ export default function AuditResultPage() {
                     className="glass-card"
                     style={{ textAlign: "center", padding: 40 }}
                   >
-                    <div style={{ fontSize: 44, marginBottom: 10 }}>✅</div>
+                    <div style={{ fontSize: 44, marginBottom: 10 }}></div>
                     <div style={{ fontSize: 16, fontWeight: 600 }}>
                       No Dark Patterns Detected
                     </div>
@@ -6881,7 +6940,8 @@ export default function AuditResultPage() {
                         marginTop: 2,
                       }}
                     >
-                      {perf.basePagesAudited ?? 0} crawled + {perf.targetedPagesAudited} targeted
+                      {perf.basePagesAudited ?? 0} crawled +{" "}
+                      {perf.targetedPagesAudited} targeted
                     </div>
                   )}
                 </div>
@@ -6997,7 +7057,9 @@ export default function AuditResultPage() {
                                   {ci.flagLabel}
                                 </span>
                                 <span
-                                  style={{display: "inline-flex", alignItems: "center", 
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
                                     fontSize: 9,
                                     fontWeight: 700,
                                     padding: "1px 7px",
@@ -7105,11 +7167,19 @@ export default function AuditResultPage() {
                   const isInp = m.key === "inp";
                   const color = vColor(val, m.good, m.poor);
                   const label =
-                    val === null && isInp ? "Not Measured" : vLabel(val, m.good, m.poor);
+                    val === null && isInp
+                      ? "Not Measured"
+                      : vLabel(val, m.good, m.poor);
                   const threshold =
                     val === null && isInp
                       ? "requires real user interaction"
-                      : vThreshold(val, m.good, m.poor, m.unit, m.key === "cls");
+                      : vThreshold(
+                          val,
+                          m.good,
+                          m.poor,
+                          m.unit,
+                          m.key === "cls",
+                        );
                   const pct =
                     val === null ? 0 : Math.min(100, (val / m.max) * 100);
                   const display =
@@ -7178,7 +7248,9 @@ export default function AuditResultPage() {
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <span
-                          style={{display: "inline-flex", alignItems: "center", 
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
                             fontSize: 9,
                             fontWeight: 700,
                             padding: "2px 7px",
@@ -7464,7 +7536,9 @@ export default function AuditResultPage() {
                             {Math.round(row.val)}ms
                           </span>
                           <span
-                            style={{display: "inline-flex", alignItems: "center", 
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
                               fontSize: 9,
                               fontWeight: 700,
                               padding: "2px 7px",
@@ -7516,7 +7590,9 @@ export default function AuditResultPage() {
                           {(perf.authFlow.totalRoundTripMs / 1000).toFixed(1)}s
                         </span>
                         <span
-                          style={{display: "inline-flex", alignItems: "center", 
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
                             fontSize: 9,
                             fontWeight: 700,
                             padding: "2px 8px",
@@ -7714,7 +7790,9 @@ export default function AuditResultPage() {
                                 >
                                   {p.resourceIssues.length > 0 ? (
                                     <span
-                                      style={{display: "inline-flex", alignItems: "center", 
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
                                         fontSize: 10,
                                         fontWeight: 700,
                                         padding: "2px 7px",
@@ -7797,7 +7875,9 @@ export default function AuditResultPage() {
                           }}
                         >
                           <span
-                            style={{display: "inline-flex", alignItems: "center", 
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
                               fontSize: 10,
                               fontWeight: 700,
                               padding: "2px 9px",
@@ -7854,7 +7934,9 @@ export default function AuditResultPage() {
                                         )}
                                     </span>
                                     <span
-                                      style={{display: "inline-flex", alignItems: "center", 
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
                                         marginLeft: 8,
                                         fontSize: 9,
                                         fontWeight: 700,
@@ -7968,7 +8050,9 @@ export default function AuditResultPage() {
                             }}
                           >
                             <span
-                              style={{display: "inline-flex", alignItems: "center", 
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
                                 fontSize: 11,
                                 fontWeight: 700,
                                 padding: "2px 8px",
@@ -8025,7 +8109,9 @@ export default function AuditResultPage() {
                           >
                             {r.effort && (
                               <span
-                                style={{display: "inline-flex", alignItems: "center", 
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
                                   fontSize: 9,
                                   fontWeight: 600,
                                   padding: "1px 7px",
@@ -8041,7 +8127,9 @@ export default function AuditResultPage() {
                             )}
                             {r.impact && (
                               <span
-                                style={{display: "inline-flex", alignItems: "center", 
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
                                   fontSize: 9,
                                   fontWeight: 700,
                                   padding: "1px 7px",

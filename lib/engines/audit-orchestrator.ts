@@ -9,10 +9,15 @@ import {
 import { crawlWebsite, closeCrawler } from "./crawler";
 import { scanWithAxe, PageApplicabilityHints } from "./axe-scanner";
 import { runCustomRules } from "./custom-rules";
-import { analyzePdf } from "./pdf-analyzer";
+import {
+  analyzePdf,
+  analyzePdfDarkPatterns,
+  detectDarkPatternsInPdfText,
+} from "./pdf-analyzer";
 import { analyzeWithAI, assignConfidence } from "./ai-analyzer";
 import { calculateScore, normalizeSelector } from "./scoring";
 import { generateReport } from "./report-generator";
+import type { PillarContext } from "./report-generator";
 import { runJourneyTests, runDarkPatternJourney } from "./journey-tester";
 import { runTestSuite, TEST_CASES } from "./test-runner";
 import {
@@ -1228,6 +1233,7 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
     audit.completedAt = new Date().toISOString();
     storeSet(id, audit);
   } catch (error) {
+    console.error("runPdfAudit error:", error);
     audit.status = "error";
     audit.error = error instanceof Error ? error.message : "Unknown error";
     audit.progressMessage = `Error: ${audit.error}`;
@@ -1264,8 +1270,12 @@ function deduplicateIssues(issues: AccessibilityIssue[]): AccessibilityIssue[] {
 export async function runPdfAudit(
   fileBuffer: Buffer,
   fileName: string,
+  pillars?: string[],
 ): Promise<string> {
   const id = uuidv4();
+  const enabledPillars: AuditPillar[] = (pillars || [
+    "accessibility",
+  ]) as AuditPillar[];
   const config: AuditConfig = {
     type: "pdf",
     crawlDepth: 0,
@@ -1273,6 +1283,7 @@ export async function runPdfAudit(
     includeAI: false,
     wcagLevels: ["A", "AA"],
     standard: "WCAG 2.2",
+    enabledPillars,
   };
   const audit: AuditResult = {
     id,
@@ -1298,27 +1309,64 @@ export async function runPdfAudit(
   storeSet(id, audit);
 
   try {
-    const result = await analyzePdf(fileBuffer, fileName, (msg) => {
-      audit.progressMessage = msg;
-    });
-    for (const issue of result.issues) {
-      if (!issue.confidence) issue.confidence = assignConfidence(issue);
+    const allIssues: AccessibilityIssue[] = [];
+    let pdfText = "";
+    const pillarResultPayload: PillarContext = { enabledPillars };
+    let darkPatternResult: DarkPatternResult | null = null;
+
+    if (enabledPillars.includes("accessibility")) {
+      const result = await analyzePdf(fileBuffer, fileName, (msg) => {
+        audit.progressMessage = msg;
+      });
+      pdfText = result.text;
+      for (const issue of result.issues) {
+        if (!issue.confidence) issue.confidence = assignConfidence(issue);
+      }
+      allIssues.push(...result.issues);
+    } else if (enabledPillars.includes("darkpatterns")) {
+      const result = await analyzePdf(fileBuffer, fileName, (msg) => {
+        audit.progressMessage = msg;
+      });
+      pdfText = result.text;
     }
-    audit.issues = result.issues;
-    audit.score = calculateScore(result.issues, 1);
+
+    if (enabledPillars.includes("darkpatterns")) {
+      const dpResult = analyzePdfDarkPatterns(pdfText, fileName);
+      const dpIssues = detectDarkPatternsInPdfText(pdfText, fileName);
+      allIssues.push(...dpIssues);
+      pillarResultPayload.darkpatterns = dpResult;
+      audit.pillarResults = { darkpatterns: dpResult };
+      darkPatternResult = dpResult;
+    }
+
+    audit.issues = allIssues;
+    audit.score = calculateScore(allIssues, 1);
     audit.score.testsRun = 0;
     audit.score.testsPassed = 0;
     audit.score.testsFailed = 0;
     audit.report = generateReport(
       id,
-      result.issues,
+      allIssues,
       audit.score,
-      [{ url: fileName, title: result.metadata.title || fileName }],
+      [{ url: fileName, title: fileName }],
       undefined,
       undefined,
       [],
       "AA",
-      { enabledPillars: ["accessibility"] },
+      pillarResultPayload,
+    );
+
+    audit.trustScore = calculateTrustScore(
+      {
+        overall: audit.score.overall,
+        totalIssues: audit.score.totalIssues,
+        uniqueIssues: audit.score.uniqueIssues,
+        issueBySeverity: audit.score.issueBySeverity,
+      },
+      darkPatternResult,
+      null,
+      null,
+      enabledPillars,
     );
     audit.status = "complete";
     audit.progress = 100;
