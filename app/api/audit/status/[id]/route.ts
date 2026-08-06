@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAudit } from '@/lib/engines/audit-orchestrator';
+import { getAuditAsync } from '@/lib/engines/audit-orchestrator';
+import { getSessionFromCookiesAsync } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSessionFromCookiesAsync(request);
+  const userId = session?.user?.id;
+
   const { id } = await params;
-  const audit = getAudit(id);
+  const audit = await getAuditAsync(id);
 
   if (!audit) {
     return NextResponse.json({ error: 'Audit not found' }, { status: 404 });
+  }
+
+  if (userId && audit.config.userId && audit.config.userId !== userId) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
 
   // Always return full audit state so the UI can render in-progress and complete views

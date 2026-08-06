@@ -313,8 +313,17 @@ export async function deleteAuditAsync(id: string): Promise<boolean> {
   return false;
 }
 
-export async function deleteAllAuditsAsync(): Promise<boolean> {
-  activeCache.clear();
+export async function deleteAllAuditsAsync(userId?: string): Promise<boolean> {
+  // Clear in-memory cache
+  if (!userId) {
+    activeCache.clear();
+  } else {
+    for (const [id, audit] of activeCache) {
+      if (audit.config?.userId === userId) {
+        activeCache.delete(id);
+      }
+    }
+  }
 
   for (const timeoutId of pendingFlush.values()) {
     clearTimeout(timeoutId);
@@ -323,15 +332,31 @@ export async function deleteAllAuditsAsync(): Promise<boolean> {
 
   if (STORAGE_MODE === "database") {
     try {
-      return await dbDeleteAllAudits();
+      return await dbDeleteAllAudits(userId);
     } catch (err) {
       console.error('[AuditStore] Database delete all failed:', err);
     }
   }
 
   try {
-    fs.rmSync(DATA_DIR, { recursive: true, force: true });
-    ensureDataDir();
+    if (userId) {
+      // File-based: filter by userId in config
+      const files = fs.readdirSync(DATA_DIR).filter((f) => f.endsWith(".json"));
+      for (const file of files) {
+        try {
+          const data = fs.readFileSync(path.join(DATA_DIR, file), "utf-8");
+          const audit = JSON.parse(data) as AuditResult;
+          if (audit.config?.userId === userId) {
+            fs.unlinkSync(path.join(DATA_DIR, file));
+          }
+        } catch {
+          /* skip corrupted files */
+        }
+      }
+    } else {
+      fs.rmSync(DATA_DIR, { recursive: true, force: true });
+      ensureDataDir();
+    }
     return true;
   } catch (err) {
     console.error(`[AuditStore] File delete all failed:`, err);

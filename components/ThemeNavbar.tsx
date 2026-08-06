@@ -14,7 +14,7 @@ export default function ThemeNavbar() {
   useEffect(() => {
     const fetchAudits = async () => {
       try {
-        const res = await fetch("/api/audit/list");
+        const res = await fetch("/api/audit/list", { credentials: "include" });
         if (res.ok) setAudits(await res.json());
       } catch {
         /* ignore */

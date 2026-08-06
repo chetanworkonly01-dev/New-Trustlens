@@ -200,7 +200,7 @@ export default function HomePage() {
   useEffect(() => {
     const fetchAudits = async () => {
       try {
-        const res = await fetch("/api/audit/list");
+        const res = await fetch("/api/audit/list", { credentials: "include" });
         if (res.ok) setAudits(await res.json());
       } catch {
         /* ignore */
@@ -287,10 +287,13 @@ export default function HomePage() {
             marginBottom: 48,
           }}
         >
-          <Link href={user ? "/audit" : "/auth/signin?callbackUrl=/audit"} className="btn btn-primary btn-lg">
+          <Link
+            href={user ? "/audit" : "/auth/signin?callbackUrl=/audit"}
+            className="btn btn-primary btn-lg"
+          >
             Start New Audit
           </Link>
-          {user && (
+          {!loading && user && audits.length > 0 && (
             <Link href="/audit-history" className="btn btn-secondary btn-lg">
               View Audit History
             </Link>
@@ -1444,7 +1447,9 @@ export default function HomePage() {
                               return (
                                 <span
                                   key={p}
-                                  style={{display: "inline-flex", alignItems: "center", 
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
                                     fontSize: 9,
                                     padding: "1px 6px",
                                     borderRadius: 99,

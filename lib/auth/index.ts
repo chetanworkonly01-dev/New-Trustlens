@@ -1,13 +1,18 @@
 import * as crypto from 'crypto';
 import { executeQuery } from '../db';
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'trustlens-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET ||
+  (process.env.NODE_ENV === 'production'
+    ? process.env.PROD_JWT_SECRET
+    : process.env.DEV_JWT_SECRET) ||
+  'trustlens-secret-key-change-in-production';
 const JWT_EXPIRES_IN = '30d';
 
 interface SessionUser {
   id: string;
   email: string;
   name?: string;
+  role?: string;
 }
 
 interface Session {
@@ -100,10 +105,18 @@ export async function createUser(email: string, password: string, name?: string)
   }
 }
 
+// Check if any users exist (to determine if this is the first user / super admin)
+export async function userCount(): Promise<number> {
+  const result = await executeQuery<{ count: string }>(
+    `SELECT COUNT(*) as count FROM users`
+  );
+  return result.length > 0 ? parseInt(result[0].count, 10) : 0;
+}
+
 // Authenticate user
 export async function authenticateUser(email: string, password: string): Promise<SessionUser | null> {
-  const result = await executeQuery<{ id: string; email: string; name: string; password_hash: string }>(
-    `SELECT id, email, name, password_hash FROM users WHERE email = $1`,
+  const result = await executeQuery<{ id: string; email: string; name: string; password_hash: string; role: string }>(
+    `SELECT id, email, name, password_hash, role FROM users WHERE email = $1`,
     [email.toLowerCase()]
   );
 
@@ -118,13 +131,14 @@ export async function authenticateUser(email: string, password: string): Promise
     id: user.id,
     email: user.email,
     name: user.name,
+    role: user.role,
   };
 }
 
 // Get user by ID
 export async function getUserById(id: string): Promise<SessionUser | null> {
-  const result = await executeQuery<{ id: string; email: string; name: string }>(
-    `SELECT id, email, name FROM users WHERE id = $1`,
+  const result = await executeQuery<{ id: string; email: string; name: string; role: string }>(
+    `SELECT id, email, name, role FROM users WHERE id = $1`,
     [id]
   );
 
@@ -134,6 +148,7 @@ export async function getUserById(id: string): Promise<SessionUser | null> {
     id: result[0].id,
     email: result[0].email,
     name: result[0].name,
+    role: result[0].role,
   };
 }
 
@@ -201,6 +216,41 @@ export async function verifySession(token: string | undefined): Promise<SessionU
   if (!payload || !payload.userId) return null;
 
   return getUserById(payload.userId);
+}
+
+// Extract session from request cookies (for server-side use)
+export function getSessionFromCookies(request: Request): { user: SessionUser } | null {
+  const cookies = request.headers.get('cookie');
+  const tokenMatch = cookies?.match(/auth-token=([^;]+)/);
+  const token = tokenMatch ? tokenMatch[1] : undefined;
+  if (!token) return null;
+
+  const payload = verifyJWT(token) as { userId?: string } | null;
+  if (!payload || !payload.userId) return null;
+
+  // Synchronous verification - return the payload info immediately
+  // Full user lookup can be done async if needed
+  return {
+    user: {
+      id: payload.userId,
+      email: '',
+      name: undefined,
+      role: undefined,
+    },
+  };
+}
+
+// Extract session from request cookies (async version with full user lookup)
+export async function getSessionFromCookiesAsync(request: Request): Promise<{ user: SessionUser } | null> {
+  const cookies = request.headers.get('cookie');
+  const tokenMatch = cookies?.match(/auth-token=([^;]+)/);
+  const token = tokenMatch ? tokenMatch[1] : undefined;
+  if (!token) return null;
+
+  const user = await verifySession(token);
+  if (!user) return null;
+
+  return { user };
 }
 
 // Hash password utility for direct export

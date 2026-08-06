@@ -180,10 +180,11 @@ export async function setAudit(id: string, audit: AuditResult): Promise<void> {
  */
 async function upsertAuditProgress(id: string, audit: AuditResult): Promise<void> {
   await executeQuery(
-    `INSERT INTO audits (id, url, type, status, progress, progress_message, 
+    `INSERT INTO audits (id, user_id, url, type, status, progress, progress_message, 
      audit_config, score_data, started_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
      ON CONFLICT (id) DO UPDATE SET
+       user_id = EXCLUDED.user_id,
        status = EXCLUDED.status,
        progress = EXCLUDED.progress,
        progress_message = EXCLUDED.progress_message,
@@ -192,6 +193,7 @@ async function upsertAuditProgress(id: string, audit: AuditResult): Promise<void
        updated_at = NOW()`,
     [
       id,
+      audit.config?.userId || null,
       audit.config?.url || null,
       audit.config?.type || 'website',
       audit.status,
@@ -216,15 +218,13 @@ async function upsertAuditProgress(id: string, audit: AuditResult): Promise<void
  * Save full audit data (for completed audits)
  */
 async function saveFullAudit(id: string, audit: AuditResult): Promise<void> {
-  const queries = [];
-
-  // Main audit record
-  queries.push({
-    text: `INSERT INTO audits (id, url, type, status, progress, progress_message,
+  const mainAuditQuery = {
+    text: `INSERT INTO audits (id, user_id, url, type, status, progress, progress_message,
            site_profile, audit_config, score_data, crawl_coverage, trust_score,
            pillar_results, pillar_progress, audit_integrity, started_at, completed_at, error, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
            ON CONFLICT (id) DO UPDATE SET
+             user_id = EXCLUDED.user_id,
              status = EXCLUDED.status,
              progress = EXCLUDED.progress,
              progress_message = EXCLUDED.progress_message,
@@ -239,6 +239,7 @@ async function saveFullAudit(id: string, audit: AuditResult): Promise<void> {
              updated_at = NOW()`,
     params: [
       id,
+      audit.config?.userId || null,
       audit.config?.url || null,
       audit.config?.type || 'website',
       audit.status,
@@ -260,7 +261,9 @@ async function saveFullAudit(id: string, audit: AuditResult): Promise<void> {
       audit.completedAt || null,
       audit.error || null,
     ]
-  });
+  };
+
+  const queries = [mainAuditQuery];
 
   // Save pages
   if (audit.pages && audit.pages.length > 0) {
@@ -442,19 +445,40 @@ export async function deleteAudit(id: string): Promise<boolean> {
 
 /**
  * Deletes ALL audits from the cache and the database.
+ * If userId is provided, only deletes that user's audits.
  */
-export async function deleteAllAudits(): Promise<boolean> {
+export async function deleteAllAudits(userId?: string): Promise<boolean> {
   ensureDatabase();
-  
-  activeCache.clear();
-  
+
+  // Clear in-memory cache only for relevant audits
+  if (!userId) {
+    activeCache.clear();
+  } else {
+    for (const [id, audit] of activeCache) {
+      if (audit.config?.userId === userId) {
+        activeCache.delete(id);
+      }
+    }
+  }
+
   try {
-    await executeQuery(`DELETE FROM audits`);
-    await executeQuery(`DELETE FROM audit_issues`);
-    await executeQuery(`DELETE FROM audit_pages`);
-    await executeQuery(`DELETE FROM audit_test_results`);
-    await executeQuery(`DELETE FROM audit_test_logs`);
-    await executeQuery(`DELETE FROM audit_reports`);
+    if (userId) {
+      // Delete only this user's audits - need to get audit IDs first since child tables use audit_id
+      const auditIds = await executeQuery<{ id: string }>(
+        `SELECT id FROM audits WHERE user_id = $1`,
+        [userId]
+      );
+      for (const row of auditIds) {
+        await executeQuery(`DELETE FROM audits WHERE id = $1`, [row.id]);
+      }
+    } else {
+      await executeQuery(`DELETE FROM audits`);
+      await executeQuery(`DELETE FROM audit_issues`);
+      await executeQuery(`DELETE FROM audit_pages`);
+      await executeQuery(`DELETE FROM audit_test_results`);
+      await executeQuery(`DELETE FROM audit_test_logs`);
+      await executeQuery(`DELETE FROM audit_reports`);
+    }
     return true;
   } catch (err) {
     console.error('[AuditStoreDB] Failed to delete all audits:', err);

@@ -6,6 +6,7 @@ interface User {
   id: string;
   email: string;
   name?: string;
+  role?: string;
 }
 
 interface AuthContextType {
@@ -67,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
-    setUser({ id: data.user.id, email: data.user.email, name: data.user.name });
+    setUser({ id: data.user.id, email: data.user.email, name: data.user.name, role: data.user.role });
   };
 
   const signup = async (email: string, password: string, name?: string) => {
@@ -84,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
-    setUser({ id: data.user.id, email: data.user.email, name: data.user.name });
+    setUser({ id: data.user.id, email: data.user.email, name: data.user.name, role: data.user.role });
   };
 
   const signout = async () => {
