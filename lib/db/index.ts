@@ -206,6 +206,19 @@ CREATE INDEX IF NOT EXISTS idx_audit_reports_audit_id ON audit_reports(audit_id)
 CREATE INDEX IF NOT EXISTS idx_ai_learning_audit_id ON ai_learning_data(audit_id);
 CREATE INDEX IF NOT EXISTS idx_ai_learning_model_feedback ON ai_learning_data(ai_model_version, user_feedback);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+-- System settings table
+CREATE TABLE IF NOT EXISTS system_settings (
+    id SERIAL PRIMARY KEY,
+    key VARCHAR(255) UNIQUE NOT NULL,
+    value VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
+INSERT INTO system_settings (key, value)
+VALUES ('is_signup_allowed', 'false')
+ON CONFLICT (key) DO NOTHING;
 `;
 
 // Initialize the database schema

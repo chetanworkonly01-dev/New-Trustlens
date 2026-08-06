@@ -86,12 +86,17 @@ function verifyJWT(token: string): Record<string, unknown> | null {
 }
 
 // Create a new user
-export async function createUser(email: string, password: string, name?: string): Promise<{ id: string; email: string; name?: string } | null> {
+export async function createUser(
+  email: string,
+  password: string,
+  name?: string,
+  role: string = 'user'
+): Promise<{ id: string; email: string; name?: string } | null> {
   const passwordHash = hashPassword(password);
   try {
     const result = await executeQuery<{ id: string; email: string; name: string }>(
-      `INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING id, email, name`,
-      [email.toLowerCase(), name || null, passwordHash]
+      `INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name`,
+      [email.toLowerCase(), name || null, passwordHash, role]
     );
     if (result.length > 0) {
       return { id: result[0].id, email: result[0].email, name: result[0].name };
@@ -258,3 +263,29 @@ export { hashPassword, verifyPassword, generateToken, generateJWT, verifyJWT };
 
 // Export types
 export type { SessionUser, Session };
+
+// ── System Settings ──────────────────────────────────────────────────────────
+
+export async function getSetting(key: string): Promise<string | null> {
+  const result = await executeQuery<{ value: string }>(
+    `SELECT value FROM system_settings WHERE key = $1`,
+    [key]
+  );
+  return result.length > 0 ? result[0].value : null;
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  await executeQuery(
+    `INSERT INTO system_settings (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+    [key, value]
+  );
+}
+
+export async function isSignupAllowed(): Promise<boolean> {
+  const value = await getSetting('is_signup_allowed');
+  return value === 'true';
+}
+
+export async function setSignupAllowed(allowed: boolean): Promise<void> {
+  await setSetting('is_signup_allowed', allowed ? 'true' : 'false');
+}
