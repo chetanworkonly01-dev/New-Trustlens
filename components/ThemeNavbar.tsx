@@ -12,6 +12,10 @@ export default function ThemeNavbar() {
   const [audits, setAudits] = useState<Audit[]>([]);
 
   useEffect(() => {
+    setAudits([]);
+  }, [user?.id]);
+
+  useEffect(() => {
     const fetchAudits = async () => {
       try {
         const res = await fetch("/api/audit/list", { credentials: "include" });
@@ -20,8 +24,10 @@ export default function ThemeNavbar() {
         /* ignore */
       }
     };
-    fetchAudits();
-  }, []);
+    if (user?.id) {
+      fetchAudits();
+    }
+  }, [user?.id]);
 
   const handleSignOut = async () => {
     await signout();
@@ -82,6 +88,11 @@ export default function ThemeNavbar() {
               >
                 {user.name || user.email.split("@")[0]}
               </span> */}
+              {user.role === "admin" && (
+                <Link href="/admin/settings" className="navbar-link">
+                  Admin Settings
+                </Link>
+              )}
               <button
                 onClick={handleSignOut}
                 className="navbar-link"

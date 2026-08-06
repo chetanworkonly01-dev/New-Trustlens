@@ -160,6 +160,29 @@ The app resolves database and JWT secrets based on `NODE_ENV`:
 
 ---
 
+## 🔐 Authentication & Access Control
+
+### Sign In
+- Navigate to `http://localhost:3000/auth/signin`
+- Enter your email and password
+- On success you will be redirected to the dashboard
+
+### Sign Up
+- Public signup is **disabled by default**
+- When enabled, navigate to `http://localhost:3000/auth/signup` to create a new account
+- New signups are created with the **`user`** role by default
+- If signup is disabled, the signup page shows a disabled message and the API returns `403`
+
+### Enabling / Disabling Signup (Admin Only)
+1. Sign in with an **admin** account
+2. Click **Admin Settings** in the top navigation bar
+3. You will be taken to `/admin/settings`
+4. Click **Enable Sign Up** or **Disable Sign Up** to toggle public registration
+
+> **Note:** Only users with the `admin` role can access `/admin/settings`. Non-admin users are redirected to the home page.
+
+---
+
 ## 📜 Available Scripts
 | Script | Description |
 |---|---|

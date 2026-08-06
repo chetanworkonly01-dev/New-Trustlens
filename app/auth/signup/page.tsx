@@ -9,30 +9,47 @@ export default function SignUpPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isSignupAllowed, setIsSignupAllowed] = useState(false);
+  const [checking, setChecking] = useState(true);
   const router = useRouter();
-  const { signup, user, loading: authLoading } = useAuth();
+  const { signup, user } = useAuth();
 
-  // Check if the current user is an admin (for creating additional users)
   useEffect(() => {
-    if (!authLoading && user) {
-      setIsAdmin(user.role === 'admin');
-    }
-  }, [user, authLoading]);
+    const checkSetting = async () => {
+      try {
+        const res = await fetch('/api/public/settings');
+        if (res.ok) {
+          const data = await res.json();
+          setIsSignupAllowed(data.isSignupAllowed);
+        }
+      } catch {
+        setIsSignupAllowed(false);
+      } finally {
+        setChecking(false);
+      }
+    };
+    checkSetting();
+  }, []);
 
-  // If not admin and not loading, redirect to signin
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace("/auth/signin?callbackUrl=/auth/signup");
+    if (user) {
+      router.replace("/");
     }
-  }, [user, authLoading, router]);
+  }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      setLoading(false);
+      return;
+    }
 
     try {
       await signup(email, password, name);
@@ -44,8 +61,7 @@ export default function SignUpPage() {
     }
   };
 
-  // Show loading while checking auth
-  if (authLoading) {
+  if (checking) {
     return (
       <div
         style={{
@@ -77,10 +93,53 @@ export default function SignUpPage() {
     );
   }
 
-  // If we have a user but they're not an admin, show the "first user" setup
-  // If we don't have a user, the redirect useEffect will handle it
-  if (!user) {
-    return null;
+  if (!isSignupAllowed) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          minHeight: "63vh",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--gradient-bg)",
+          padding: "24px",
+        }}
+      >
+        <div style={{ width: "100%", maxWidth: "400px", textAlign: "center" }}>
+          <div
+            style={{
+              backgroundColor: "var(--bg-darkcard)",
+              boxShadow: "0 20px 60px rgba(0, 0, 0, 0.08)",
+              padding: "40px",
+            }}
+          >
+            <h1
+              style={{
+                fontSize: "24px",
+                fontWeight: 700,
+                color: "var(--text-primary)",
+                marginBottom: "12px",
+              }}
+            >
+              Sign Up Currently Disabled
+            </h1>
+            <p style={{ fontSize: "14px", color: "#6b7280", marginBottom: "24px" }}>
+              New account registration is not available at this time. Please contact your administrator.
+            </p>
+            <Link
+              href="/auth/signin"
+              style={{
+                color: "var(--kpmg-dynamic)",
+                fontWeight: 500,
+                textDecoration: "none",
+              }}
+            >
+              Back to Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -111,29 +170,12 @@ export default function SignUpPage() {
                 marginBottom: "8px",
               }}
             >
-              {isAdmin ? "Create New User" : "Create First Account"}
+              Create Account
             </h1>
             <p style={{ fontSize: "14px", color: "#6b7280" }}>
-              {isAdmin
-                ? "Add a new user to the system"
-                : "Set up your admin account to get started"}
+              Sign up to access TrustLens
             </p>
           </div>
-
-          {!isAdmin && (
-            <div
-              style={{
-                marginBottom: "24px",
-                padding: "16px",
-                backgroundColor: "rgba(59, 130, 246, 0.1)",
-                borderRadius: "8px",
-                fontSize: "14px",
-                color: "var(--kpmg-dynamic)",
-              }}
-            >
-              Note: You are creating the first account which will have administrator privileges.
-            </div>
-          )}
 
           {error && (
             <div
@@ -152,49 +194,46 @@ export default function SignUpPage() {
 
           <form
             onSubmit={handleSubmit}
-            style={{ display: "flex", flexDirection: "column", gap: "28px" }}
+            style={{ display: "flex", flexDirection: "column", gap: "20px" }}
           >
-            {!isAdmin && (
-              <div>
-                <label
-                  htmlFor="name"
-                  style={{
-                    display: "block",
-                    fontSize: "16px",
-                    fontWeight: 500,
-                    color: "var(--text-primary)",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="John Doe"
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    border: "1px solid var(--border)",
-                    fontSize: "15px",
-                    outline: "none",
-                    transition: "border-color 0.2s, box-shadow 0.2s",
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = "var(--kpmg-dynamic)";
-                    e.target.style.boxShadow =
-                      "0 0 0 3px rgba(59, 130, 246, 0.2)";
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = "var(--border)";
-                    e.target.style.boxShadow = "none";
-                  }}
-                />
-              </div>
-            )}
+            <div>
+              <label
+                htmlFor="name"
+                style={{
+                  display: "block",
+                  fontSize: "16px",
+                  fontWeight: 500,
+                  color: "var(--text-primary)",
+                  marginBottom: "6px",
+                }}
+              >
+                Full Name
+              </label>
+              <input
+                type="text"
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="John Doe"
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  border: "1px solid var(--border)",
+                  fontSize: "15px",
+                  outline: "none",
+                  transition: "border-color 0.2s, box-shadow 0.2s",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "var(--kpmg-dynamic)";
+                  e.target.style.boxShadow =
+                    "0 0 0 3px rgba(59, 130, 246, 0.2)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "var(--border)";
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+            </div>
 
             <div>
               <label
@@ -275,16 +314,47 @@ export default function SignUpPage() {
                   e.target.style.boxShadow = "none";
                 }}
               />
-              <p
+            </div>
+
+            <div>
+              <label
+                htmlFor="confirmPassword"
                 style={{
-                  marginTop: "8px",
-                  fontSize: "13px",
-                  color: "#9ca3af",
+                  display: "block",
+                  fontSize: "16px",
+                  fontWeight: 500,
+                  color: "var(--text-primary)",
+                  marginBottom: "6px",
                 }}
               >
-                Must contain at least one uppercase letter, one lowercase
-                letter, and one number
-              </p>
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                id="confirmPassword"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm your password"
+                required
+                minLength={8}
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  border: "1px solid var(--border)",
+                  fontSize: "15px",
+                  outline: "none",
+                  transition: "border-color 0.2s, box-shadow 0.2s",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "var(--kpmg-dynamic)";
+                  e.target.style.boxShadow =
+                    "0 0 0 3px rgba(59, 130, 246, 0.2)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "var(--border)";
+                  e.target.style.boxShadow = "none";
+                }}
+              />
             </div>
 
             <button
@@ -300,39 +370,28 @@ export default function SignUpPage() {
                 fontWeight: 600,
                 opacity: loading ? 0.6 : 1,
                 transition: "background-color 0.2s",
-              }}
-              onMouseEnter={(e) => {
-                if (!loading) {
-                  (e.target as HTMLButtonElement).style.cursor = "pointer";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!loading) {
-                  (e.target as HTMLButtonElement).style.cursor = "default";
-                }
+                cursor: loading ? "default" : "pointer",
               }}
             >
-              {loading ? "Creating account..." : isAdmin ? "Create User" : "Create Admin Account"}
+              {loading ? "Creating account..." : "Create Account"}
             </button>
           </form>
 
-          {isAdmin && (
-            <div style={{ marginTop: "32px", textAlign: "center" }}>
-              <p style={{ fontSize: "14px", color: "#6b7280" }}>
-                <Link
-                  href="/"
-                  style={{
-                    color: "var(--kpmg-dynamic)",
-                    fontWeight: 500,
-                    textDecoration: "none",
-                    transition: "color 0.2s",
-                  }}
-                >
-                  Back to Dashboard
-                </Link>
-              </p>
-            </div>
-          )}
+          <div style={{ marginTop: "24px", textAlign: "center" }}>
+            <p style={{ fontSize: "14px", color: "#6b7280" }}>
+              Already have an account?{" "}
+              <Link
+                href="/auth/signin"
+                style={{
+                  color: "var(--kpmg-dynamic)",
+                  fontWeight: 500,
+                  textDecoration: "none",
+                }}
+              >
+                Sign in
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

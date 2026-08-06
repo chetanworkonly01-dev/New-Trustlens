@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createUser } from '@/lib/auth';
+import { createUser, isSignupAllowed } from '@/lib/auth';
 import { z } from 'zod';
 
 const signupSchema = z.object({
@@ -10,6 +10,14 @@ const signupSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const allowed = await isSignupAllowed();
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Sign up is currently disabled' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const result = signupSchema.safeParse(body);
 
@@ -22,7 +30,7 @@ export async function POST(request: Request) {
 
     const { email, password, name } = result.data;
 
-    const user = await createUser(email, password, name);
+    const user = await createUser(email, password, name, 'user');
 
     if (!user) {
       return NextResponse.json(
