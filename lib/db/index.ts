@@ -6,7 +6,11 @@
  */
 import { Pool } from 'pg';
 
-const connectionString = process.env.DATABASE_URL || '';
+const connectionString = process.env.DATABASE_URL ||
+  (process.env.NODE_ENV === 'production'
+    ? process.env.DATABASE_PROD_URL
+    : process.env.DATABASE_DEV_URL) ||
+  '';
 
 if (!connectionString) {
   console.error('[TrustLens DB] DATABASE_URL is not configured. Database storage will not work.');
@@ -48,6 +52,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(255),
     password_hash TEXT,
+    role VARCHAR(20) DEFAULT 'user' NOT NULL,
     reset_token TEXT,
     reset_token_expiry TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW() NOT NULL,
@@ -200,6 +205,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_test_logs_audit_id ON audit_test_logs(audit
 CREATE INDEX IF NOT EXISTS idx_audit_reports_audit_id ON audit_reports(audit_id);
 CREATE INDEX IF NOT EXISTS idx_ai_learning_audit_id ON ai_learning_data(audit_id);
 CREATE INDEX IF NOT EXISTS idx_ai_learning_model_feedback ON ai_learning_data(ai_model_version, user_feedback);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 `;
 
 // Initialize the database schema

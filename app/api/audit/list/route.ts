@@ -1,13 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getAllAuditsAsync } from "@/lib/store/audit-store";
+import { getSessionFromCookiesAsync } from "@/lib/auth";
 import type { AuditResult } from "@/lib/types/audit";
 
 export const dynamic = "force-dynamic";
 
 type PillarResults = NonNullable<AuditResult["pillarResults"]>;
 
-export async function GET() {
-  const audits = await getAllAuditsAsync();
+export async function GET(request: NextRequest) {
+  const session = await getSessionFromCookiesAsync(request);
+  const userId = session?.user?.id;
+  const audits = await getAllAuditsAsync(userId);
   const summary = audits.map((a) => {
     const pillars: string[] = (a.config as { enabledPillars?: string[] }).enabledPillars || [];
     const pillarResults = a.pillarResults as PillarResults | undefined;

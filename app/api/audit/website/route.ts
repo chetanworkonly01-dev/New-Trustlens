@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runWebsiteAudit } from '@/lib/engines/audit-orchestrator';
+import { getSessionFromCookiesAsync } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getSessionFromCookiesAsync(request);
+    const userId = session?.user?.id;
+
     const body = await request.json();
     const {
       url, loginConfig,
@@ -47,7 +51,8 @@ export async function POST(request: NextRequest) {
       journeySteps: Array.isArray(journeySteps) ? journeySteps : undefined,
       aiDirection: aiDirection || undefined,
       performanceProblemContext: performanceProblemContext || undefined,
-    });
+      userId,
+    }, userId);
 
     return NextResponse.json({ auditId, status: 'started' });
   } catch (error) {

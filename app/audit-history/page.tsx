@@ -27,6 +27,20 @@ export default function AuditHistoryPage() {
     }
   }, [user, authLoading, router]);
 
+  useEffect(() => {
+    if (!user) return;
+    const fetchAudits = async () => {
+      try {
+        const res = await fetch("/api/audit/list", { credentials: "include" });
+        if (res.ok) setAudits(await res.json());
+      } catch {
+        /* ignore */
+      }
+      setLoading(false);
+    };
+    fetchAudits();
+  }, [user]);
+
   if (authLoading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -37,19 +51,6 @@ export default function AuditHistoryPage() {
       </div>
     );
   }
-
-  useEffect(() => {
-    const fetchAudits = async () => {
-      try {
-        const res = await fetch("/api/audit/list");
-        if (res.ok) setAudits(await res.json());
-      } catch {
-        /* ignore */
-      }
-      setLoading(false);
-    };
-    fetchAudits();
-  }, []);
 
   const running = audits.filter(
     (a) => a.status !== "complete" && a.status !== "error",

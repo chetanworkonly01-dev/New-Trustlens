@@ -62,3 +62,114 @@ KPMG TrustLens doesn't just evaluate design — it embodies premium design.
 * **Platform:** Railway (Docker-based)
 * **Health Check:** `GET /api/health`
 * **Data Store:** File-backed JSON with persistent volume (PostgreSQL upgrade path available)
+
+---
+
+## 🏃 Getting Started
+
+### Prerequisites
+- **Node.js** 18+
+- **npm** (comes with Node.js)
+- **PostgreSQL** database (Neon, Supabase, or local)
+
+### 1. Clone and Install
+```bash
+git clone <repo-url>
+cd New-Trustlens
+npm install
+```
+
+### 2. Set Up Environment Files
+Copy the appropriate environment file and fill in your values:
+
+```bash
+# For local development
+cp .env.local.dev .env.local
+
+# For production
+cp .env.production .env.production.local
+```
+
+### 3. Configure Database
+Update the database connection URL in your `.env.local`:
+```
+DATABASE_DEV_URL=postgresql://user:password@host:port/database?sslmode=require
+```
+
+### 4. Run Database Migrations
+```bash
+# Add role column (if first time)
+npm run migrate:role
+
+# Migrate existing audits (if upgrading from file storage)
+npm run migrate:audits
+```
+
+### 5. Start the Development Server
+```bash
+# Local development with dev database
+npm run dev:local
+
+# Or default dev (uses DATABASE_URL from .env.local)
+npm run dev
+```
+
+The app runs at `http://localhost:3000`.
+
+### 6. Build for Production
+```bash
+npm run build:prod
+npm run start:prod
+```
+
+---
+
+## 🔑 Environment Variables
+
+### `.env.local` (Local Development)
+| Variable | Description | Example |
+|---|---|---|
+| `DATABASE_DEV_URL` | Dev database connection string | `postgresql://user:pass@host:port/db?sslmode=require` |
+| `DATABASE_URL` | Active database URL (set to `DATABASE_DEV_URL`) | Same as `DATABASE_DEV_URL` |
+| `STORAGE_MODE` | Storage mode: `database` or `file` | `database` |
+| `OPENAI_API_KEY` | OpenAI API key for AI analysis | `sk-...` |
+| `NEXTAUTH_URL` | App URL for auth | `http://localhost:3000` |
+| `NEXTAUTH_SECRET` | NextAuth secret key | `your-secret` |
+| `JWT_SECRET` | JWT signing secret | `dev-jwt-secret-key` |
+| `NODE_ENV` | Environment | `development` |
+
+### `.env.production` (Production)
+| Variable | Description | Example |
+|---|---|---|
+| `DATABASE_PROD_URL` | Production database connection string | `postgresql://user:pass@host:port/db?sslmode=require` |
+| `DATABASE_URL` | Active database URL (set to `DATABASE_PROD_URL`) | Same as `DATABASE_PROD_URL` |
+| `STORAGE_MODE` | Storage mode: `database` or `file` | `database` |
+| `OPENAI_API_KEY` | OpenAI API key for AI analysis | `sk-...` |
+| `NEXTAUTH_URL` | App URL for auth | `https://yourdomain.com` |
+| `NEXTAUTH_SECRET` | NextAuth secret key | `your-prod-secret` |
+| `JWT_SECRET` | JWT signing secret | `prod-jwt-secret-key` |
+| `NODE_ENV` | Environment | `production` |
+
+### Environment Resolution
+The app resolves database and JWT secrets based on `NODE_ENV`:
+
+- **`npm run dev:local`** → Uses `DATABASE_DEV_URL` and `JWT_SECRET` from `.env.local.dev`
+- **`npm run build:prod`** → Uses `DATABASE_PROD_URL` and `JWT_SECRET` from `.env.production`
+- **Fallback chain for DB URL:** `DATABASE_URL` → `DATABASE_PROD_URL` (prod) → `DATABASE_DEV_URL` (dev)
+- **Fallback chain for JWT:** `JWT_SECRET` → `PROD_JWT_SECRET` (prod) → `DEV_JWT_SECRET` (dev)
+
+---
+
+## 📜 Available Scripts
+| Script | Description |
+|---|---|
+| `npm run dev` | Start dev server (default) |
+| `npm run dev:local` | Start dev server with local dev env |
+| `npm run build` | Build for production |
+| `npm run build:prod` | Build with production env |
+| `npm run start` | Start production server |
+| `npm run start:prod` | Start with production env |
+| `npm run lint` | Run ESLint |
+| `npm run test-db` | Test database connection |
+| `npm run migrate:audits` | Migrate existing JSON audits to DB |
+| `npm run migrate:role` | Add role column to users table |

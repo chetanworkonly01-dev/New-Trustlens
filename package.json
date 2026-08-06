@@ -4,11 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:local": "set NODE_ENV=development && next dev",
     "build": "next build",
+    "build:prod": "set NODE_ENV=production && next build",
     "start": "next start",
+    "start:prod": "set NODE_ENV=production && next start",
     "lint": "eslint",
     "test-db": "tsx scripts/test-db.ts",
-    "migrate:audits": "tsx --env-file=.env.local scripts/migrate-audits.ts"
+    "migrate:audits": "tsx --env-file=.env.local scripts/migrate-audits.ts",
+    "migrate:role": "tsx --env-file=.env.local scripts/migrate-role.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
