@@ -1,7 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Audit } from "../lib/types";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   PILLAR_META,
   TRUST_COLORS,
@@ -151,6 +153,8 @@ export default function HomePage() {
   const [audits, setAudits] = useState<Audit[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAllCompleted, setShowAllCompleted] = useState(false);
+  const router = useRouter();
+  const { user } = useAuth();
 
   // --- Typewriter Effect State ---
   const [wordIndex, setWordIndex] = useState(0);
@@ -283,9 +287,14 @@ export default function HomePage() {
             marginBottom: 48,
           }}
         >
-          <Link href="/audit" className="btn btn-primary btn-lg">
+          <Link href={user ? "/audit" : "/auth/signin?callbackUrl=/audit"} className="btn btn-primary btn-lg">
             Start New Audit
           </Link>
+          {user && (
+            <Link href="/audit-history" className="btn btn-secondary btn-lg">
+              View Audit History
+            </Link>
+          )}
           {/* {audits.length > 0 && (
             <a href="#audits" className="btn btn-secondary btn-lg">
               View Audit History

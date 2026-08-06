@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import Image from "next/image";
 import {
   RadarChart,
@@ -2023,6 +2024,8 @@ function ResourceIssueBadge({ severity }: { severity: string }) {
 export default function FinalReportPage() {
   const params = useParams();
   const id = params.id as string;
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<AuditData | null>(null);
   const [activeTab, setActiveTab] = useState("executive");
   const [statusMap, setStatusMap] = useState<Record<string, IssueStatus>>({});
@@ -2049,6 +2052,24 @@ export default function FinalReportPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Auth check - redirect to signin if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/auth/signin?callbackUrl=" + encodeURIComponent(window.location.pathname));
+    }
+  }, [user, authLoading, router]);
+
+  if (authLoading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!data)
     return (

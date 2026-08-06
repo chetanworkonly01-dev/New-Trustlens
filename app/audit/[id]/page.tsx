@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ===== TYPE INTERFACES =====
 interface AuditData {
@@ -778,6 +779,8 @@ function ScoreGauge({ score }: { score: number }) {
 export default function AuditResultPage() {
   const params = useParams();
   const id = params.id as string;
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<AuditData | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [tabInitialized, setTabInitialized] = useState(false);
@@ -794,6 +797,24 @@ export default function AuditResultPage() {
     "developer" | "designer" | "legal"
   >("developer");
   const logEndRef = useRef<HTMLDivElement>(null);
+
+  // Auth check - redirect to signin if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/auth/signin?callbackUrl=" + encodeURIComponent(window.location.pathname));
+    }
+  }, [user, authLoading, router]);
+
+  if (authLoading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleExport = async (format: "docx" | "pdf" | "pptx") => {
     setExportLoading(format);

@@ -1,12 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { deleteAllAudits } from "../../../lib/store/audit-store";
+import { deleteAllAuditsAsync } from "@/lib/store/audit-store";
 
 type ResponseData = {
   message: string;
   success: boolean;
 };
 
-export default function handler(
+export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ResponseData>,
 ) {
@@ -20,7 +20,7 @@ export default function handler(
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
 
-    const success = deleteAllAudits();
+    const success = await deleteAllAuditsAsync();
     if (success) {
       return res.status(200).json({
         message: "All audit history has been cleared.",

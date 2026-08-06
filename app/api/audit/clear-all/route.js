@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { deleteAllAudits } from "@/lib/store/audit-store";
+import { deleteAllAuditsAsync } from "@/lib/store/audit-store";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export async function GET() {
     "✅ [App Router] Attempting to hit /api/audits/clear-all endpoint.",
   );
 
-  const success = deleteAllAudits();
+  const success = await deleteAllAuditsAsync();
 
   if (success) {
     return NextResponse.json({
