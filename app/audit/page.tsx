@@ -1,6 +1,8 @@
 "use client";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import AuthGuard from "@/components/Auth/AuthGuard";
 
 const STANDARDS = [
   {
@@ -107,7 +109,7 @@ const PREDEFINED_JOURNEYS: PredefinedJourneyTemplate[] = [
       {
         id: crypto.randomUUID(),
         label: "Post-Auth Dashboard",
-        url: "/dashboard",
+        url: "/",
         action: "Verify no forced upgrades or dark patterns after login",
       },
     ],
@@ -2095,13 +2097,32 @@ const PREDEFINED_JOURNEYS: PredefinedJourneyTemplate[] = [
       },
     ],
   },
-];
+ ];
+ 
+ export default function AuditPage() {
+    const router = useRouter();
+    const fileRef = useRef<HTMLInputElement>(null);
+    const { user, loading: authLoading } = useAuth();
+    const imageRef = useRef<HTMLInputElement>(null);
+    const videoRef = useRef<HTMLInputElement>(null);
 
-export default function AuditPage() {
-  const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const imageRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLInputElement>(null);
+    // Redirect to sign in if not authenticated
+    useEffect(() => {
+      if (!authLoading && !user) {
+        router.replace("/auth/signin?callbackUrl=/audit");
+      }
+    }, [user, authLoading, router]);
+
+    if (authLoading || !user) {
+      return (
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      );
+    }
 
   const [tab, setTab] = useState<"website" | "pdf" | "image" | "video">(
     "website",

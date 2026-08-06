@@ -1,7 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Audit } from "../../lib/types";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   PILLAR_META,
   TRUST_COLORS,
@@ -16,6 +18,25 @@ export default function AuditHistoryPage() {
   const [audits, setAudits] = useState<Audit[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAllCompleted, setShowAllCompleted] = useState(false);
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/auth/signin?callbackUrl=/audit-history");
+    }
+  }, [user, authLoading, router]);
+
+  if (authLoading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     const fetchAudits = async () => {

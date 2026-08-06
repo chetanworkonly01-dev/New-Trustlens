@@ -2,9 +2,9 @@ import {
   AuditConfig,
   AuditResult,
   AccessibilityIssue,
-  PageData,
   CrawlCoverage,
   TestLogEntry,
+  JourneyTestResult,
 } from "../types/audit";
 import { crawlWebsite, closeCrawler } from "./crawler";
 import { scanWithAxe, PageApplicabilityHints } from "./axe-scanner";
@@ -20,12 +20,27 @@ import { generateReport } from "./report-generator";
 import type { PillarContext } from "./report-generator";
 import { runJourneyTests, runDarkPatternJourney } from "./journey-tester";
 import { runTestSuite, TEST_CASES } from "./test-runner";
+
+// uuid replacement
+const uuidv4 = (): string => crypto.randomUUID();
+
+import { initDatabase } from "../store/audit-store";
 import {
   getAudit as storeGet,
-  setAudit as storeSet,
-  getAllAudits as storeGetAll,
+  setAuditSync as storeSetSync,
+  setAuditAsync as storeSetAsync,
+  getAllAuditsSync as storeGetAllSync,
+  getAllAuditsAsync as storeGetAllAsync,
 } from "../store/audit-store";
-const uuidv4 = (): string => crypto.randomUUID();
+
+let databaseInitialized = false;
+
+async function ensureDatabaseReady(): Promise<void> {
+  if (!databaseInitialized) {
+    await initDatabase();
+    databaseInitialized = true;
+  }
+}
 // ── TrustLens Pillar Engines ──
 import { runDarkPatternAudit } from "./darkpattern-engine";
 import { runPerformanceAudit } from "./performance-engine";
@@ -222,8 +237,16 @@ export function getAudit(id: string): AuditResult | undefined {
   return storeGet(id);
 }
 
+export async function getAuditAsync(id: string): Promise<AuditResult | undefined> {
+  return storeGet(id);
+}
+
 export function getAllAudits(): AuditResult[] {
-  return storeGetAll();
+  return storeGetAllSync();
+}
+
+export async function getAllAuditsAsync(userId?: string): Promise<AuditResult[]> {
+  return storeGetAllAsync(userId);
 }
 
 function createEmptyScore() {
@@ -247,7 +270,8 @@ function createEmptyScore() {
   };
 }
 
-export async function runWebsiteAudit(config: AuditConfig): Promise<string> {
+export async function runWebsiteAudit(config: AuditConfig, userId?: string): Promise<string> {
+  ensureDatabaseReady();
   const id = uuidv4();
   const audit: AuditResult = {
     id,
@@ -263,7 +287,15 @@ export async function runWebsiteAudit(config: AuditConfig): Promise<string> {
     inapplicableCriteria: [],
     startedAt: new Date().toISOString(),
   };
-  storeSet(id, audit);
+  
+  // Store user ID in config for database association
+  if (userId) {
+    audit.config.userId = userId;
+  }
+  
+  storeSetSync(id, audit);
+  // Also asynchronously persist to database
+  storeSetAsync(id, audit).catch(console.error);
 
   // Run pipeline with a 15-minute global timeout so audits never spin forever
   const TIMEOUT_MS = 15 * 60 * 1000;
@@ -279,7 +311,8 @@ export async function runWebsiteAudit(config: AuditConfig): Promise<string> {
       a.status = "error";
       a.error = err.message;
       a.progressMessage = `Error: ${err.message}`;
-      storeSet(id, a);
+      storeSetSync(id, a);
+      storeSetAsync(id, a).catch(console.error);
     }
   });
 
@@ -298,19 +331,19 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
   const updateProgress = (msg: string, pct: number) => {
     audit.progressMessage = msg;
     audit.progress = pct;
-    storeSet(id, audit); // ensure polling always sees fresh progress
+    storeSetSync(id, audit); // ensure polling always sees fresh progress
   };
 
   const addLog = (entry: TestLogEntry) => {
     audit.testLog.push(entry);
     if (entry.status === "running") audit.progressMessage = entry.message;
-    storeSet(id, audit);
+    storeSetSync(id, audit);
   };
 
   // Aggregate N/A and pass data across all pages
   const allInapplicable = new Set<string>();
   const allPassed = new Set<string>();
-  let mergedApplicabilityHints: PageApplicabilityHints = {
+  const mergedApplicabilityHints: PageApplicabilityHints = {
     hasMedia: false,
     hasForms: false,
     hasTimedContent: false,
@@ -439,7 +472,7 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
       crawlResult.pages[0]?.html,
     );
 
-    let journeyResult: { journeyResults: any[]; issues: any[] } = {
+    let journeyResult: { journeyResults: JourneyTestResult[]; issues: AccessibilityIssue[] } = {
       journeyResults: [],
       issues: [],
     };
@@ -678,7 +711,7 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
 
     const failedPillars: string[] = [];
     audit.pillarProgress = { accessibility: a11yEnabled ? 100 : undefined };
-    storeSet(id, audit);
+    storeSetSync(id, audit);
 
     // Helper: update per-pillar progress
     // Also maps dark pattern pillar progress (0–100) → overall audit progress (87–97)
@@ -696,7 +729,7 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
             ? `Dark Pattern Engine: ${pct}% complete...`
             : "Dark pattern scan complete — building report...";
       }
-      storeSet(id, audit);
+      storeSetSync(id, audit);
     };
 
     let darkPatternResult: DarkPatternResult | null = null;
@@ -1231,13 +1264,13 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
     audit.progress = 100;
     audit.progressMessage = "Audit complete!";
     audit.completedAt = new Date().toISOString();
-    storeSet(id, audit);
+    storeSetSync(id, audit);
   } catch (error) {
     console.error("runPdfAudit error:", error);
     audit.status = "error";
     audit.error = error instanceof Error ? error.message : "Unknown error";
     audit.progressMessage = `Error: ${audit.error}`;
-    storeSet(id, audit);
+    storeSetSync(id, audit);
   }
 }
 
@@ -1306,7 +1339,7 @@ export async function runPdfAudit(
     inapplicableCriteria: [],
     startedAt: new Date().toISOString(),
   };
-  storeSet(id, audit);
+  storeSetSync(id, audit);
 
   try {
     const allIssues: AccessibilityIssue[] = [];
@@ -1371,11 +1404,11 @@ export async function runPdfAudit(
     audit.status = "complete";
     audit.progress = 100;
     audit.completedAt = new Date().toISOString();
-    storeSet(id, audit);
+    storeSetSync(id, audit);
   } catch (error) {
     audit.status = "error";
     audit.error = error instanceof Error ? error.message : "Unknown error";
-    storeSet(id, audit);
+    storeSetSync(id, audit);
   }
 
   return id;

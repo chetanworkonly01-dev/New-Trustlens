@@ -46,6 +46,8 @@ export interface AuditConfig {
   aiDirection?: string;
   // ── Performance Problem Context (client-reported issues) ──
   performanceProblemContext?: import("./performance").PerformanceProblemContext;
+  // ── User ID for database association (future auth) ──
+  userId?: string;
 }
 
 export interface PageData {
