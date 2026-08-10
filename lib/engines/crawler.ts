@@ -213,9 +213,14 @@ export async function crawlWebsite(options: CrawlOptions): Promise<CrawlResult> 
 
     if (batch.length === 0) continue;
 
+    const currentProg = 15 + Math.round((pages.length / maxPages) * 35);
+    const firstUrl = batch[0]?.url || baseUrl.href;
+    onProgress?.(`Crawling page ${pages.length + 1}/${maxPages}: ${firstUrl}`, currentProg);
+
     const results = await Promise.allSettled(
       batch.map(item => crawlSinglePage(context, item, baseUrl, crawlDepth))
     );
+
 
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
@@ -307,8 +312,9 @@ async function crawlSinglePage(
   try {
     await page.waitForTimeout(500 + Math.random() * 1500);
 
-    const response = await page.goto(item.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForLoadState('networkidle', { timeout: 12000 }).catch(() => {});
+    const response = await page.goto(item.url, { waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => null);
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
 
     const finalUrl = page.url();
     const statusCode = response?.status() ?? 200;
@@ -461,16 +467,15 @@ async function injectExternalCSS(html: string, baseUrl: string): Promise<string>
   while ((m = hrefRe.exec(html)) !== null) cssUrls.push(m[1]);
 
   const resolved = [...new Set(cssUrls)]
-    .slice(0, 10)
+    .slice(0, 5)
     .map(u => { try { return new URL(u, baseUrl).href; } catch { return null; } })
     .filter((u): u is string => !!u && /^https?:\/\//.test(u));
 
-  // Fetch every CSS file via Node.js (no size limit, no CORS restriction, direct CDN access)
-  let combinedCss = '';
-  for (const cssUrl of resolved) {
+  // Fetch CSS files in parallel via Node.js with 2s timeout
+  const cssPromises = resolved.map(async (cssUrl) => {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
+      const timer = setTimeout(() => controller.abort(), 2000);
       const res = await fetch(cssUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -479,21 +484,25 @@ async function injectExternalCSS(html: string, baseUrl: string): Promise<string>
         },
         signal: controller.signal,
       }).finally(() => clearTimeout(timer));
+
       if (res.ok) {
         const css = await res.text();
-        // Fix relative url() paths inside this CSS file to absolute URLs
         const cssBase = new URL(cssUrl);
-        const fixedCss = css.replace(
+        return css.replace(
           /url\(['"]?(?!data:|https?:|#)([^'")]+)['"]?\)/gi,
           (match: string, relPath: string) => {
             try { return `url("${new URL(relPath.trim(), cssBase.href).href}")`; }
             catch { return match; }
           }
         );
-        combinedCss += `\n/* === ${cssUrl} === */\n${fixedCss}\n`;
       }
-    } catch { /* skip unreachable CSS files */ }
-  }
+    } catch { /* skip unreachable CSS */ }
+    return '';
+  });
+
+  const fetchedCss = await Promise.all(cssPromises);
+  const combinedCss = fetchedCss.join('\n');
+
 
   // Minimal fallback for any elements not covered by the fetched CSS
   const fallback = `
@@ -676,32 +685,36 @@ async function discoverAllLinks(page: Page, baseOrigin: string): Promise<Discove
 
 async function discoverFromSitemap(context: BrowserContext, origin: string): Promise<string[]> {
   const urls: string[] = [];
-  const page = await context.newPage();
+  const sitemapUrls = [`${origin}/sitemap.xml`, `${origin}/sitemap_index.xml`, `${origin}/sitemap/sitemap.xml`];
 
-  try {
-    const sitemapUrls = [`${origin}/sitemap.xml`, `${origin}/sitemap_index.xml`, `${origin}/sitemap/sitemap.xml`];
+  for (const sitemapUrl of sitemapUrls) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      const res = await fetch(sitemapUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'application/xml,text/xml,*/*',
+        },
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timer));
 
-    for (const sitemapUrl of sitemapUrls) {
-      try {
-        const response = await page.goto(sitemapUrl, { timeout: 10000, waitUntil: 'domcontentloaded' });
-        if (response?.ok()) {
-          const content = await page.content();
-          const locRegex = /<loc>\s*(https?:\/\/[^<]+)\s*<\/loc>/gi;
-          let match;
-          while ((match = locRegex.exec(content)) !== null) {
-            const u = match[1].trim();
-            if (u.startsWith(origin)) urls.push(u);
-          }
-          if (urls.length > 0) break;
+      if (res.ok) {
+        const content = await res.text();
+        const locRegex = /<loc>\s*(https?:\/\/[^<]+)\s*<\/loc>/gi;
+        let match;
+        while ((match = locRegex.exec(content)) !== null) {
+          const u = match[1].trim();
+          if (u.startsWith(origin)) urls.push(u);
         }
-      } catch { /* sitemap not available */ }
-    }
-  } catch { /* ignore */ } finally {
-    await page.close();
+        if (urls.length > 0) break;
+      }
+    } catch { /* sitemap not available */ }
   }
 
   return [...new Set(urls)];
 }
+
 
 function shouldSkipUrl(url: string, baseOrigin: string): string | null {
   if (!url.startsWith(baseOrigin)) return 'External domain';

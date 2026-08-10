@@ -9,6 +9,9 @@
 
 import type { AuditResult } from '../types/audit';
 import type { PerformanceResult } from '../types/performance';
+import type { DarkPatternFinding, EthicalPrinciple } from '../types/darkpattern';
+import { PRINCIPLE_WEIGHTS } from '../types/darkpattern';
+
 
 const PILLAR_LABEL: Record<string, string> = {
   accessibility: 'Accessibility',
@@ -117,3 +120,63 @@ export function formatPageCount(perfResult: {
   }
   return `${total} page(s)`;
 }
+
+/**
+ * Creates a sanitized copy of AuditResult for export (PDF/DOCX/PPTX)
+ * by removing rejected false-positive findings and recalculating scores.
+ */
+export function sanitizeAuditForExport(audit: AuditResult): AuditResult {
+  const cleanAudit: AuditResult = JSON.parse(JSON.stringify(audit));
+
+  const dp = cleanAudit.pillarResults?.darkpatterns;
+  if (dp && Array.isArray(dp.findings)) {
+    const activeFindings = (dp.findings as DarkPatternFinding[]).filter(
+      (f) => !f.rejected,
+    );
+
+    dp.findings = activeFindings;
+    dp.totalFindings = activeFindings.length;
+
+    // Recalculate severity breakdown
+    const findingsBySeverity: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0 };
+    for (const f of activeFindings) {
+      findingsBySeverity[f.severity] = (findingsBySeverity[f.severity] || 0) + 1;
+    }
+    dp.findingsBySeverity = findingsBySeverity;
+
+    // Recalculate principle scores
+    const allPrinciples: EthicalPrinciple[] = [
+      'informed-consent',
+      'symmetry-of-choice',
+      'transparency',
+      'user-autonomy',
+      'accessibility-clarity',
+    ];
+    const sevWeights: Record<string, number> = { critical: 15, high: 8, medium: 3, low: 1 };
+    const principleScores = {} as Record<EthicalPrinciple, number>;
+
+    for (const p of allPrinciples) {
+      const pFindings = activeFindings.filter((f) => f.principle === p);
+      let deduction = 0;
+      for (const f of pFindings) {
+        const confidenceMult = f.confidence === 'high' ? 1 : f.confidence === 'medium' ? 0.7 : 0;
+        const exemptionFactor = (f as any).complianceExemption?.scoreReductionFactor ?? 1;
+        deduction += sevWeights[f.severity] * confidenceMult * exemptionFactor;
+      }
+      principleScores[p] = Math.max(0, Math.round(100 - deduction));
+    }
+    dp.principleScores = principleScores;
+
+    let weightedSum = 0, totalWeight = 0;
+    for (const p of allPrinciples) {
+      const w = PRINCIPLE_WEIGHTS[p];
+      weightedSum += principleScores[p] * w;
+      totalWeight += w;
+    }
+    dp.ethicsScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 100;
+  }
+
+  return cleanAudit;
+}
+
+

@@ -82,7 +82,7 @@ export function setAudit(id: string, audit: AuditResult): void {
   // Always keep in active cache for fast access
   activeCache.set(id, audit);
 
-  if (STORAGE_MODE === "database") {
+  if (process.env.STORAGE_MODE === "database" && process.env.DEV_BYPASS_DB !== "true") {
     // Async database save - fire-and-forget with error handling
     dbSetAudit(id, audit).catch((err) => {
       console.error(`[AuditStore] Database save failed for ${id}, falling back to file:`, err);
@@ -103,15 +103,16 @@ export async function setAuditSync(id: string, audit: AuditResult): Promise<void
   // Always keep in active cache for fast access
   activeCache.set(id, audit);
 
-  if (STORAGE_MODE === "database") {
+  // Save to file system fallback
+  saveToFile(id, audit);
+
+  // Also try saving to database if configured and not bypassed
+  if (process.env.STORAGE_MODE === "database" && process.env.DEV_BYPASS_DB !== "true") {
     try {
       await dbSetAudit(id, audit);
     } catch (err) {
-      console.error(`[AuditStore] Database save failed for ${id}, falling back to file:`, err);
-      saveToFile(id, audit);
+      /* db save error — already saved to file */
     }
-  } else {
-    saveToFile(id, audit);
   }
 
   // Remove from active cache after terminal state to free memory
@@ -119,6 +120,7 @@ export async function setAuditSync(id: string, audit: AuditResult): Promise<void
     setTimeout(() => activeCache.delete(id), 10000);
   }
 }
+
 
 // Async alias for the async orchestrator
 export const setAuditAsync = setAuditSync;
@@ -250,16 +252,15 @@ export async function getAuditAsync(id: string): Promise<AuditResult | undefined
   const cached = activeCache.get(id);
   if (cached) return cached;
 
-  if (STORAGE_MODE === "database") {
-    try {
-      const audit = await dbGetAudit(id);
-      if (audit) {
-        activeCache.set(id, audit);
-        return audit;
-      }
-    } catch (err) {
-      console.error(`[AuditStore] Database read failed for ${id}, trying file:`, err);
+  // Try database read first
+  try {
+    const audit = await dbGetAudit(id);
+    if (audit) {
+      activeCache.set(id, audit);
+      return audit;
     }
+  } catch (err) {
+    /* database read failed or DB not configured — fall through to file fallback */
   }
 
   // Fallback to file system
@@ -276,6 +277,7 @@ export async function getAuditAsync(id: string): Promise<AuditResult | undefined
   }
   return undefined;
 }
+
 
 export async function getAllAuditsAsync(userId?: string): Promise<AuditResult[]> {
   if (STORAGE_MODE === "database") {
@@ -369,7 +371,7 @@ export { saveAILearningData };
 
 // Initialize database connection
 export async function initDatabase(): Promise<void> {
-  if (STORAGE_MODE === "database") {
+  if (process.env.STORAGE_MODE === "database" && process.env.DEV_BYPASS_DB !== "true") {
     try {
       await dbInitialize();
       dbAvailable = true;

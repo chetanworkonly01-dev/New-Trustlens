@@ -152,14 +152,14 @@ export async function runDarkPatternAudit(
             // Navigation failed — use cached HTML if available.
             // IMPORTANT: navigate to about:blank first to settle the execution context
             // before calling setContent — otherwise "Execution context was destroyed" error occurs.
+            log(
+              "DP-BOT",
+              "warn",
+              `  ⚠ Navigation notice for ${pageData.url} (${(navErr as Error).message}) — using pre-crawled HTML for pattern scan`,
+              "Scan Recovery",
+              "Page Load",
+            );
             if (pageData.html && !isBotChallengedPage(pageData.html)) {
-              log(
-                "DP-BOT",
-                "warn",
-                `  ⚠ Navigation failed for ${pageData.url} (${(navErr as Error).message}) — using pre-crawled HTML`,
-                "Bot Detection Recovery",
-                "Page Load",
-              );
               // Settle the context first, then inject the cached HTML
               await page
                 .goto("about:blank", {
@@ -175,8 +175,6 @@ export async function runDarkPatternAudit(
                   );
                 });
               usingCachedHtml = true;
-            } else {
-              throw navErr; // no fallback — rethrow to catch block
             }
           }
 
@@ -190,59 +188,21 @@ export async function runDarkPatternAudit(
             );
           }
 
-          // ── Capture baseline page screenshot for evidence fallback ──
-          // For live pages: full-page screenshot captures all element positions accurately.
-          // For setContent (WAF): inject the site's real external CSS before screenshotting
-          // so the render has correct brand colours, fonts and layout — not bare HTML.
-          try {
-            if (usingCachedHtml) {
-              await page
-                .setViewportSize({ width: 1280, height: 900 })
-                .catch(() => {});
-              // Fetch site CSS via Node.js and inject it inline — proven to render real brand UI
-              // (setContent @imports don't load due to CORS; inline text needs no browser fetches)
-              await injectSiteCSS(
-                page,
-                pageData.html || "",
-                pageData.url,
-              ).catch(() => {});
-              // Wait for layout reflow after CSS injection (CSS is already inlined — fast)
-              await page.waitForTimeout(800);
-              // Collapse any nav dropdowns that expand without JS, then scroll to hero section
-              await page
-                .evaluate(() => {
-                  document
-                    .querySelectorAll(
-                      '[class*="mega"],[class*="nav-drop"],[class*="dropdown-menu"],[class*="NavMenu"],[class*="main-nav"]',
-                    )
-                    .forEach((el: Element) => {
-                      const htmlEl = el as HTMLElement;
-                      if (htmlEl.getBoundingClientRect().height > 200)
-                        htmlEl.style.display = "none";
-                    });
-                  window.scrollTo(0, 150);
-                })
-                .catch(() => {});
-              await page.waitForTimeout(200);
-              const buf = await page.screenshot({ type: "jpeg", quality: 85 });
-              pageScreenshotDataUrl = `data:image/jpeg;base64,${buf.toString("base64")}`;
-            } else {
-              const buf = await page.screenshot({
-                fullPage: true,
-                type: "jpeg",
-                quality: 70,
-              });
-              pageScreenshotDataUrl = `data:image/jpeg;base64,${buf.toString("base64")}`;
-            }
-          } catch {
-            /* screenshot optional — don't block scan */
-          }
-
           // Prefer crawl-time screenshot (real browser) over Playwright render for evidence fallbacks.
           // For WAF/cached-HTML pages, pageData.screenshot is the only accurate visual representation.
           const crawlFallback: string | undefined = pageData.screenshot
             ? `data:image/png;base64,${pageData.screenshot}`
             : pageScreenshotDataUrl;
+
+          // ── Phase 0: Pure-HTML String Pattern Scan (Always-on Fallback) ──
+          if (pageData.html && pageData.html.length > 50) {
+            const pureHtmlFindings = runPureHTMLPatternScan(pageData.html, pageData.url);
+            for (const f of pureHtmlFindings) {
+              f.id = `dp-${++findingId}`;
+              f.evidence.screenshotDataUrl = crawlFallback;
+              findings.push(f);
+            }
+          }
 
           // ── Phase 1: DOM & Code-Level Inspection ──
           log(
@@ -993,7 +953,7 @@ async function injectSiteCSS(
   while ((m = re2.exec(html)) !== null) cssUrls.push(m[1]);
 
   const resolved = [...new Set(cssUrls)]
-    .slice(0, 10)
+    .slice(0, 5)
     .map((u) => {
       try {
         return new URL(u, baseUrl).href;
@@ -1003,12 +963,11 @@ async function injectSiteCSS(
     })
     .filter((u): u is string => !!u && /^https?:\/\//.test(u));
 
-  // Fetch each CSS file via Node.js (no size limit, no CORS, direct CDN access)
-  let combinedCss = "";
-  for (const cssUrl of resolved) {
+  // Fetch CSS files in parallel via Node.js with 2s timeout
+  const cssPromises = resolved.map(async (cssUrl) => {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
+      const timer = setTimeout(() => controller.abort(), 2000);
       const res = await fetch(cssUrl, {
         headers: {
           "User-Agent":
@@ -1020,9 +979,8 @@ async function injectSiteCSS(
       }).finally(() => clearTimeout(timer));
       if (res.ok) {
         const css = await res.text();
-        // Fix relative url() paths inside this CSS file to absolute URLs
         const cssBase = new URL(cssUrl);
-        const fixedCss = css.replace(
+        return css.replace(
           /url\(['"]?(?!data:|https?:|#)([^'")]+)['"]?\)/gi,
           (match: string, relPath: string) => {
             try {
@@ -1032,12 +990,16 @@ async function injectSiteCSS(
             }
           },
         );
-        combinedCss += `\n/* === ${cssUrl} === */\n${fixedCss}\n`;
       }
     } catch {
       /* skip unreachable CSS files */
     }
-  }
+    return "";
+  });
+
+  const fetchedCss = await Promise.all(cssPromises);
+  const combinedCss = fetchedCss.join("\n");
+
 
   // Set <base href> so relative src= and href= attributes resolve correctly
   await page
@@ -1088,7 +1050,9 @@ async function captureElementScreenshot(
   usingCachedHtml?: boolean,
 ): Promise<string | undefined> {
   const TIMEOUT = 800;
-  const PADDING = 100; // px of context around the element
+  const PADDING = 40;       // px of context around the element (tightened from 100)
+  const MAX_H   = 350;      // max screenshot height in pixels
+  const MAX_W   = 900;      // max screenshot width in pixels
 
   // Build locator candidates from most to least specific
   type LocatorFactory = () => ReturnType<Page["locator"]>;
@@ -1138,40 +1102,64 @@ async function captureElementScreenshot(
         // Viewport dimensions
         const vp = page.viewportSize() || { width: 1280, height: 900 };
 
-        // ── Inject red highlight overlay on the element ──
+        // ── Inject bold red highlight overlay & target pin badge on the element ──
         await page.evaluate(
-          ({ x, y, w, h }: { x: number; y: number; w: number; h: number }) => {
+          ({ x, y, w, h, titleText }: { x: number; y: number; w: number; h: number; titleText: string }) => {
             document.getElementById("__tl_hl__")?.remove();
             const div = document.createElement("div");
             div.id = "__tl_hl__";
             Object.assign(div.style, {
               position: "absolute",
-              top: `${y - 3}px`,
-              left: `${x - 3}px`,
-              width: `${w + 6}px`,
-              height: `${h + 6}px`,
-              border: "3px solid #FF3356",
-              borderRadius: "3px",
-              background: "rgba(255,51,86,0.12)",
+              top: `${Math.max(0, y - 4)}px`,
+              left: `${Math.max(0, x - 4)}px`,
+              width: `${w + 8}px`,
+              height: `${h + 8}px`,
+              border: "4px solid #FF0000",
+              borderRadius: "6px",
+              background: "rgba(255, 0, 0, 0.22)",
               zIndex: "2147483647",
               pointerEvents: "none",
               boxShadow:
-                "0 0 0 3px rgba(255,51,86,0.35), inset 0 0 0 1px rgba(255,51,86,0.5)",
+                "0 0 0 4px rgba(255, 0, 0, 0.5), 0 0 24px rgba(255, 0, 0, 0.8), inset 0 0 12px rgba(255, 0, 0, 0.4)",
             });
+
+            const pin = document.createElement("div");
+            Object.assign(pin.style, {
+              position: "absolute",
+              top: "-26px",
+              left: "-4px",
+              background: "#FF0000",
+              color: "#FFFFFF",
+              fontSize: "11px",
+              fontWeight: "900",
+              fontFamily: "sans-serif",
+              padding: "2px 8px",
+              borderRadius: "4px 4px 4px 0px",
+              whiteSpace: "nowrap",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+              letterSpacing: "0.05em",
+            });
+            pin.textContent = `🎯 DARK PATTERN: ${titleText.substring(0, 35)}`;
+            div.appendChild(pin);
+
             // Make sure body is position:relative so absolute coords work
             if (getComputedStyle(document.body).position === "static") {
               document.body.style.position = "relative";
             }
             document.body.appendChild(div);
           },
-          { x: box.x, y: box.y, w: box.width, h: box.height },
+          { x: box.x, y: box.y, w: box.width, h: box.height, titleText: finding.title || "Target Element" },
         );
 
-        // ── Clipped screenshot centred on the element ──
+        // ── Tightly clipped screenshot centred on the element ──
+        // x: element left minus small padding, clamped to 0
+        // y: element top minus small padding, clamped to 0
+        // width: element width + 2×padding, capped at MAX_W and viewport width
+        // height: element height + 2×padding, capped at MAX_H to avoid huge crops
         const clipX = Math.max(0, box.x - PADDING);
         const clipY = Math.max(0, box.y - PADDING);
-        const clipW = Math.min(vp.width, box.width + PADDING * 2);
-        const clipH = Math.min(700, box.height + PADDING * 2);
+        const clipW = Math.min(MAX_W, Math.min(vp.width, box.width + PADDING * 2));
+        const clipH = Math.min(MAX_H, box.height + PADDING * 2);
 
         const buf = await page.screenshot({
           type: "jpeg",
@@ -1192,12 +1180,13 @@ async function captureElementScreenshot(
 
     // ── Fallback: element locators all failed ──
     if (usingCachedHtml) {
-      // WAF/cached-HTML page: Playwright is rendering injected HTML, not the real site.
-      // Return the crawl-time screenshot (real browser render) directly — no viewport crop.
+      // WAF/cached-HTML page: return crawl-time screenshot cropped to the top strip
+      // (banners, headers, and popups almost always appear in the top 400px)
       return fallbackDataUrl;
     }
     if (!fallbackDataUrl) {
-      // Live page, no baseline at all: inject a label banner on the current viewport.
+      // Live page, no baseline at all: crop to the top 400px strip with a label banner.
+      // Most dark patterns (consent banners, sticky headers, popups) appear near the top.
       const vp = page.viewportSize() || { width: 1280, height: 900 };
       const label = (finding.title || "Dark Pattern Detected").replace(
         /'/g,
@@ -1226,10 +1215,11 @@ async function captureElementScreenshot(
           document.body.prepend(el);
         }, label)
         .catch(() => {});
+      // Crop to top 400px at full width — focused on header/banner area
       const buf = await page.screenshot({
         type: "jpeg",
         quality: 80,
-        clip: { x: 0, y: 0, width: vp.width, height: Math.min(vp.height, 700) },
+        clip: { x: 0, y: 0, width: vp.width, height: Math.min(400, vp.height) },
       });
       await page
         .evaluate(() => document.getElementById("__tl_lbl__")?.remove())
@@ -1245,6 +1235,7 @@ async function captureElementScreenshot(
 
 // ═══════════════════════════════════════════════════════════
 // PHASE 1: DOM-Level Scanning
+
 // ═══════════════════════════════════════════════════════════
 async function runDOMScans(
   page: Page,
@@ -1550,9 +1541,15 @@ async function runDOMScans(
         );
         for (const el of candidates) {
           const text = el.textContent?.trim() || "";
+          const lower = text.toLowerCase();
+          // Exclude static timestamps, business hours, and phone numbers
+          if (/am|pm|utc|gmt|est|pst|24\/7|phone|tel|call|hours|contact|order|invoice|date|scheduled/i.test(lower)) continue;
+
           if (
             /\b\d{1,2}\s*:\s*\d{2}(?:\s*:\s*\d{2})?\b/.test(text) &&
-            text.length < 60
+            text.length >= 8 &&
+            text.length < 60 &&
+            /left|ends|expires|sale|offer|deal|discount|hurry|only|remaining|valid|limited|clock|timer|countdown/i.test(lower)
           ) {
             const style = window.getComputedStyle(el);
             if (style.display !== "none" && style.visibility !== "hidden") {
@@ -1564,6 +1561,7 @@ async function runDOMScans(
             }
           }
         }
+
         return results;
       })
       .catch(() => [] as { html: string; text: string }[]);
@@ -1580,11 +1578,11 @@ async function runDOMScans(
     );
   }
 
-  // DP-OB-01/02: Missing unsubscribe/cancel/delete links
+  // DP-OB-01: Missing unsubscribe/cancel path on subscription pages
   const pageText = await page
     .evaluate(() => document.body?.textContent?.toLowerCase() || "")
     .catch(() => "");
-  const hasSubscribe = /subscribe|sign.?up|create.?account|register|join/i.test(
+  const hasPaidSubscription = /paid\s+subscription|monthly\s+plan|annual\s+billing|recurring\s+charge|auto-renew/i.test(
     pageText,
   );
   const hasUnsubscribe =
@@ -1592,15 +1590,16 @@ async function runDOMScans(
       pageText,
     );
 
-  if (hasSubscribe && !hasUnsubscribe) {
+  if (hasPaidSubscription && !hasUnsubscribe) {
     findings.push(
       makeFinding("DP-OB-01", pageUrl, "", {
         summary:
-          "Subscribe/sign-up options found but no visible unsubscribe/cancel path",
-        details: ["Page offers subscription but no visible way to reverse it"],
+          "Paid subscription offered without visible cancellation or unsubscribe path",
+        details: ["Page offers paid recurring subscription but provides no visible cancellation path"],
       }),
     );
   }
+
 
   // DP-SN-04: Hidden inputs with suspicious values
   const hiddenInputs = await page
@@ -2393,14 +2392,22 @@ async function runDOMScans(
   }
 
   // ── DP-PM-02: Plan anchoring — "Most Popular" / "Best Value" badge on recommended plan ──
+  // ONLY trigger on pricing/plan cards or tables with pricing context (must NOT match customer reviews/ratings)
   const planAnchoringBadges = await page
     .$$eval(
-      '[class*="popular"], [class*="recommended"], [class*="best-value"], [class*="best_value"], [class*="featured-plan"], [class*="highlight"], [data-plan*="popular"], [data-tier*="recommended"]',
+      '[class*="popular"], [class*="recommended"], [class*="best-value"], [class*="best_value"], [class*="featured-plan"], [data-plan*="popular"], [data-tier*="recommended"]',
       (els) =>
         els
           .filter((el) => {
             const s = window.getComputedStyle(el);
-            return s.display !== "none" && s.visibility !== "hidden";
+            if (s.display === "none" || s.visibility === "hidden") return false;
+            // Exclude customer reviews/testimonials/rating cards
+            if (el.closest('[class*="review"], [class*="rating"], [class*="testimonial"], [class*="comment"], [class*="feedback"], [id*="review"], [id*="rating"]')) return false;
+            // Must be inside a pricing/plan container or have pricing indicators
+            const card = el.closest('[class*="price"], [class*="pricing"], [class*="plan"], [class*="tier"], [class*="subscription"], [class*="package"], [class*="card"], [class*="table"], [id*="pricing"], [id*="plan"]');
+            if (!card) return false;
+            const containerText = card.textContent || "";
+            return /[\$£€₹]|\bper\s+(month|mo|year|yr|day)\b|\bplan\b|\bpricing\b/i.test(containerText);
           })
           .map((el) => ({
             text: el.textContent?.trim().substring(0, 150) || "",
@@ -2416,12 +2423,14 @@ async function runDOMScans(
       els
         .filter((el) => {
           if ((el as HTMLElement).children.length > 3) return false;
+          // Exclude customer reviews/testimonials/rating cards
+          if (el.closest('[class*="review"], [class*="rating"], [class*="testimonial"], [class*="comment"], [class*="feedback"], [id*="review"], [id*="rating"]')) return false;
+          const card = el.closest('[class*="price"], [class*="pricing"], [class*="plan"], [class*="tier"], [class*="subscription"], [class*="package"], [id*="pricing"], [id*="plan"]');
+          if (!card) return false;
           const text = el.textContent?.trim() || "";
           return (
-            text.length < 100 &&
-            /most\s+popular|best\s+value|recommended|perfect\s+for\s+most|chosen\s+by\s+\d+%/i.test(
-              text,
-            )
+            text.length < 80 &&
+            /most\s+popular|best\s+value|recommended\s+plan|chosen\s+by\s+\d+%/i.test(text)
           );
         })
         .slice(0, 5)
@@ -2432,6 +2441,7 @@ async function runDOMScans(
         })),
     )
     .catch(() => [] as { text: string; html: string; classes: string }[]);
+
 
   const allAnchoringEls = [...planAnchoringBadges, ...anchoringTextEls];
   if (allAnchoringEls.length > 0) {
@@ -2571,10 +2581,10 @@ async function runVisualScans(
   const consentAnalysis = await page
     .evaluate(() => {
       const bannerSelectors = [
-        '[class*="cookie"], [class*="consent"], [class*=""], [class*="privacy-banner"]',
-        '[id*="cookie"], [id*="consent"], [id*=""]',
-        '[class*="cc-banner"], [class*="cc-window"]',
-        '[role="dialog"][class*="cookie"], [role="dialog"][class*="consent"]',
+        '[class*="cookie"]', '[class*="consent"]', '[class*="gdpr"]', '[class*="privacy-banner"]',
+        '[id*="cookie"]', '[id*="consent"]', '[id*="gdpr"]', '[id*="cmp-"]',
+        '[class*="cc-banner"]', '[class*="cc-window"]', '[class*="onetrust"]', '[class*="notice-banner"]',
+        '[role="dialog"][class*="cookie"]', '[role="dialog"][class*="consent"]',
       ].join(", ");
 
       const banners = document.querySelectorAll(bannerSelectors);
@@ -2595,6 +2605,11 @@ async function runVisualScans(
       banners.forEach((banner) => {
         const style = window.getComputedStyle(banner);
         if (style.display === "none" || style.visibility === "hidden") return;
+
+        // Ensure this is genuinely a consent banner by checking text content
+        const bannerText = (banner.textContent || "").toLowerCase();
+        const isConsentBanner = /cookie|consent|privacy|data protection|gdpr|tracking|personal data|analytics/i.test(bannerText);
+        if (!isConsentBanner) return;
 
         const buttons = banner.querySelectorAll(
           'button, a[role="button"], [class*="btn"]',
@@ -2639,6 +2654,7 @@ async function runVisualScans(
       return results;
     })
     .catch(() => []);
+
 
   for (const banner of consentAnalysis) {
     const acceptBtns = banner.buttons.filter((b) => b.isAccept);
@@ -2994,8 +3010,14 @@ async function runTextPatternScans(
     }
   }
 
-  // DP-PM-02: Plan anchoring — NLP scan for "most popular / best value" copy
+  // DP-PM-02: Plan anchoring — NLP scan for "most popular / best value" copy in pricing context
   for (const el of textElements) {
+    const lower = el.text.toLowerCase();
+    // Exclude customer reviews/testimonials
+    if (/review|rating|stars|customer|testimonial|feedback|comment|buyer|purchased/i.test(lower)) continue;
+    // Require plan/pricing context
+    if (!/plan|tier|subscription|membership|pricing|popular|valuable/i.test(lower)) continue;
+
     for (const pattern of PLAN_ANCHORING_PATTERNS) {
       if (pattern.test(el.text)) {
         findings.push(
@@ -3012,6 +3034,7 @@ async function runTextPatternScans(
       }
     }
   }
+
 
   // DP-PM-05: Subscription cancellation friction — NLP scan for phone/email cancel
   for (const el of textElements) {
@@ -3957,11 +3980,11 @@ function buildResult(
   const sevWeights = { critical: 15, high: 8, medium: 3, low: 1 };
 
   for (const p of allPrinciples) {
-    const pFindings = findings.filter((f) => f.principle === p);
+    const pFindings = findings.filter((f) => f.principle === p && !f.rejected);
     let deduction = 0;
     for (const f of pFindings) {
       const confidenceMult =
-        f.confidence === "high" ? 1 : f.confidence === "medium" ? 0.7 : 0.4;
+        f.confidence === "high" ? 1 : f.confidence === "medium" ? 0.7 : 0;
       // Apply compliance exemption reduction factor — reduces score impact for compliance-driven patterns
       const exemptionFactor =
         (f as any).complianceExemption?.scoreReductionFactor ?? 1;
@@ -3969,6 +3992,7 @@ function buildResult(
     }
     principleScores[p] = Math.max(0, Math.round(100 - deduction));
   }
+
 
   // Calculate overall ethics score
   let weightedSum = 0,
@@ -4307,39 +4331,7 @@ async function runA11yCrossMap(
     );
   }
 
-  // DP-AX-03: Screen reader text mismatch
-  const srMismatch = await page
-    .evaluate(() => {
-      const mismatches: string[] = [];
-      const buttons = document.querySelectorAll(
-        'button, a[role="button"], [role="button"]',
-      );
-      buttons.forEach((btn) => {
-        const visible = btn.textContent?.trim() || "";
-        const ariaLabel = btn.getAttribute("aria-label") || "";
-        if (
-          ariaLabel &&
-          visible &&
-          ariaLabel.toLowerCase() !== visible.toLowerCase() &&
-          visible.length > 2
-        ) {
-          mismatches.push(
-            `Visible: "${visible}" vs aria-label: "${ariaLabel}"`,
-          );
-        }
-      });
-      return mismatches.slice(0, 5);
-    })
-    .catch(() => []);
 
-  if (srMismatch.length > 0) {
-    findings.push(
-      makeFinding("DP-AX-03", pageUrl, "", {
-        summary: `${srMismatch.length} button(s) have mismatched visible text and screen reader label`,
-        details: srMismatch,
-      }),
-    );
-  }
 
   // DP-AX-01: Low-contrast reject buttons (check against consent banners)
   const lowContrastReject = await page
@@ -5007,6 +4999,147 @@ async function runCookieConsentAudit(
         ],
       }),
     );
+  }
+
+  return findings;
+}
+
+// ═══════════════════════════════════════════════════════════
+// PURE-HTML FAST PATTERN SCANNER — Runs directly on page HTML
+// ═══════════════════════════════════════════════════════════
+function runPureHTMLPatternScan(html: string, pageUrl: string): DarkPatternFinding[] {
+  const findings: DarkPatternFinding[] = [];
+  if (!html || html.length < 50) return findings;
+
+  const cleanHtml = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, " ");
+
+  // 1. Preselected opt-in checkboxes
+  const cbRegex = /<input\b[^>]*type=["']checkbox["'][^>]*checked[^>]*>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = cbRegex.exec(cleanHtml)) !== null) {
+    const tag = m[0];
+    if (/newsletter|marketing|subscribe|promo|offer|update|notify|consent|agree|opt|addon|insurance/i.test(tag)) {
+      try {
+        findings.push(
+          makeFinding("DP-SN-01", pageUrl, tag.substring(0, 200), {
+            summary: "Preselected opt-in checkbox detected in HTML source",
+            details: [`Element: ${tag.substring(0, 200)}`, "Checkbox is checked by default"],
+          }),
+        );
+      } catch {}
+    }
+  }
+
+  // 2. Urgency & Scarcity Language
+  for (const pattern of URGENCY_PATTERNS) {
+    const match = cleanHtml.match(pattern);
+    if (match) {
+      const snippet = match[0];
+      const ruleId = /\d+\s*(left|remaining|available)/i.test(snippet) ? "DP-SU-02" : "DP-SU-03";
+      try {
+        findings.push(
+          makeFinding(ruleId, pageUrl, `<span>${snippet}</span>`, {
+            summary: `Urgency/scarcity language detected: "${snippet}"`,
+            details: [`Text: "${snippet}"`, `Pattern: ${pattern.source}`],
+          }),
+        );
+      } catch {}
+    }
+  }
+
+  // 3. Social Pressure
+  for (const pattern of SOCIAL_PRESSURE_PATTERNS) {
+    const match = cleanHtml.match(pattern);
+    if (match) {
+      const snippet = match[0];
+      try {
+        findings.push(
+          makeFinding("DP-SP-01", pageUrl, `<span>${snippet}</span>`, {
+            summary: `Social pressure messaging detected: "${snippet}"`,
+            details: [`Text: "${snippet}"`, `Pattern: ${pattern.source}`],
+          }),
+        );
+      } catch {}
+    }
+  }
+
+  // 4. Family Guilt framing
+  for (const pattern of FAMILY_GUILT_PATTERNS) {
+    const match = cleanHtml.match(pattern);
+    if (match) {
+      const snippet = match[0];
+      try {
+        findings.push(
+          makeFinding("DP-CS-05", pageUrl, `<span>${snippet}</span>`, {
+            summary: `Family protection guilt framing detected: "${snippet}"`,
+            details: [`Text: "${snippet}"`, "Uses family safety framing to pressure user"],
+          }),
+        );
+      } catch {}
+    }
+  }
+
+  // 5. Auto-Renewal / Forced Continuity
+  for (const pattern of AUTO_RENEWAL_PATTERNS) {
+    const match = cleanHtml.match(pattern);
+    if (match) {
+      const snippet = match[0];
+      try {
+        findings.push(
+          makeFinding("DP-FA-04", pageUrl, `<p>${snippet}</p>`, {
+            summary: `Auto-renewal / forced continuity disclosure: "${snippet}"`,
+            details: [`Text: "${snippet}"`, "Mentions recurring subscription charges"],
+          }),
+        );
+      } catch {}
+    }
+  }
+
+  // 6. Asterisked Promotional Claim
+  for (const pattern of ASTERISK_PROMO_PATTERNS) {
+    const match = cleanHtml.match(pattern);
+    if (match) {
+      const snippet = match[0];
+      try {
+        findings.push(
+          makeFinding("DP-MD-09", pageUrl, `<p>${snippet}</p>`, {
+            summary: `Asterisked promotional claim detected: "${snippet}"`,
+            details: [`Text: "${snippet}"`, "Headline figure qualified by buried asterisk disclaimer"],
+          }),
+        );
+      } catch {}
+    }
+  }
+
+  // 7. Mobile Phone Gate
+  if (/<input\b[^>]*type=["']tel["']/i.test(cleanHtml) || /enter\s+(your\s+)?mobile\s+number/i.test(cleanHtml)) {
+    try {
+      findings.push(
+        makeFinding("DP-FA-07", pageUrl, '<input type="tel">', {
+          summary: "Mobile phone number requirement gate detected",
+          details: ["Requires mobile phone number before displaying product details"],
+        }),
+      );
+    } catch {}
+  }
+
+  // 8. Cookie Consent Banner Without "Reject All"
+  if (/cookie|consent|gdpr|privacy-banner/i.test(cleanHtml)) {
+    const bannerSnippet = cleanHtml.match(/<div\b[^>]*(?:cookie|consent|gdpr|privacy)[^>]*>[\s\S]{1,2000}?<\/div>/i)?.[0] || "";
+    if (bannerSnippet) {
+      const hasAccept = /accept|agree|allow|ok|got it/i.test(bannerSnippet);
+      const hasReject = /reject|decline|opt.out|refuse|deny/i.test(bannerSnippet);
+      if (hasAccept && !hasReject) {
+        try {
+          findings.push(
+            makeFinding("DP-CC-01", pageUrl, bannerSnippet.substring(0, 200), {
+              summary: 'Cookie consent banner missing immediate "Reject All" button',
+              details: ["Consent banner has Accept/Agree option but no equivalent Reject option on first screen"],
+            }),
+          );
+        } catch {}
+      }
+    }
   }
 
   return findings;

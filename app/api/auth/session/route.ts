@@ -12,6 +12,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ user: null }, { status: 401 });
   }
 
+
+
   return NextResponse.json({
     user: {
       id: user.id,

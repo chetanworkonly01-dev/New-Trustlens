@@ -2297,7 +2297,7 @@ export default function FinalReportPage() {
     recs.forEach((r) => {
       rows.push([
         `"${data.config?.url || ""}"`,
-        r.issueType || r.title,
+        r.title,
         r.impact,
         `"${r.detail.replace(/"/g, '""')}"`,
         `"${r.detail.replace(/"/g, '""')}"`,

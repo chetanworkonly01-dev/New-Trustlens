@@ -52,7 +52,7 @@ import type { PerformanceResult } from "../types/performance";
 import type { PrivacyResult } from "../types/privacy";
 // ── New Phase 2 engines ──
 import { classifySite } from "./site-profiler";
-import { getTransactionalPages } from "./page-intent-classifier";
+import { getTransactionalPages, sortByIntent } from "./page-intent-classifier";
 // ── Gap 3 & 4: Temporal Scanner + CTA Prominence Scorer ──
 import { runTemporalPatternScan } from "./temporal-scanner";
 import { scoreCTAHierarchy } from "./cta-prominence-scorer";
@@ -690,18 +690,20 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
       message: ` Site profile: ${siteProfile.profile} (${siteProfile.confidence} confidence) — ${siteProfile.highRiskPatterns.slice(0, 3).join(", ")}`,
     });
 
-    // Get transactional pages for dark pattern engine (Bug 2 fix)
+    // Get transactional & high-intent pages for dark pattern engine
     // Cap at 5 pages — each page scan takes 1–3 min; >5 pages risks exceeding the 15-min global budget.
     const transactionalPages = getTransactionalPages(
       crawlResult.pages.map((p) => ({ url: p.url, html: p.html })),
-    ).slice(0, 5);
-    // Pass pre-crawled HTML to DP engine — enables bot-detection fallback (WAF evasion mode)
-    const dpPageList = transactionalPages.map((p) => {
+    );
+    const candidatePages = transactionalPages.length > 0 ? transactionalPages : crawlResult.pages;
+    const sortedPages = sortByIntent(candidatePages);
+    const dpPageList = sortedPages.slice(0, 5).map((p: { url: string; html?: string }) => {
       const crawledPage = crawlResult.pages.find((cp) => cp.url === p.url);
       return {
         url: p.url,
         title: crawledPage?.title || p.url,
         html: crawledPage?.html,
+        screenshot: crawledPage?.screenshot,
       };
     });
     const fullPageList = crawlResult.pages.map((p) => ({
@@ -933,6 +935,30 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
                   message: `  ⚠ Temporal scan failed: ${(err as Error).message}`,
                 });
               }
+            }
+            if (result && result.findings && result.findings.length > 0) {
+              const dpConverted: AccessibilityIssue[] = result.findings.map((f) => ({
+                id: f.id || crypto.randomUUID(),
+                testId: f.ruleId || "DP-RULE",
+                title: f.title,
+                description: f.description,
+                element: f.element || "DOM Element",
+                elementHtml: f.elementHtml,
+                elementScreenshot: f.evidence?.screenshotDataUrl,
+                pageUrl: f.pageUrl,
+                wcagCriterion: f.dsaArticle || f.ruleId || "dark-pattern",
+                wcagName: `Dark Pattern: ${f.category}`,
+                wcagLevel: "AA" as const,
+                severity: f.severity === "critical" ? "critical" : f.severity === "high" ? "high" : f.severity === "medium" ? "medium" : "low",
+                impact: f.userImpact || f.description,
+                recommendation: f.recommendation || `Remediate ${f.title}`,
+                codeFix: f.developerFix,
+                category: "darkpatterns" as const,
+                source: "darkpattern" as const,
+                confidence: f.confidence || "high",
+                affectedPages: [f.pageUrl],
+              }));
+              allIssues.push(...dpConverted);
             }
             setPillarProgress("darkpatterns", 100);
           })

@@ -255,6 +255,10 @@ interface DPFinding {
     exemptionLabel: string;
     scoreReductionFactor: number;
   };
+  // False positive rejection
+  rejected?: boolean;
+  rejectionReason?: string;
+  rejectedAt?: string;
 }
 interface PerfPage {
   url: string;
@@ -424,9 +428,8 @@ function ScreenshotPanel({
   );
   const [gone, setGone] = useState(false);
   const [pageGone, setPageGone] = useState(false);
-  // Default to 'page' (real crawl screenshot = what the user sees).
-  // 'element' tab shows the cropped highlight when available.
-  const [view, setView] = useState<"element" | "page">("page");
+  // Default to 'element' pinpoint view (cropped highlight box).
+  const [view, setView] = useState<"element" | "page">("element");
 
   if (gone) return null;
 
@@ -496,101 +499,47 @@ function ScreenshotPanel({
             marginTop: 8,
             borderRadius: 8,
             overflow: "hidden",
-            // border: `2px solid ${color}55`,
+            border: "2px solid #FF0000",
+            boxShadow: "0 0 14px rgba(255, 0, 0, 0.3)",
           }}
         >
-          {/* View switcher — always show both tabs when element screenshot exists */}
+          {/* Header — Element Pinpoint view only */}
           <div
             style={{
+              padding: "6px 14px",
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: "0.06em",
+              color: "#FFFFFF",
+              background: "#FF0000",
               display: "flex",
-              // background: "rgba(0,0,0,0.04)",
-              // borderBottom: `1px solid ${color}33`,
+              alignItems: "center",
+              justifyContent: "space-between",
             }}
           >
-            {/* Page tab always present — this is the real crawl screenshot (what the user sees) */}
-            {hasPage && (
-              <button
-                onClick={() => setView("page")}
-                style={{
-                  flex: 1,
-                  padding: "5px 10px",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  // fontFamily: "Geist Mono, monospace",
-                  letterSpacing: "0.04em",
-                  cursor: "pointer",
-                  border: "none",
-                  borderBottom:
-                    view === "page"
-                      ? `2px solid var(--kpmg-dynamic)`
-                      : "2px solid transparent",
-                  // background: view === "page" ? `${color}12` : "transparent",
-                  // color: view === "page" ? color : "var(--text-secondary)",
-                  transition: "all 0.15s",
-                }}
-              >
-                WHAT USER SEES
-              </button>
-            )}
-            {/* Element tab only when we have a cropped/annotated element screenshot */}
-            {hasElement && (
-              <button
-                onClick={() => setView("element")}
-                style={{
-                  flex: 1,
-                  padding: "5px 10px",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  // fontFamily: "Geist Mono, monospace",
-                  letterSpacing: "0.04em",
-                  cursor: "pointer",
-                  border: "none",
-                  borderBottom:
-                    view === "element"
-                      ? `2px solid ${color}`
-                      : "2px solid transparent",
-                  // background: view === "element" ? `${color}12` : "transparent",
-                  // color: view === "element" ? color : "var(--text-secondary)",
-                  transition: "all 0.15s",
-                }}
-              >
-                ELEMENT PINPOINT
-              </button>
-            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#FFFFFF", display: "inline-block" }}></span>
+              <span>🎯 EXACT ELEMENT LOCATION</span>
+            </div>
+            <span style={{ fontSize: 10, opacity: 0.9, fontWeight: 600 }}>HIGHLIGHTED IN RED BELOW</span>
           </div>
 
           {/* Evidence image area */}
-          <div style={{ position: "relative", background: "#0a0a0a" }}>
-            {/* Page screenshot — real crawl-time view, what the user actually sees */}
-            {view === "page" && (
-              <img
-                src={pageSrc}
-                alt={`Page — ${pageUrl}`}
-                onError={handlePageError}
-                style={{
-                  width: "100%",
-                  display: "block",
-                  maxHeight: 420,
-                  objectFit: "cover",
-                  objectPosition: "top",
-                }}
-              />
-            )}
+          <div style={{ position: "relative", background: "#0a0a0a", border: "2px solid rgba(255,0,0,0.3)" }}>
+            {/* Element pinpoint screenshot with red highlight box */}
+            <img
+              src={hasElement ? elementScreenshot : pageSrc}
+              alt={`Element evidence — ${label}`}
+              onError={handlePageError}
+              style={{
+                width: "100%",
+                display: "block",
+                maxHeight: 420,
+                objectFit: "contain",
+                objectPosition: "center",
+              }}
+            />
 
-            {/* Element screenshot — engine-captured crop with red highlight box */}
-            {view === "element" && hasElement && (
-              <img
-                src={elementScreenshot}
-                alt={`Element evidence — ${label}`}
-                style={{
-                  width: "100%",
-                  display: "block",
-                  maxHeight: 420,
-                  objectFit: "contain",
-                  objectPosition: "center",
-                }}
-              />
-            )}
 
             {/* Annotation banner — finding title overlaid on the screenshot */}
             <div
@@ -797,52 +746,18 @@ export default function AuditResultPage() {
     "developer" | "designer" | "legal"
   >("developer");
   const logEndRef = useRef<HTMLDivElement>(null);
+  // Dark-pattern false positive rejection state
+  const [dpRejecting, setDpRejecting] = useState<Record<string, boolean>>({});   // findingId -> isLoading
+  const [dpConfirming, setDpConfirming] = useState<Record<string, boolean>>({}); // findingId -> showConfirm
+  const [showRejected, setShowRejected] = useState(false);
 
+  // Auth check - redirect to signin if not authenticated
   // Auth check - redirect to signin if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
       router.replace("/auth/signin?callbackUrl=" + encodeURIComponent(window.location.pathname));
     }
   }, [user, authLoading, router]);
-
-  if (authLoading || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const handleExport = async (format: "docx" | "pdf" | "pptx") => {
-    setExportLoading(format);
-    try {
-      const res = await fetch(`/api/export-report?id=${id}&format=${format}`);
-      if (!res.ok) {
-        alert("Export failed");
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const d = res.headers
-        .get("Content-Disposition")
-        ?.match(/filename="(.+?)"/);
-      a.download = d ? d[1] : `audit-report.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setShowExportMenu(false);
-    } catch {
-      alert("Export failed.");
-    } finally {
-      setExportLoading(null);
-    }
-  };
 
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/audit/${id}`);
@@ -888,6 +803,64 @@ export default function AuditResultPage() {
       else if (!a11yEnabled && privEnabled) setActiveTab("privacy");
     }
   }, [data, tabInitialized, a11yEnabled, dpEnabled, perfEnabled, privEnabled]);
+
+  if (authLoading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const handleExport = async (format: "docx" | "pdf" | "pptx") => {
+    setExportLoading(format);
+    try {
+      const res = await fetch(`/api/export-report?id=${id}&format=${format}`);
+      if (!res.ok) {
+        alert("Export failed");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const d = res.headers
+        .get("Content-Disposition")
+        ?.match(/filename="(.+?)"/);
+      a.download = d ? d[1] : `audit-report.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setShowExportMenu(false);
+    } catch {
+      alert("Export failed.");
+    } finally {
+      setExportLoading(null);
+    }
+  };
+
+  /** Mark or unmark a dark-pattern finding as a false positive */
+  const handleRejectFinding = async (findingId: string, reason?: string, undo = false) => {
+    setDpRejecting(prev => ({ ...prev, [findingId]: true }));
+    try {
+      const res = await fetch(`/api/audit/${id}/reject-finding`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ findingId, reason, undo }),
+      });
+      if (res.ok) {
+        // Refetch so state reflects updated findings + score
+        await fetchData();
+      }
+    } finally {
+      setDpRejecting(prev => { const n = { ...prev }; delete n[findingId]; return n; });
+      setDpConfirming(prev => { const n = { ...prev }; delete n[findingId]; return n; });
+    }
+  };
 
   const pillarMeta: Record<
     string,
@@ -1503,13 +1476,13 @@ export default function AuditResultPage() {
         ? "trustlens-4pillar-report"
         : dlPillars.length === 1
           ? (
-              {
-                accessibility: "accessibility-report",
-                darkpatterns: "dark-pattern-report",
-                performance: "performance-report",
-                privacy: "privacy-report",
-              } as Record<string, string>
-            )[dlPillars[0]] || "trustlens-report"
+            {
+              accessibility: "accessibility-report",
+              darkpatterns: "dark-pattern-report",
+              performance: "performance-report",
+              privacy: "privacy-report",
+            } as Record<string, string>
+          )[dlPillars[0]] || "trustlens-report"
           : "trustlens-report";
     a.download = `kpmg-${dlLabel}-${id}.json`;
     a.click();
@@ -1832,8 +1805,8 @@ export default function AuditResultPage() {
                         transition: "background 0.2s",
                       }}
                       onMouseEnter={(e) =>
-                        (e.currentTarget.style.background =
-                          "var(--bg-card-hover)")
+                      (e.currentTarget.style.background =
+                        "var(--bg-card-hover)")
                       }
                       onMouseLeave={(e) =>
                         (e.currentTarget.style.background = "transparent")
@@ -1892,8 +1865,8 @@ export default function AuditResultPage() {
                       transition: "background 0.2s",
                     }}
                     onMouseEnter={(e) =>
-                      (e.currentTarget.style.background =
-                        "var(--bg-card-hover)")
+                    (e.currentTarget.style.background =
+                      "var(--bg-card-hover)")
                     }
                     onMouseLeave={(e) =>
                       (e.currentTarget.style.background = "transparent")
@@ -2209,8 +2182,8 @@ export default function AuditResultPage() {
           </div>
           {/* Smart trust score context note — Gap 3 */}
           {data.auditIntegrity &&
-          data.auditIntegrity.status !== "clean" &&
-          data.auditIntegrity.failedPillars ? (
+            data.auditIntegrity.status !== "clean" &&
+            data.auditIntegrity.failedPillars ? (
             <div
               style={{
                 fontSize: 11,
@@ -3320,8 +3293,8 @@ export default function AuditResultPage() {
                               color: d.startsWith("")
                                 ? "var(--offshade-text)"
                                 : d.startsWith("") ||
-                                    d.startsWith("") ||
-                                    d.startsWith("")
+                                  d.startsWith("") ||
+                                  d.startsWith("")
                                   ? "var(--offshade-text)"
                                   : "var(--text-secondary)",
                             }}
@@ -3800,7 +3773,7 @@ export default function AuditResultPage() {
             <div
               key={step.priority}
               className="glass-card"
-              // style={{ borderLeft: `3px solid ${sevColors[step.severity]}` }}
+            // style={{ borderLeft: `3px solid ${sevColors[step.severity]}` }}
             >
               <div
                 style={{
@@ -3937,18 +3910,18 @@ export default function AuditResultPage() {
               : undefined,
             dpFindings: dpEnabled
               ? (data.pillarResults?.darkpatterns?.findings || []).filter(
-                  (f) => f.pageUrl === url,
-                )
+                (f) => f.pageUrl === url,
+              )
               : [],
             perfPage: perfEnabled
               ? data.pillarResults?.performance?.pages?.find(
-                  (p) => p.url === url,
-                )
+                (p) => p.url === url,
+              )
               : undefined,
             privFindings: privEnabled
               ? (data.pillarResults?.privacy?.findings || []).filter(
-                  (f) => f.pageUrl === url,
-                )
+                (f) => f.pageUrl === url,
+              )
               : [],
           });
 
@@ -3974,9 +3947,9 @@ export default function AuditResultPage() {
                 dpFindings.length === 0
                   ? 100
                   : Math.max(
-                      0,
-                      100 - dpCrit * 25 - dpHigh * 15 - dpMed * 8 - dpLow * 3,
-                    ),
+                    0,
+                    100 - dpCrit * 25 - dpHigh * 15 - dpMed * 8 - dpLow * 3,
+                  ),
               );
             if (perfEnabled && perfPage) scores.push(perfPage.score);
             if (privEnabled)
@@ -4251,37 +4224,37 @@ export default function AuditResultPage() {
                         <>
                           {privFindings.filter((f) => f.severity === "critical")
                             .length > 0 && (
-                            <span className="badge badge-critical">
-                              {
-                                privFindings.filter(
-                                  (f) => f.severity === "critical",
-                                ).length
-                              }{" "}
-                              Critical
-                            </span>
-                          )}
+                              <span className="badge badge-critical">
+                                {
+                                  privFindings.filter(
+                                    (f) => f.severity === "critical",
+                                  ).length
+                                }{" "}
+                                Critical
+                              </span>
+                            )}
                           {privFindings.filter((f) => f.severity === "high")
                             .length > 0 && (
-                            <span className="badge badge-high">
-                              {
-                                privFindings.filter(
-                                  (f) => f.severity === "high",
-                                ).length
-                              }{" "}
-                              High
-                            </span>
-                          )}
+                              <span className="badge badge-high">
+                                {
+                                  privFindings.filter(
+                                    (f) => f.severity === "high",
+                                  ).length
+                                }{" "}
+                                High
+                              </span>
+                            )}
                           {privFindings.filter((f) => f.severity === "medium")
                             .length > 0 && (
-                            <span className="badge badge-medium">
-                              {
-                                privFindings.filter(
-                                  (f) => f.severity === "medium",
-                                ).length
-                              }{" "}
-                              Med
-                            </span>
-                          )}
+                              <span className="badge badge-medium">
+                                {
+                                  privFindings.filter(
+                                    (f) => f.severity === "medium",
+                                  ).length
+                                }{" "}
+                                Med
+                              </span>
+                            )}
                         </>
                       )}
                     </div>
@@ -4859,18 +4832,26 @@ export default function AuditResultPage() {
             );
           }
           // Collapse duplicate findings (same ruleId on same page) into grouped entries with a count.
+          // Split into active (not rejected) and rejected findings.
           const dpGroupMap = new Map<
+            string,
+            { finding: DPFinding; count: number }
+          >();
+          const dpRejectedGroupMap = new Map<
             string,
             { finding: DPFinding; count: number }
           >();
           for (const f of dp.findings) {
             const key = `${(f as any).ruleId || f.id}|${f.pageUrl}`;
-            if (!dpGroupMap.has(key))
-              dpGroupMap.set(key, { finding: f, count: 1 });
-            else dpGroupMap.get(key)!.count++;
+            const target = f.rejected ? dpRejectedGroupMap : dpGroupMap;
+            if (!target.has(key))
+              target.set(key, { finding: f, count: 1 });
+            else target.get(key)!.count++;
           }
           const dpGrouped = [...dpGroupMap.values()];
-          const dpDupCount = dp.findings.length - dpGrouped.length;
+          const dpRejectedGrouped = [...dpRejectedGroupMap.values()];
+          const dpDupCount = dp.findings.filter(f => !f.rejected).length - dpGrouped.length;
+
           const principleLabels: Record<string, string> = {
             "informed-consent": "Informed Consent",
             "symmetry-of-choice": "Symmetry of Choice",
@@ -5128,305 +5109,305 @@ export default function AuditResultPage() {
               {/* ── Detection Intelligence Dashboard ── */}
               {(dp as any).findingsBySource || (dp as any).findingsByPhase
                 ? // <div className="glass-card" style={{ marginBottom: 20 }}>
-                  //   <div
-                  //     style={{
-                  //       display: "flex",
-                  //       alignItems: "center",
-                  //       gap: 8,
-                  //       marginBottom: 14,
-                  //     }}
-                  //   >
-                  //     <span style={{ fontSize: 14, fontWeight: 700 }}>
-                  //       🔬 Detection Intelligence
-                  //     </span>
-                  //     <span
-                  //       style={{display: "inline-flex", alignItems: "center",
-                  //         fontSize: 10,
-                  //         padding: "2px 7px",
-                  //         borderRadius: 99,
-                  //         background: "rgba(205,171,254,0.15)",
-                  //         color: "var(--accent-purple)",
-                  //         border: "1px solid rgba(205,171,254,0.3)",
-                  //         fontWeight: 700,
-                  //         fontFamily: "Geist Mono, monospace",
-                  //       }}
-                  //     >
-                  //       MULTI-ENGINE
-                  //     </span>
-                  //   </div>
-                  //   <div
-                  //     style={{
-                  //       display: "grid",
-                  //       gridTemplateColumns: "1fr 1fr",
-                  //       gap: 16,
-                  //     }}
-                  //   >
-                  //     {/* Detection Source Breakdown */}
-                  //     {/* {(dp as any).findingsBySource &&
-                  //       Object.keys((dp as any).findingsBySource).length > 0 && (
-                  //         <div>
-                  //           <div
-                  //             style={{
-                  //               fontSize: 11,
-                  //               fontWeight: 700,
-                  //               color: "var(--text-secondary)",
-                  //               marginBottom: 8,
-                  //               fontFamily: "Geist Mono, monospace",
-                  //               textTransform: "uppercase",
-                  //             }}
-                  //           >
-                  //             By Detection Source
-                  //           </div>
-                  //           <div
-                  //             style={{
-                  //               display: "flex",
-                  //               flexDirection: "column",
-                  //               gap: 5,
-                  //             }}
-                  //           >
-                  //             {Object.entries(
-                  //               (dp as any).findingsBySource as Record<
-                  //                 string,
-                  //                 number
-                  //               >,
-                  //             ).map(([src, count]) => {
-                  //               const srcMeta: Record<
-                  //                 string,
-                  //                 { icon: string; color: string; label: string }
-                  //               > = {
-                  //                 rule: {
-                  //                   icon: "📋",
-                  //                   color: "#0091DA",
-                  //                   label: "DOM + NLP Rules",
-                  //                 },
-                  //                 "ai-vision": {
-                  //                   icon: "👁️",
-                  //                   color: "#9B59B6",
-                  //                   label: "GPT-4o Vision (Phase 8)",
-                  //                 },
-                  //                 temporal: {
-                  //                   icon: "⏱️",
-                  //                   color: "#E67E22",
-                  //                   label: "Temporal Scanner (Gap 3)",
-                  //                 },
-                  //                 "cta-scorer": {
-                  //                   icon: "⚖️",
-                  //                   color: "#E74C3C",
-                  //                   label: "CTA Prominence Scorer (Gap 4)",
-                  //                 },
-                  //                 ai: {
-                  //                   icon: "🤖",
-                  //                   color: "#27AE60",
-                  //                   label: "AI Classification",
-                  //                 },
-                  //                 journey: {
-                  //                   icon: "🗺️",
-                  //                   color: "#F39C12",
-                  //                   label: "Journey Tester",
-                  //                 },
-                  //               };
-                  //               const meta = srcMeta[src] || {
-                  //                 icon: "📌",
-                  //                 color: "var(--text-secondary)",
-                  //                 label: src,
-                  //               };
-                  //               return (
-                  //                 <div
-                  //                   key={src}
-                  //                   style={{
-                  //                     display: "flex",
-                  //                     alignItems: "center",
-                  //                     gap: 7,
-                  //                   }}
-                  //                 >
-                  //                   <span style={{ fontSize: 11 }}>
-                  //                     {meta.icon}
-                  //                   </span>
-                  //                   <div
-                  //                     style={{
-                  //                       flex: 1,
-                  //                       height: 6,
-                  //                       borderRadius: 99,
-                  //                       background: "var(--bg-secondary)",
-                  //                       overflow: "hidden",
-                  //                     }}
-                  //                   >
-                  //                     <div
-                  //                       style={{
-                  //                         height: "100%",
-                  //                         width: `${Math.min(100, (count / dp.totalFindings) * 100)}%`,
-                  //                         background: meta.color,
-                  //                         borderRadius: 99,
-                  //                         transition: "width 0.5s ease",
-                  //                       }}
-                  //                     />
-                  //                   </div>
-                  //                   <span
-                  //                     style={{
-                  //                       fontSize: 10,
-                  //                       color: meta.color,
-                  //                       fontWeight: 700,
-                  //                       minWidth: 18,
-                  //                       textAlign: "right",
-                  //                     }}
-                  //                   >
-                  //                     {count}
-                  //                   </span>
-                  //                   <span
-                  //                     style={{
-                  //                       fontSize: 10,
-                  //                       color: "var(--text-secondary)",
-                  //                       minWidth: 140,
-                  //                     }}
-                  //                   >
-                  //                     {meta.label}
-                  //                   </span>
-                  //                 </div>
-                  //               );
-                  //             })}
-                  //           </div>
-                  //         </div>
-                  //       )} */}
-                  //     {/* Phase Breakdown */}
-                  //     {(dp as any).findingsByPhase &&
-                  //       Object.keys((dp as any).findingsByPhase).length > 0 && (
-                  //         <div>
-                  //           <div
-                  //             style={{
-                  //               fontSize: 11,
-                  //               fontWeight: 700,
-                  //               color: "var(--text-secondary)",
-                  //               marginBottom: 8,
-                  //               fontFamily: "Geist Mono, monospace",
-                  //               textTransform: "uppercase",
-                  //             }}
-                  //           >
-                  //             By Detection Phase
-                  //           </div>
-                  //           <div
-                  //             style={{
-                  //               display: "flex",
-                  //               flexWrap: "wrap",
-                  //               gap: 5,
-                  //             }}
-                  //           >
-                  //             {Object.entries(
-                  //               (dp as any).findingsByPhase as Record<
-                  //                 string,
-                  //                 number
-                  //               >,
-                  //             )
-                  //               .sort(([, a], [, b]) => b - a)
-                  //               .map(([phase, count]) => (
-                  //                 <div
-                  //                   key={phase}
-                  //                   style={{
-                  //                     display: "flex",
-                  //                     alignItems: "center",
-                  //                     gap: 5,
-                  //                     padding: "4px 9px",
-                  //                     borderRadius: 99,
-                  //                     fontSize: 10,
-                  //                     fontWeight: 700,
-                  //                     fontFamily: "Geist Mono, monospace",
-                  //                     background: "var(--bg-secondary)",
-                  //                     border: "1px solid var(--border)",
-                  //                     color: "var(--text-secondary)",
-                  //                   }}
-                  //                 >
-                  //                   <span
-                  //                     style={{ color: "var(--accent-purple)" }}
-                  //                   >
-                  //                     {count}
-                  //                   </span>
-                  //                   <span>{phase}</span>
-                  //                 </div>
-                  //               ))}
-                  //           </div>
-                  //         </div>
-                  //       )}
-                  //   </div>
-                  //   {/* Brignull Taxonomy Distribution */}
-                  //   {dp.findings.some((f: any) => f.brignullPattern) && (
-                  //     <div
-                  //       style={{
-                  //         marginTop: 14,
-                  //         paddingTop: 14,
-                  //         borderTop: "1px solid var(--border)",
-                  //       }}
-                  //     >
-                  //       <div
-                  //         style={{
-                  //           fontSize: 11,
-                  //           fontWeight: 700,
-                  //           color: "var(--text-secondary)",
-                  //           marginBottom: 8,
-                  //           fontFamily: "Geist Mono, monospace",
-                  //           textTransform: "uppercase",
-                  //         }}
-                  //       >
-                  //         Brignull Taxonomy Distribution
-                  //       </div>
-                  //       <div
-                  //         style={{ display: "flex", flexWrap: "wrap", gap: 5 }}
-                  //       >
-                  //         {(() => {
-                  //           const brignullCounts: Record<
-                  //             string,
-                  //             { count: number; number: number }
-                  //           > = {};
-                  //           for (const f of dp.findings) {
-                  //             const bp = (f as any).brignullPattern;
-                  //             const bn = (f as any).brignullNumber;
-                  //             if (bp)
-                  //               brignullCounts[bp] = {
-                  //                 count: (brignullCounts[bp]?.count || 0) + 1,
-                  //                 number: bn || 0,
-                  //               };
-                  //           }
-                  //           return Object.entries(brignullCounts)
-                  //             .sort(([, a], [, b]) => b.count - a.count)
-                  //             .map(([pattern, { count, number }]) => (
-                  //               <div
-                  //                 key={pattern}
-                  //                 style={{
-                  //                   display: "flex",
-                  //                   alignItems: "center",
-                  //                   gap: 5,
-                  //                   padding: "4px 9px",
-                  //                   borderRadius: 99,
-                  //                   fontSize: 10,
-                  //                   fontWeight: 700,
-                  //                   background: "rgba(205,171,254,0.1)",
-                  //                   border: "1px solid rgba(205,171,254,0.3)",
-                  //                   color: "var(--pillar-dp)",
-                  //                 }}
-                  //               >
-                  //                 {number > 0 && (
-                  //                   <span style={{ opacity: 0.6 }}>
-                  //                     #{number}
-                  //                   </span>
-                  //                 )}
-                  //                 <span>{pattern}</span>
-                  //                 <span
-                  //                   style={{display: "inline-flex", alignItems: "center",
-                  //                     background: "rgba(205,171,254,0.2)",
-                  //                     borderRadius: 99,
-                  //                     padding: "0 5px",
-                  //                     minWidth: 16,
-                  //                     textAlign: "center",
-                  //                   }}
-                  //                 >
-                  //                   {count}
-                  //                 </span>
-                  //               </div>
-                  //             ));
-                  //         })()}
-                  //       </div>
-                  //     </div>
-                  //   )}
-                  // </div>
-                  null
+                //   <div
+                //     style={{
+                //       display: "flex",
+                //       alignItems: "center",
+                //       gap: 8,
+                //       marginBottom: 14,
+                //     }}
+                //   >
+                //     <span style={{ fontSize: 14, fontWeight: 700 }}>
+                //       🔬 Detection Intelligence
+                //     </span>
+                //     <span
+                //       style={{display: "inline-flex", alignItems: "center",
+                //         fontSize: 10,
+                //         padding: "2px 7px",
+                //         borderRadius: 99,
+                //         background: "rgba(205,171,254,0.15)",
+                //         color: "var(--accent-purple)",
+                //         border: "1px solid rgba(205,171,254,0.3)",
+                //         fontWeight: 700,
+                //         fontFamily: "Geist Mono, monospace",
+                //       }}
+                //     >
+                //       MULTI-ENGINE
+                //     </span>
+                //   </div>
+                //   <div
+                //     style={{
+                //       display: "grid",
+                //       gridTemplateColumns: "1fr 1fr",
+                //       gap: 16,
+                //     }}
+                //   >
+                //     {/* Detection Source Breakdown */}
+                //     {/* {(dp as any).findingsBySource &&
+                //       Object.keys((dp as any).findingsBySource).length > 0 && (
+                //         <div>
+                //           <div
+                //             style={{
+                //               fontSize: 11,
+                //               fontWeight: 700,
+                //               color: "var(--text-secondary)",
+                //               marginBottom: 8,
+                //               fontFamily: "Geist Mono, monospace",
+                //               textTransform: "uppercase",
+                //             }}
+                //           >
+                //             By Detection Source
+                //           </div>
+                //           <div
+                //             style={{
+                //               display: "flex",
+                //               flexDirection: "column",
+                //               gap: 5,
+                //             }}
+                //           >
+                //             {Object.entries(
+                //               (dp as any).findingsBySource as Record<
+                //                 string,
+                //                 number
+                //               >,
+                //             ).map(([src, count]) => {
+                //               const srcMeta: Record<
+                //                 string,
+                //                 { icon: string; color: string; label: string }
+                //               > = {
+                //                 rule: {
+                //                   icon: "📋",
+                //                   color: "#0091DA",
+                //                   label: "DOM + NLP Rules",
+                //                 },
+                //                 "ai-vision": {
+                //                   icon: "👁️",
+                //                   color: "#9B59B6",
+                //                   label: "GPT-4o Vision (Phase 8)",
+                //                 },
+                //                 temporal: {
+                //                   icon: "⏱️",
+                //                   color: "#E67E22",
+                //                   label: "Temporal Scanner (Gap 3)",
+                //                 },
+                //                 "cta-scorer": {
+                //                   icon: "⚖️",
+                //                   color: "#E74C3C",
+                //                   label: "CTA Prominence Scorer (Gap 4)",
+                //                 },
+                //                 ai: {
+                //                   icon: "🤖",
+                //                   color: "#27AE60",
+                //                   label: "AI Classification",
+                //                 },
+                //                 journey: {
+                //                   icon: "🗺️",
+                //                   color: "#F39C12",
+                //                   label: "Journey Tester",
+                //                 },
+                //               };
+                //               const meta = srcMeta[src] || {
+                //                 icon: "📌",
+                //                 color: "var(--text-secondary)",
+                //                 label: src,
+                //               };
+                //               return (
+                //                 <div
+                //                   key={src}
+                //                   style={{
+                //                     display: "flex",
+                //                     alignItems: "center",
+                //                     gap: 7,
+                //                   }}
+                //                 >
+                //                   <span style={{ fontSize: 11 }}>
+                //                     {meta.icon}
+                //                   </span>
+                //                   <div
+                //                     style={{
+                //                       flex: 1,
+                //                       height: 6,
+                //                       borderRadius: 99,
+                //                       background: "var(--bg-secondary)",
+                //                       overflow: "hidden",
+                //                     }}
+                //                   >
+                //                     <div
+                //                       style={{
+                //                         height: "100%",
+                //                         width: `${Math.min(100, (count / dp.totalFindings) * 100)}%`,
+                //                         background: meta.color,
+                //                         borderRadius: 99,
+                //                         transition: "width 0.5s ease",
+                //                       }}
+                //                     />
+                //                   </div>
+                //                   <span
+                //                     style={{
+                //                       fontSize: 10,
+                //                       color: meta.color,
+                //                       fontWeight: 700,
+                //                       minWidth: 18,
+                //                       textAlign: "right",
+                //                     }}
+                //                   >
+                //                     {count}
+                //                   </span>
+                //                   <span
+                //                     style={{
+                //                       fontSize: 10,
+                //                       color: "var(--text-secondary)",
+                //                       minWidth: 140,
+                //                     }}
+                //                   >
+                //                     {meta.label}
+                //                   </span>
+                //                 </div>
+                //               );
+                //             })}
+                //           </div>
+                //         </div>
+                //       )} */}
+                //     {/* Phase Breakdown */}
+                //     {(dp as any).findingsByPhase &&
+                //       Object.keys((dp as any).findingsByPhase).length > 0 && (
+                //         <div>
+                //           <div
+                //             style={{
+                //               fontSize: 11,
+                //               fontWeight: 700,
+                //               color: "var(--text-secondary)",
+                //               marginBottom: 8,
+                //               fontFamily: "Geist Mono, monospace",
+                //               textTransform: "uppercase",
+                //             }}
+                //           >
+                //             By Detection Phase
+                //           </div>
+                //           <div
+                //             style={{
+                //               display: "flex",
+                //               flexWrap: "wrap",
+                //               gap: 5,
+                //             }}
+                //           >
+                //             {Object.entries(
+                //               (dp as any).findingsByPhase as Record<
+                //                 string,
+                //                 number
+                //               >,
+                //             )
+                //               .sort(([, a], [, b]) => b - a)
+                //               .map(([phase, count]) => (
+                //                 <div
+                //                   key={phase}
+                //                   style={{
+                //                     display: "flex",
+                //                     alignItems: "center",
+                //                     gap: 5,
+                //                     padding: "4px 9px",
+                //                     borderRadius: 99,
+                //                     fontSize: 10,
+                //                     fontWeight: 700,
+                //                     fontFamily: "Geist Mono, monospace",
+                //                     background: "var(--bg-secondary)",
+                //                     border: "1px solid var(--border)",
+                //                     color: "var(--text-secondary)",
+                //                   }}
+                //                 >
+                //                   <span
+                //                     style={{ color: "var(--accent-purple)" }}
+                //                   >
+                //                     {count}
+                //                   </span>
+                //                   <span>{phase}</span>
+                //                 </div>
+                //               ))}
+                //           </div>
+                //         </div>
+                //       )}
+                //   </div>
+                //   {/* Brignull Taxonomy Distribution */}
+                //   {dp.findings.some((f: any) => f.brignullPattern) && (
+                //     <div
+                //       style={{
+                //         marginTop: 14,
+                //         paddingTop: 14,
+                //         borderTop: "1px solid var(--border)",
+                //       }}
+                //     >
+                //       <div
+                //         style={{
+                //           fontSize: 11,
+                //           fontWeight: 700,
+                //           color: "var(--text-secondary)",
+                //           marginBottom: 8,
+                //           fontFamily: "Geist Mono, monospace",
+                //           textTransform: "uppercase",
+                //         }}
+                //       >
+                //         Brignull Taxonomy Distribution
+                //       </div>
+                //       <div
+                //         style={{ display: "flex", flexWrap: "wrap", gap: 5 }}
+                //       >
+                //         {(() => {
+                //           const brignullCounts: Record<
+                //             string,
+                //             { count: number; number: number }
+                //           > = {};
+                //           for (const f of dp.findings) {
+                //             const bp = (f as any).brignullPattern;
+                //             const bn = (f as any).brignullNumber;
+                //             if (bp)
+                //               brignullCounts[bp] = {
+                //                 count: (brignullCounts[bp]?.count || 0) + 1,
+                //                 number: bn || 0,
+                //               };
+                //           }
+                //           return Object.entries(brignullCounts)
+                //             .sort(([, a], [, b]) => b.count - a.count)
+                //             .map(([pattern, { count, number }]) => (
+                //               <div
+                //                 key={pattern}
+                //                 style={{
+                //                   display: "flex",
+                //                   alignItems: "center",
+                //                   gap: 5,
+                //                   padding: "4px 9px",
+                //                   borderRadius: 99,
+                //                   fontSize: 10,
+                //                   fontWeight: 700,
+                //                   background: "rgba(205,171,254,0.1)",
+                //                   border: "1px solid rgba(205,171,254,0.3)",
+                //                   color: "var(--pillar-dp)",
+                //                 }}
+                //               >
+                //                 {number > 0 && (
+                //                   <span style={{ opacity: 0.6 }}>
+                //                     #{number}
+                //                   </span>
+                //                 )}
+                //                 <span>{pattern}</span>
+                //                 <span
+                //                   style={{display: "inline-flex", alignItems: "center",
+                //                     background: "rgba(205,171,254,0.2)",
+                //                     borderRadius: 99,
+                //                     padding: "0 5px",
+                //                     minWidth: 16,
+                //                     textAlign: "center",
+                //                   }}
+                //                 >
+                //                   {count}
+                //                 </span>
+                //               </div>
+                //             ));
+                //         })()}
+                //       </div>
+                //     </div>
+                //   )}
+                // </div>
+                null
                 : null}
 
               {/* ── Compliance Context Panel (IRDAI / RBI / SEBI) ── */}
@@ -5598,162 +5579,16 @@ export default function AuditResultPage() {
                 </div>
               )}
 
-              {/* ── Audience-Segmented Report Toggle ── */}
-              <div style={{ marginBottom: 20 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    marginBottom: 8,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: "var(--text-secondary)",
-                      fontFamily: "Geist Mono, monospace",
-                    }}
-                  >
-                    VIEW AS:
-                  </div>
-                  {(
-                    [
-                      {
-                        key: "developer",
-                        icon: "",
-                        label: "Developer",
-                        desc: "Code fixes, selectors, priority queue",
-                      },
-                      {
-                        key: "designer",
-                        icon: "",
-                        label: "Designer",
-                        desc: "Visual evidence, CTA weights, design tokens",
-                      },
-                      {
-                        key: "legal",
-                        icon: "",
-                        label: "Legal",
-                        desc: "Regulation articles, risk tiers, precedents",
-                      },
-                    ] as const
-                  ).map((v) => (
-                    <button
-                      key={v.key}
-                      onClick={() => setAudienceView(v.key)}
-                      title={v.desc}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "6px 14px",
-                        borderRadius: 99,
-                        border: `1px solid var(--kpmg-dynamic)`,
-                        background:
-                          audienceView === v.key
-                            ? "var(--kpmg-dynamic)"
-                            : "transparent",
-                        color:
-                          audienceView === v.key
-                            ? "var(--alternate-text)"
-                            : "var(--text-secondary)",
-                        cursor: "pointer",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        transition: "all 0.2s ease",
-                      }}
-                    >
-                      <span>{v.icon}</span> {v.label}
-                    </button>
-                  ))}
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: "var(--text-secondary)",
-                      marginLeft: 4,
-                    }}
-                  >
-                    — tailors finding detail for each audience
-                  </span>
-                </div>
 
-                {/* Developer View hint bar */}
-                {/* {audienceView === "developer" && (
-                  <div
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: 8,
-                      background: "rgba(0,145,218,0.07)",
-                      border: "1px solid rgba(0,145,218,0.2)",
-                      fontSize: 11,
-                      color: "#0091DA",
-                      display: "flex",
-                      gap: 6,
-                      alignItems: "center",
-                    }}
-                  >
-                    <span>👨‍💻</span>
-                    <span>
-                      <strong>Developer view:</strong> Shows WCAG/DSA article
-                      violated, element selector, P0–P3 priority, and a
-                      ready-to-use code fix for each finding.
-                    </span>
-                  </div>
-                )} */}
-                {audienceView === "designer" && (
-                  <div
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: 8,
-                      background: "rgba(205,171,254,0.07)",
-                      border: "1px solid rgba(205,171,254,0.2)",
-                      fontSize: 11,
-                      color: "var(--offshade-text)",
-                      display: "flex",
-                      gap: 6,
-                      alignItems: "center",
-                    }}
-                  >
-                    {/* <span>🎨</span> */}
-                    <span>
-                      <strong>Designer view:</strong> Shows Brignull pattern
-                      category, CTA prominence ratios, visual evidence
-                      description, and design-token fix recommendations.
-                    </span>
-                  </div>
-                )}
-                {audienceView === "legal" && (
-                  <div
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: 8,
-                      background: "rgba(223, 223, 223, 0.71)",
-                      border: "1px solid rgba(236, 236, 236, 0.8)",
-                      fontSize: 11,
-                      color: "var(--offshade-text)",
-                      display: "flex",
-                      gap: 6,
-                      alignItems: "center",
-                    }}
-                  >
-                    {/* <span>⚖️</span> */}
-                    <span>
-                      <strong>Legal view:</strong> Shows regulation articles
-                      violated (FTC/CCPA), risk tier, enforcement precedent
-                      context, and remediation deadline framing.
-                    </span>
-                  </div>
-                )}
-              </div>
 
               {/* Findings List */}
               <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
-                Dark Pattern Findings ({dpGrouped.length} unique
+                Dark Pattern Findings ({dpGrouped.length} active
                 {dpDupCount > 0
                   ? ` · ${dpDupCount} duplicate${dpDupCount > 1 ? "s" : ""} collapsed`
+                  : ""}
+                {dpRejectedGrouped.length > 0
+                  ? ` · ${dpRejectedGrouped.length} rejected`
                   : ""}
                 )
               </h3>
@@ -6076,7 +5911,7 @@ export default function AuditResultPage() {
                               {Math.round(
                                 (1 -
                                   f.complianceExemption.scoreReductionFactor) *
-                                  100,
+                                100,
                               )}
                               % score reduction applied
                             </span>
@@ -6269,410 +6104,85 @@ export default function AuditResultPage() {
                           </div>
                         )}
 
-                      {/* ── DEVELOPER VIEW ── */}
-                      {audienceView === "developer" && (
+                      {/* ── UNIFIED FINDING CARD DETAILS ── */}
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                        }}
+                      >
+                        {/* Regulation Badges & Confidence */}
                         <div
                           style={{
                             display: "flex",
-                            flexDirection: "column",
                             gap: 6,
+                            alignItems: "center",
+                            flexWrap: "wrap",
                           }}
                         >
-                          {/* Priority + effort row */}
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: 6,
-                              alignItems: "center",
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            {/* <span
-                              style={{display: "inline-flex", alignItems: "center", 
-                                fontSize: 9,
-                                fontWeight: 700,
-                                padding: "2px 8px",
-                                borderRadius: 99,
-                                // fontFamily: "Geist Mono, monospace",
-                                background:
-                                  f.severity === "critical"
-                                    ? "rgba(232,0,45,0.15)"
-                                    : f.severity === "high"
-                                      ? "rgba(254,113,65,0.15)"
-                                      : "rgba(217,119,6,0.15)",
-                                color:
-                                  f.severity === "critical"
-                                    ? "#E8002D"
-                                    : f.severity === "high"
-                                      ? "#FE7141"
-                                      : "#D97706",
-                                border: `1px solid ${f.severity === "critical" ? "rgba(232,0,45,0.3)" : f.severity === "high" ? "rgba(254,113,65,0.3)" : "rgba(217,119,6,0.3)"}`,
-                              }}
-                            >
-                              {(f as any).fixPriority ||
-                                (f.severity === "critical"
-                                  ? "P0"
-                                  : f.severity === "high"
-                                    ? "P1"
-                                    : "P2")}{" "}
-                              —{" "}
-                              {f.severity === "critical"
-                                ? "Fix immediately"
-                                : f.severity === "high"
-                                  ? "Fix this sprint"
-                                  : f.severity === "medium"
-                                    ? "Fix this quarter"
-                                    : "Backlog"}
-                            </span> */}
-                            {/* {(f as any).estimatedEffort && (
-                              <span
-                                style={{display: "inline-flex", alignItems: "center", 
-                                  fontSize: 9,
-                                  fontWeight: 700,
-                                  padding: "2px 7px",
-                                  borderRadius: 99,
-                                  background: "rgba(0,145,218,0.1)",
-                                  color: "#0091DA",
-                                  border: "1px solid rgba(0,145,218,0.25)",
-                                  fontFamily: "Geist Mono, monospace",
-                                }}
-                              >
-                                ⏳ Effort: {(f as any).estimatedEffort}
-                              </span>
-                            )} */}
-                            {/* {(f as any).dsaArticle && (
-                              <span
-                                style={{display: "inline-flex", alignItems: "center", 
-                                  fontSize: 9,
-                                  fontWeight: 600,
-                                  padding: "2px 7px",
-                                  borderRadius: 99,
-                                  background: "rgba(254,113,65,0.1)",
-                                  color: "#FE7141",
-                                  border: "1px solid rgba(254,113,65,0.25)",
-                                }}
-                              >
-                                DSA {(f as any).dsaArticle}
-                              </span>
-                            )} */}
-                            <span
-                              style={{
-                                fontSize: 10,
-                                color: "var(--text-secondary)",
-                                marginLeft: "auto",
-                              }}
-                            >
-                              {f.confidence} confidence
-                            </span>
-                          </div>
-                          {/* Regulation articles */}
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: 4,
-                              flexWrap: "wrap",
-                            }}
-                          >
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                             {f.regulation.map((r) => (
                               <span key={r} className="dp-regulation-badge">
                                 {r}
                               </span>
                             ))}
                           </div>
-                          {/* Evidence */}
-                          <div
+                          <span
                             style={{
-                              fontSize: 11,
+                              fontSize: 10,
                               color: "var(--text-secondary)",
-                              padding: "5px 9px",
-                              background: "rgba(0,0,0,0.18)",
-                              borderRadius: 6,
-                              lineHeight: 1.5,
+                              marginLeft: "auto",
                             }}
                           >
-                            <strong>Evidence:</strong> {f.evidence.summary}
-                            {f.evidence.details.length > 0 && (
-                              <div
-                                style={{
-                                  marginTop: 4,
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: 2,
-                                }}
-                              >
-                                {f.evidence.details.slice(0, 3).map((d, i) => (
-                                  <div
-                                    key={i}
-                                    style={{
-                                      fontSize: 10,
-                                      color: "var(--text-secondary)",
-                                      background: "transparent",
-                                    }}
-                                  >
-                                    • {d}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          {/* Code fix */}
-                          {(f as any).developerFix ? (
-                            <div
-                              style={{
-                                padding: "6px 10px",
-                                borderRadius: 6,
-                                // background: "rgba(0,145,218,0.06)",
-                                border: "1px solid var(--dynamic-border)",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: 9,
-                                  fontWeight: 700,
-                                  color: "var(--offshade-text)",
-                                  marginBottom: 3,
-                                  fontFamily: "Geist Mono, monospace",
-                                  textTransform: "uppercase",
-                                }}
-                              ></div>
-                              <div
-                                style={{
-                                  fontSize: 11,
-                                  color: "var(--text-secondary)",
-                                  lineHeight: 1.6,
-                                }}
-                              >
-                                {(f as any).developerFix}
-                              </div>
-                            </div>
-                          ) : (
-                            <div
-                              style={{
-                                fontSize: 11,
-                                color: "#00BA8C",
-                                lineHeight: 1.5,
-                              }}
-                            >
-                              💡 {f.recommendation}
-                            </div>
-                          )}
+                            {f.confidence} confidence
+                          </span>
                         </div>
-                      )}
 
-                      {/* ── DESIGNER VIEW ── */}
-                      {audienceView === "designer" && (
+                        {/* Evidence Summary & Details */}
                         <div
                           style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 6,
+                            fontSize: 11,
+                            color: "var(--text-secondary)",
+                            padding: "6px 10px",
+                            background: "rgba(0,0,0,0.18)",
+                            borderRadius: 6,
+                            lineHeight: 1.5,
                           }}
                         >
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: 6,
-                              flexWrap: "wrap",
-                              alignItems: "center",
-                            }}
-                          >
-                            {/* {(f as any).brignullPattern && (
-                              <span
-                                style={{display: "inline-flex", alignItems: "center", 
-                                  fontSize: 9,
-                                  fontWeight: 700,
-                                  padding: "2px 8px",
-                                  borderRadius: 99,
-                                  background: "rgba(205,171,254,0.12)",
-                                  color: "var(--pillar-dp)",
-                                  border: "1px solid rgba(205,171,254,0.3)",
-                                  fontFamily: "Geist Mono, monospace",
-                                }}
-                              >
-                                 Brignull{" "}
-                                {(f as any).brignullNumber
-                                  ? `#${(f as any).brignullNumber}`
-                                  : ""}
-                                : {(f as any).brignullPattern}
-                              </span>
-                            )} */}
-                            {/* <span className="dp-principle-badge">
-                              📐 {principleLabels[f.principle] || f.principle}
-                            </span> */}
-                          </div>
-                          {/* Visual evidence */}
-                          <div
-                            style={{
-                              fontSize: 11,
-                              color: "var(--text-secondary)",
-                              padding: "5px 9px",
-                              background: "rgba(0,0,0,0.18)",
-                              borderRadius: 6,
-                            }}
-                          >
-                            <strong>Visual evidence:</strong>{" "}
-                            {f.evidence.summary}
-                            {f.evidence.details.length > 0 && (
-                              <div
-                                style={{
-                                  marginTop: 4,
-                                  color: "var(--text-secondary)",
-                                }}
-                              >
-                                {f.evidence.details[0]}
-                              </div>
-                            )}
-                          </div>
-                          {/* Designer fix */}
-                          {(f as any).designerFix ? (
+                          <strong>Evidence:</strong> {f.evidence.summary}
+                          {f.evidence.details.length > 0 && (
                             <div
                               style={{
-                                padding: "6px 10px",
-                                borderRadius: 6,
-                                background: "rgba(205,171,254,0.06)",
-                                border: "1px solid rgba(205,171,254,0.2)",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: 9,
-                                  fontWeight: 700,
-                                  color: "var(--pillar-dp)",
-                                  marginBottom: 3,
-                                  fontFamily: "Geist Mono, monospace",
-                                  textTransform: "uppercase",
-                                }}
-                              >
-                                🎨 Design Fix
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 11,
-                                  color: "var(--text-secondary)",
-                                  lineHeight: 1.5,
-                                }}
-                              >
-                                {(f as any).designerFix}
-                              </div>
-                            </div>
-                          ) : (
-                            <div style={{ fontSize: 11, color: "#00BA8C" }}>
-                              💡 {f.recommendation}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* ── LEGAL VIEW ── */}
-                      {audienceView === "legal" && (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 6,
-                          }}
-                        >
-                          {/* Risk tier */}
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: 6,
-                              flexWrap: "wrap",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                fontSize: 9,
-                                fontWeight: 700,
-                                padding: "2px 8px",
-                                borderRadius: 99,
-                                fontFamily: "Geist Mono, monospace",
-                                background:
-                                  f.severity === "critical"
-                                    ? "rgba(232,0,45,0.12)"
-                                    : f.severity === "high"
-                                      ? "rgba(254,113,65,0.12)"
-                                      : "rgba(217,119,6,0.12)",
-                                color:
-                                  f.severity === "critical"
-                                    ? "#E8002D"
-                                    : f.severity === "high"
-                                      ? "#FE7141"
-                                      : "#D97706",
-                                border: `1px solid ${f.severity === "critical" ? "rgba(232,0,45,0.3)" : f.severity === "high" ? "rgba(254,113,65,0.3)" : "rgba(217,119,6,0.3)"}`,
-                              }}
-                            >
-                              ⚖️{" "}
-                              {f.severity === "critical"
-                                ? "Critical Risk — Regulatory Enforcement Likely"
-                                : f.severity === "high"
-                                  ? "High Risk — Investigation Risk"
-                                  : "Medium Risk — Compliance Gap"}
-                            </span>
-                          </div>
-                          {/* Regulation articles */}
-                          <div
-                            style={{
-                              padding: "6px 10px",
-                              borderRadius: 6,
-                              background: "rgba(254,113,65,0.05)",
-                              border: "1px solid rgba(254,113,65,0.2)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: 9,
-                                fontWeight: 700,
-                                color: "#FE7141",
-                                marginBottom: 4,
-                                fontFamily: "Geist Mono, monospace",
-                                textTransform: "uppercase",
-                              }}
-                            >
-                              Regulation Articles Violated
-                            </div>
-                            <div
-                              style={{
+                                marginTop: 4,
                                 display: "flex",
-                                gap: 5,
-                                flexWrap: "wrap",
+                                flexDirection: "column",
+                                gap: 2,
                               }}
                             >
-                              {f.regulation.map((r) => (
-                                <span key={r} className="dp-regulation-badge">
-                                  {r}
-                                </span>
+                              {f.evidence.details.slice(0, 3).map((d, i) => (
+                                <div
+                                  key={i}
+                                  style={{
+                                    fontSize: 10,
+                                    color: "var(--text-secondary)",
+                                  }}
+                                >
+                                  • {d}
+                                </div>
                               ))}
-                              {(f as any).dsaArticle && (
-                                <span className="dp-regulation-badge">
-                                  {(f as any).dsaArticle}
-                                </span>
-                              )}
                             </div>
-                          </div>
-                          {/* Enforcement context — use legalSummary if available */}
-                          <div
-                            style={{
-                              fontSize: 11,
-                              color: "var(--text-secondary)",
-                              padding: "5px 9px",
-                              background: "rgba(0,0,0,0.18)",
-                              borderRadius: 6,
-                              lineHeight: 1.5,
-                            }}
-                          >
-                            {(f as any).legalSummary || f.description}
-                          </div>
-                          {/* Remediation framing */}
+                          )}
+                        </div>
+
+                        {/* Code Fix or Recommendation */}
+                        {(f as any).developerFix ? (
                           <div
                             style={{
                               padding: "6px 10px",
                               borderRadius: 6,
+                              border: "1px solid var(--dynamic-border)",
                               background: "rgba(0,186,140,0.05)",
-                              border: "1px solid rgba(0,186,140,0.2)",
                             }}
                           >
                             <div
@@ -6685,7 +6195,7 @@ export default function AuditResultPage() {
                                 textTransform: "uppercase",
                               }}
                             >
-                              Recommended Remediation
+                              Remediation Fix
                             </div>
                             <div
                               style={{
@@ -6694,57 +6204,98 @@ export default function AuditResultPage() {
                                 lineHeight: 1.5,
                               }}
                             >
-                              {f.recommendation}
-                            </div>
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                marginTop: 6,
-                                flexWrap: "wrap",
-                                gap: 4,
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  color: "var(--text-secondary)",
-                                }}
-                              >
-                                {f.severity === "critical"
-                                  ? "⏱ Remediate within 30 days — critical regulatory risk"
-                                  : f.severity === "high"
-                                    ? "⏱ Remediate within 90 days — high enforcement risk"
-                                    : "⏱ Remediate within 6 months — compliance gap"}
-                              </span>
-                              {(f as any).estimatedEffort && (
-                                <span
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    fontSize: 9,
-                                    fontWeight: 700,
-                                    padding: "2px 7px",
-                                    borderRadius: 99,
-                                    background: "rgba(0,186,140,0.12)",
-                                    color: "#00BA8C",
-                                    border: "1px solid rgba(0,186,140,0.25)",
-                                    fontFamily: "Geist Mono, monospace",
-                                  }}
-                                >
-                                  Effort: {(f as any).estimatedEffort}
-                                </span>
-                              )}
+                              {(f as any).developerFix}
                             </div>
                           </div>
-                        </div>
-                      )}
+                        ) : (
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "#00BA8C",
+                              padding: "6px 10px",
+                              borderRadius: 6,
+                              background: "rgba(0,186,140,0.05)",
+                              border: "1px solid rgba(0,186,140,0.2)",
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            💡 {f.recommendation}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ── False Positive Rejection Button ── */}
+                      <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
+                        {dpConfirming[f.id] ? (
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                              Remove from final report?
+                            </span>
+                            <button
+                              id={`reject-confirm-${f.id}`}
+                              onClick={() => handleRejectFinding(f.id, "Marked as false positive")}
+                              disabled={dpRejecting[f.id]}
+                              style={{
+                                padding: "4px 12px",
+                                borderRadius: 6,
+                                border: "1px solid rgba(232,0,45,0.4)",
+                                background: "rgba(232,0,45,0.12)",
+                                color: "#E8002D",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: dpRejecting[f.id] ? "wait" : "pointer",
+                                transition: "all 0.2s",
+                              }}
+                            >
+                              {dpRejecting[f.id] ? "Removing…" : "Yes, remove it"}
+                            </button>
+                            <button
+                              id={`reject-cancel-${f.id}`}
+                              onClick={() => setDpConfirming(prev => { const n = { ...prev }; delete n[f.id]; return n; })}
+                              style={{
+                                padding: "4px 10px",
+                                borderRadius: 6,
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                background: "transparent",
+                                color: "var(--text-secondary)",
+                                fontSize: 11,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            id={`reject-btn-${f.id}`}
+                            onClick={() => setDpConfirming(prev => ({ ...prev, [f.id]: true }))}
+                            title="Mark as false positive — removes from final report"
+                            style={{
+                              padding: "3px 10px",
+                              borderRadius: 6,
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              background: "transparent",
+                              color: "var(--text-secondary)",
+                              fontSize: 10,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                              transition: "all 0.15s",
+                            }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(232,0,45,0.3)"; (e.currentTarget as HTMLButtonElement).style.color = "#E8002D"; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.08)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)"; }}
+                          >
+                            <span style={{ fontSize: 11 }}>🚫</span> False Positive
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
 
-                {dp.totalFindings === 0 && (
+                {dpGrouped.length === 0 && dpRejectedGrouped.length === 0 && (
                   <div
                     className="glass-card"
                     style={{ textAlign: "center", padding: 40 }}
@@ -6763,6 +6314,91 @@ export default function AuditResultPage() {
                       This interface appears to respect user autonomy and
                       ethical design principles.
                     </div>
+                  </div>
+                )}
+
+                {/* ── Rejected Findings Panel ── */}
+                {dpRejectedGrouped.length > 0 && (
+                  <div style={{ marginTop: 20 }}>
+                    <button
+                      id="toggle-rejected-findings"
+                      onClick={() => setShowRejected(v => !v)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "6px 14px",
+                        borderRadius: 8,
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        background: "rgba(255,255,255,0.03)",
+                        color: "var(--text-secondary)",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        marginBottom: showRejected ? 12 : 0,
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <span>{showRejected ? "▼" : "▶"}</span>
+                      <span>🚫 Rejected findings ({dpRejectedGrouped.length})</span>
+                      <span style={{ fontSize: 10, opacity: 0.6 }}>— excluded from final report &amp; score</span>
+                    </button>
+
+                    {showRejected && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {dpRejectedGrouped.map(({ finding: f }) => (
+                          <div
+                            key={f.id}
+                            className="dp-finding-card"
+                            style={{ opacity: 0.55, position: "relative", overflow: "hidden" }}
+                          >
+                            {/* Rejected ribbon */}
+                            <div style={{
+                              position: "absolute",
+                              top: 8,
+                              right: -28,
+                              background: "rgba(100,100,100,0.7)",
+                              color: "#fff",
+                              fontSize: 9,
+                              fontWeight: 700,
+                              padding: "2px 36px",
+                              transform: "rotate(35deg)",
+                              letterSpacing: "0.06em",
+                              zIndex: 10,
+                            }}>REJECTED</div>
+
+                            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4, paddingRight: 60 }}>
+                              {f.title}
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 6 }}>
+                              {f.rejectionReason || "Marked as false positive"}
+                              {f.rejectedAt && (
+                                <span style={{ marginLeft: 8, fontSize: 10, opacity: 0.6 }}>
+                                  · {new Date(f.rejectedAt).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              id={`undo-reject-${f.id}`}
+                              onClick={() => handleRejectFinding(f.id, undefined, true)}
+                              disabled={dpRejecting[f.id]}
+                              style={{
+                                padding: "3px 10px",
+                                borderRadius: 6,
+                                border: "1px solid rgba(0,186,140,0.3)",
+                                background: "rgba(0,186,140,0.06)",
+                                color: "#00BA8C",
+                                fontSize: 10,
+                                fontWeight: 600,
+                                cursor: dpRejecting[f.id] ? "wait" : "pointer",
+                              }}
+                            >
+                              {dpRejecting[f.id] ? "Restoring…" : "↩ Restore to report"}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -7195,12 +6831,12 @@ export default function AuditResultPage() {
                     val === null && isInp
                       ? "requires real user interaction"
                       : vThreshold(
-                          val,
-                          m.good,
-                          m.poor,
-                          m.unit,
-                          m.key === "cls",
-                        );
+                        val,
+                        m.good,
+                        m.poor,
+                        m.unit,
+                        m.key === "cls",
+                      );
                   const pct =
                     val === null ? 0 : Math.min(100, (val / m.max) * 100);
                   const display =
@@ -7823,8 +7459,8 @@ export default function AuditResultPage() {
                                         )
                                           ? "#E8002D20"
                                           : p.resourceIssues.some(
-                                                (i) => i.severity === "high",
-                                              )
+                                            (i) => i.severity === "high",
+                                          )
                                             ? "#FE714120"
                                             : "#D9770620",
                                         color: p.resourceIssues.some(
@@ -7832,8 +7468,8 @@ export default function AuditResultPage() {
                                         )
                                           ? "#E8002D"
                                           : p.resourceIssues.some(
-                                                (i) => i.severity === "high",
-                                              )
+                                            (i) => i.severity === "high",
+                                          )
                                             ? "#FE7141"
                                             : "#D97706",
                                       }}
@@ -8028,13 +7664,13 @@ export default function AuditResultPage() {
                       const r =
                         typeof rec === "string"
                           ? {
-                              priority: "P" + (i + 1),
-                              title: rec,
-                              detail: "",
-                              effort: "",
-                              impact: "",
-                              clientReported: false,
-                            }
+                            priority: "P" + (i + 1),
+                            title: rec,
+                            detail: "",
+                            effort: "",
+                            impact: "",
+                            clientReported: false,
+                          }
                           : rec;
                       const pColor =
                         r.priority === "P0"

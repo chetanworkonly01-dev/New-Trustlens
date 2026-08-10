@@ -29,6 +29,10 @@ const pool = new Pool({
 let connectionTested = false;
 
 async function testConnection() {
+  if (process.env.DEV_BYPASS_DB === 'true') {
+    console.log('[TrustLens DB] Database bypassed via DEV_BYPASS_DB env var');
+    return false;
+  }
   if (connectionTested) return true;
   
   try {
@@ -248,6 +252,9 @@ export async function executeQuery<T = Record<string, unknown>>(
   text: string,
   params?: unknown[]
 ): Promise<T[]> {
+  if (process.env.DEV_BYPASS_DB === 'true') {
+    return [];
+  }
   const client = await pool.connect();
   try {
     const result = await client.query(text, params);
@@ -264,6 +271,9 @@ export async function executeQuery<T = Record<string, unknown>>(
 export async function executeTransaction<T = Record<string, unknown>>(
   queries: { text: string; params?: unknown[] }[]
 ): Promise<T[]> {
+  if (process.env.DEV_BYPASS_DB === 'true') {
+    return [];
+  }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

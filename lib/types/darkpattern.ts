@@ -84,20 +84,9 @@ export const PRINCIPLE_WEIGHTS: Record<EthicalPrinciple, number> = {
 
 // ── Regulation Mapping ──
 export type DarkPatternRegulation =
-  | "EU-DSA" // EU Digital Services Act
-  | "EU-GDPR" // General Data Protection Regulation
-  | "US-FTC" // Federal Trade Commission Act
   | "US-CCPA" // California Consumer Privacy Act
-  | "IN-CCPA" // India Consumer Protection Act 2019
-  | "IN-CPA" // India Consumer Protection (Dark Patterns) Guidelines 2023
-  | "IN-ASCI" // Advertising Standards Council of India Dark Pattern Guidelines 2023
-  | "IN-DPDPA" // India Digital Personal Data Protection Act 2023
-  | "IN-RBI" // Reserve Bank of India Guidelines
-  | "IN-SEBI" // Securities and Exchange Board of India
-  | "UK-CPR" // UK Consumer Protection Regulations
-  | "UK-PECR" // UK Privacy and Electronic Communications Regulations
-  | "UK-ICO" // UK Information Commissioner's Office Guidance
-  | "AU-ACL"; // Australia Consumer Law
+  | "EU-GDPR"; // General Data Protection Regulation
+
 
 // ── Finding Verifiability (Signal vs Verdict model) ──
 export type FindingVerdict = "verdict" | "signal";
@@ -156,6 +145,13 @@ export interface DarkPatternFinding {
   };
   /** Optional management response / owner acknowledgement notes (per-finding) */
   managementResponse?: import("./audit").ManagementResponseBlock;
+  // ── False Positive Rejection ──
+  /** If true, this finding was dismissed as a false positive by the reviewer */
+  rejected?: boolean;
+  /** Optional reason provided when dismissing as false positive */
+  rejectionReason?: string;
+  /** ISO timestamp of when the finding was rejected */
+  rejectedAt?: string;
 }
 
 export interface DarkPatternEvidence {

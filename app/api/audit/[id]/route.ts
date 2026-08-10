@@ -19,6 +19,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
 
+
+
   // Base response — always safe to serialize
   const response: Record<string, unknown> = {
     id: audit.id,
