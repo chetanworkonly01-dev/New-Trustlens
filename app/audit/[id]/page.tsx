@@ -5732,7 +5732,7 @@ export default function AuditResultPage() {
                           {(f as any).ruleId && (
                             <span
                               style={{
-                                fontSize: 9,
+                                fontSize: 12,
                                 fontFamily: "Geist Mono, monospace",
                                 color: "var(--text-secondary)",
                                 background: "rgba(0,0,0,0.12)",
@@ -6142,7 +6142,7 @@ export default function AuditResultPage() {
                         {/* Evidence Summary & Details */}
                         <div
                           style={{
-                            fontSize: 11,
+                            fontSize: 12,
                             color: "var(--text-secondary)",
                             padding: "6px 10px",
                             background: "rgba(0,0,0,0.18)",
@@ -6150,7 +6150,7 @@ export default function AuditResultPage() {
                             lineHeight: 1.5,
                           }}
                         >
-                          <strong>Evidence:</strong> {f.evidence.summary}
+                          <strong>Evidence:</strong> <span style={{ fontSize: "12px" }}>{f.evidence.summary}</span>
                           {f.evidence.details.length > 0 && (
                             <div
                               style={{
@@ -6164,7 +6164,7 @@ export default function AuditResultPage() {
                                 <div
                                   key={i}
                                   style={{
-                                    fontSize: 10,
+                                    fontSize: 12,
                                     color: "var(--text-secondary)",
                                   }}
                                 >
@@ -6187,7 +6187,7 @@ export default function AuditResultPage() {
                           >
                             <div
                               style={{
-                                fontSize: 9,
+                                fontSize: 12,
                                 fontWeight: 700,
                                 color: "#00BA8C",
                                 marginBottom: 3,
@@ -6199,7 +6199,7 @@ export default function AuditResultPage() {
                             </div>
                             <div
                               style={{
-                                fontSize: 11,
+                                fontSize: 12,
                                 color: "var(--text-secondary)",
                                 lineHeight: 1.5,
                               }}

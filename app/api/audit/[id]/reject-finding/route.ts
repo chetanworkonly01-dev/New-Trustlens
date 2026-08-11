@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuditAsync, setAuditAsync } from '@/lib/store/audit-store';
 import { getSessionFromCookiesAsync } from '@/lib/auth';
+import { recordDarkPatternFeedback } from '@/lib/engines/dark-pattern-learning';
 
 import type { DarkPatternFinding } from '@/lib/types/darkpattern';
 import { PRINCIPLE_WEIGHTS } from '@/lib/types/darkpattern';
@@ -67,6 +68,19 @@ export async function PATCH(
     finding.rejected = true;
     finding.rejectionReason = reason || 'Marked as false positive';
     finding.rejectedAt = new Date().toISOString();
+
+    // Save learning feedback into dark_pattern_learning table in PostgreSQL
+    try {
+      await recordDarkPatternFeedback({
+        domain: audit.config?.url || finding.pageUrl || '*',
+        patternType: finding.category || finding.ruleId || 'dark_pattern',
+        elementSelector: finding.element || '*',
+        action: 'false_positive',
+        reason: reason || 'Marked as false positive by auditor',
+      });
+    } catch (learnErr) {
+      console.warn('[RejectFinding] Failed to save dark pattern learning record:', learnErr);
+    }
   }
 
   // ── Recalculate ethics score excluding rejected findings ──

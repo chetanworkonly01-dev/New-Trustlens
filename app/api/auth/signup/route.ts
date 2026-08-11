@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createUser, isSignupAllowed } from '@/lib/auth';
+import { createUser, isSignupAllowed, userCount, setSignupAllowed } from '@/lib/auth';
 import { z } from 'zod';
 
 const signupSchema = z.object({
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const allowed = await isSignupAllowed();
     if (!allowed) {
       return NextResponse.json(
-        { error: 'Sign up is currently disabled' },
+        { error: 'Sign up is currently disabled by system administrator.' },
         { status: 403 }
       );
     }
@@ -29,19 +29,31 @@ export async function POST(request: Request) {
     }
 
     const { email, password, name } = result.data;
+    const initialCount = await userCount();
 
+    // Create user (first user automatically receives 'admin' role)
     const user = await createUser(email, password, name, 'user');
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Failed to create user' },
+        { error: 'Failed to create user account' },
         { status: 500 }
       );
     }
 
-    // Auto-signin after signup
+    // If initial admin bootstrap was created, lock signups by default for subsequent users
+    if (initialCount === 0) {
+      await setSignupAllowed(false);
+    }
+
+    // Auto-signin after signup with role in session payload
     const { createSession } = await import('@/lib/auth');
-    const session = createSession({ id: user.id, email: user.email, name: user.name || undefined });
+    const session = createSession({ 
+      id: user.id, 
+      email: user.email, 
+      name: user.name || undefined,
+      role: user.role 
+    });
 
     const response = NextResponse.json({ success: true, user });
     

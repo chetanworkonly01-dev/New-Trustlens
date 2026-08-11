@@ -17,7 +17,9 @@ import {
 export default function AuditHistoryPage() {
   const [audits, setAudits] = useState<Audit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAllCompleted, setShowAllCompleted] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [hasMore, setHasMore] = useState<boolean>(false);
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
 
@@ -29,17 +31,50 @@ export default function AuditHistoryPage() {
 
   useEffect(() => {
     if (!user) return;
-    const fetchAudits = async () => {
+    const fetchInitialAudits = async () => {
       try {
-        const res = await fetch("/api/audit/list", { credentials: "include" });
-        if (res.ok) setAudits(await res.json());
+        const res = await fetch("/api/audit/list?limit=3", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.audits)) {
+            setAudits(data.audits);
+            setTotalCount(data.totalCount || data.audits.length);
+            setHasMore(data.hasMore ?? false);
+          } else if (Array.isArray(data)) {
+            setAudits(data.slice(0, 3));
+            setTotalCount(data.length);
+            setHasMore(data.length > 3);
+          }
+        }
       } catch {
         /* ignore */
       }
       setLoading(false);
     };
-    fetchAudits();
+    fetchInitialAudits();
   }, [user]);
+
+  const handleFetchAllAudits = async () => {
+    setLoadingMore(true);
+    try {
+      const res = await fetch("/api/audit/list?limit=all", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        const allList = Array.isArray(data.audits)
+          ? data.audits
+          : Array.isArray(data)
+            ? data
+            : [];
+        setAudits(allList);
+        setTotalCount(allList.length);
+        setHasMore(false);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   if (authLoading || !user) {
     return (
@@ -65,9 +100,9 @@ export default function AuditHistoryPage() {
   // Pillar-aware aggregate stats
   const avgScore = completed.length
     ? Math.round(
-        completed.reduce((s, a) => s + (a.displayScore ?? a.score.overall), 0) /
-          completed.length,
-      )
+      completed.reduce((s, a) => s + (a.displayScore ?? a.score.overall), 0) /
+      completed.length,
+    )
     : 0;
   const totalIssues = completed.reduce(
     (s, a) => s + (a.totalIssues ?? a.score.totalIssues),
@@ -112,7 +147,7 @@ export default function AuditHistoryPage() {
         <div className="grid-4 animate-slide-up" style={{ marginBottom: 28 }}>
           {[
             {
-              val: completed.length,
+              val: totalCount,
               label: "Audits Completed",
               color: "var(--accent-blue)",
             },
@@ -166,12 +201,13 @@ export default function AuditHistoryPage() {
               </h2> */}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {completed.length > 3 && !showAllCompleted && (
+            {hasMore && (
               <button
                 className="btn btn-secondary btn-sm"
-                onClick={() => setShowAllCompleted(true)}
+                onClick={handleFetchAllAudits}
+                disabled={loadingMore}
               >
-                Show All ({completed.length})
+                {loadingMore ? "Loading..." : `Show All (${totalCount})`}
               </button>
             )}
             <Link href="/audit" className="btn btn-primary btn-sm">
@@ -233,7 +269,7 @@ export default function AuditHistoryPage() {
         )}
 
         <div style={{ display: "grid", gap: 12 }}>
-          {(showAllCompleted ? completed : completed.slice(0, 3)).map((a) => {
+          {completed.map((a) => {
             let pillars =
               a.config?.enabledPillars ?? Object.keys(a.pillarScores ?? {});
             if (pillars.length === 0) pillars = ["accessibility"];
@@ -668,6 +704,44 @@ export default function AuditHistoryPage() {
             );
           })}
         </div>
+
+        {hasMore && (
+          <div style={{ textAlign: "center", marginTop: 24 }}>
+            <button
+              className="btn btn-secondary"
+              onClick={handleFetchAllAudits}
+              disabled={loadingMore}
+              style={{
+                padding: "10px 24px",
+                fontSize: 14,
+                fontWeight: 600,
+                borderRadius: 8,
+                cursor: loadingMore ? "default" : "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              {loadingMore ? (
+                <>
+                  <div
+                    style={{
+                      width: 14,
+                      height: 14,
+                      border: "2px solid rgba(255, 255, 255, 0.3)",
+                      borderTopColor: "var(--kpmg-dynamic)",
+                      borderRadius: "50%",
+                      animation: "spin 1s linear infinite",
+                    }}
+                  />
+                  <span>Fetching remaining audits...</span>
+                </>
+              ) : (
+                <span>Show More Audits ({totalCount - completed.length} remaining) →</span>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

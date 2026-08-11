@@ -765,6 +765,30 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
           addLog,
         )
           .then(async (result) => {
+            // Apply Minimal Dark Pattern Learning Filter
+            try {
+              const { filterDarkPatternsWithLearning } = await import("./dark-pattern-learning");
+              const { activePatterns, filteredCount } = await filterDarkPatternsWithLearning(
+                result.findings as any[],
+                config.url || ""
+              );
+              if (filteredCount > 0) {
+                result.findings = activePatterns as any[];
+                result.totalFindings = activePatterns.length;
+                addLog({
+                  timestamp: new Date().toISOString(),
+                  testId: "DP-LEARNING",
+                  testName: "Dark Pattern Learning Engine",
+                  wcag: "",
+                  status: "pass",
+                  pillar: "darkpatterns",
+                  message: `🧠 Applied Dark Pattern Learning: Suppressed ${filteredCount} learned false positive(s)`,
+                });
+              }
+            } catch (learningErr) {
+              console.warn('[AuditOrchestrator] Dark Pattern learning filter error:', learningErr);
+            }
+
             darkPatternResult = result;
             setPillarProgress("darkpatterns", 60);
             addLog({

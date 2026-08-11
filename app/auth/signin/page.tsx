@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
@@ -12,8 +12,16 @@ export default function SignInPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signin } = useAuth();
-  const callbackUrl = searchParams?.get("callbackUrl") || "/";
+  const { user, loading: authLoading, signin } = useAuth();
+  
+  const rawCallback = searchParams?.get("callbackUrl");
+  const callbackUrl = rawCallback && rawCallback !== "/" ? rawCallback : "/audit";
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace(callbackUrl);
+    }
+  }, [user, authLoading, router, callbackUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

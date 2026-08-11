@@ -92,16 +92,25 @@ export async function createUser(
   email: string,
   password: string,
   name?: string,
-  role: string = 'user'
-): Promise<{ id: string; email: string; name?: string } | null> {
+  requestedRole: string = 'user'
+): Promise<{ id: string; email: string; name?: string; role: string } | null> {
   const passwordHash = hashPassword(password);
   try {
-    const result = await executeQuery<{ id: string; email: string; name: string }>(
-      `INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name`,
-      [email.toLowerCase(), name || null, passwordHash, role]
+    const currentCount = await userCount();
+    // First user is automatically assigned 'admin' role!
+    const assignedRole = currentCount === 0 ? 'admin' : requestedRole;
+
+    const result = await executeQuery<{ id: string; email: string; name: string; role: string }>(
+      `INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role`,
+      [email.toLowerCase(), name || null, passwordHash, assignedRole]
     );
     if (result.length > 0) {
-      return { id: result[0].id, email: result[0].email, name: result[0].name };
+      return { 
+        id: result[0].id, 
+        email: result[0].email, 
+        name: result[0].name,
+        role: result[0].role || assignedRole
+      };
     }
     return null;
   } catch (err: unknown) {
@@ -324,10 +333,99 @@ export async function setSetting(key: string, value: string): Promise<void> {
 }
 
 export async function isSignupAllowed(): Promise<boolean> {
-  const value = await getSetting('is_signup_allowed');
-  return value === 'true';
+  try {
+    const currentCount = await userCount();
+    if (currentCount === 0) {
+      return true; // First user signup is always allowed for admin bootstrap
+    }
+    const value = await getSetting('is_signup_allowed');
+    return value === 'true';
+  } catch {
+    return false;
+  }
 }
 
 export async function setSignupAllowed(allowed: boolean): Promise<void> {
   await setSetting('is_signup_allowed', allowed ? 'true' : 'false');
+}
+
+// ── User Management ────────────────────────────────────────────────────────────
+
+export interface AdminUserListItem {
+  id: string;
+  email: string;
+  name?: string;
+  role: string;
+  createdAt: string;
+}
+
+export async function getAllUsers(): Promise<AdminUserListItem[]> {
+  if (process.env.DEV_BYPASS_DB === 'true') {
+    return [
+      {
+        id: 'dev-admin-id',
+        email: 'admin@kpmg.com',
+        name: 'KPMG Admin',
+        role: 'admin',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+  }
+
+  try {
+    const rows = await executeQuery<{
+      id: string;
+      email: string;
+      name?: string;
+      role: string;
+      created_at: string;
+    }>(
+      `SELECT id, email, name, role, created_at FROM users ORDER BY created_at DESC`
+    );
+
+    return rows.map((r) => ({
+      id: r.id,
+      email: r.email,
+      name: r.name || undefined,
+      role: r.role || 'user',
+      createdAt: r.created_at,
+    }));
+  } catch (err) {
+    console.error('[Auth] Failed to fetch users list:', err);
+    return [];
+  }
+}
+
+export async function deleteNonAdminUser(id: string): Promise<boolean> {
+  if (process.env.DEV_BYPASS_DB === 'true') {
+    return true;
+  }
+
+  try {
+    const result = await executeQuery(
+      `DELETE FROM users WHERE id = $1 AND role != 'admin'`,
+      [id]
+    );
+    return true;
+  } catch (err) {
+    console.error(`[Auth] Failed to delete user ${id}:`, err);
+    return false;
+  }
+}
+
+export async function updateUserRole(userId: string, newRole: string): Promise<boolean> {
+  if (process.env.DEV_BYPASS_DB === 'true') {
+    return true;
+  }
+
+  try {
+    await executeQuery(
+      `UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2`,
+      [newRole, userId]
+    );
+    return true;
+  } catch (err) {
+    console.error(`[Auth] Failed to update role for user ${userId}:`, err);
+    return false;
+  }
 }
