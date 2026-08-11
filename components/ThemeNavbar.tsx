@@ -1,14 +1,47 @@
 "use client";
+import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useTheme } from "./ThemeProvider";
+import { useAuth } from "@/contexts/AuthContext";
+import { Audit } from "../lib/types";
 
 export default function ThemeNavbar() {
   const { isDark, toggleTheme } = useTheme();
+  const { user, loading, signout } = useAuth();
+  const [audits, setAudits] = useState<Audit[]>([]);
+
+  useEffect(() => {
+    setAudits([]);
+  }, [user?.id]);
+
+  useEffect(() => {
+    const fetchAudits = async () => {
+      try {
+        const res = await fetch("/api/audit/list", { credentials: "include" });
+        if (res.ok) setAudits(await res.json());
+      } catch {
+        /* ignore */
+      }
+    };
+    if (user?.id) {
+      fetchAudits();
+    }
+  }, [user?.id]);
+
+  const handleSignOut = async () => {
+    await signout();
+    window.location.href = "/";
+  };
 
   return (
     <nav className="navbar" aria-label="Main navigation">
       <div className="navbar-inner">
-        <a href="/" className="navbar-brand" aria-label="KPMG TrustLens — Home">
+        <Link
+          href="/"
+          className="navbar-brand"
+          aria-label="KPMG TrustLens — Home"
+        >
           <div className="kpmg-logo-wrap">
             <Image
               src={isDark ? "/kpmg-logo-dark.svg" : "/kpmg-logo-light-user.svg"}
@@ -29,41 +62,60 @@ export default function ThemeNavbar() {
               <span className="kpmg-product-title">Powered by AI</span>
             </div>
           </div>
-        </a>
+        </Link>
 
         <div className="navbar-links">
-          <a href="/" className="navbar-link">
+          <Link href="/" className="navbar-link">
             Dashboard
-          </a>
-          <a href="/audit" className="navbar-link">
+          </Link>
+          <Link href="/audit" className="navbar-link">
             New Audit
-          </a>
+          </Link>
+          {!loading && user && audits.length > 0 && (
+            <Link href="/audit-history" className="navbar-link">
+              View Audit History
+            </Link>
+          )}
 
-          {/* <div
-            className="trustlens-pillars-badge"
-            aria-label="Active audit pillars"
-          >
-            <span
-              className="pillar-dot"
-              title="Accessibility"
-              aria-hidden="true"
-            >
-              ♿
-            </span>
-            <span
-              className="pillar-dot"
-              title="Dark Patterns"
-              aria-hidden="true"
-            >
-              🕵️
-            </span>
-            <span className="pillar-dot" title="Performance" aria-hidden="true">
-              ⚡
-            </span>
-            <span className="pillar-dot" title="Privacy" aria-hidden="true">
-              🔒
-            </span>
-          </div> */}
+          {!loading && user ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              {/* <span
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  color: "var(--text-primary)",
+                }}
+              >
+                {user.name || user.email.split("@")[0]}
+              </span> */}
+              {user.role === "admin" && (
+                <Link href="/admin/settings" className="navbar-link">
+                  Admin Settings
+                </Link>
+              )}
+              <button
+                onClick={handleSignOut}
+                className="navbar-link"
+                style={{
+                  cursor: "pointer",
+                  // padding: "6px 12px",
+                  // borderRadius: "6px",
+                  border: "none",
+                  // fontSize: "14px",
+                  // fontWeight: 500,
+                  background: "transparent",
+                }}
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            !loading && (
+              <Link href="/auth/signin" className="navbar-link">
+                Sign In
+              </Link>
+            )
+          )}
 
           {/* Theme Toggle */}
           <button
@@ -82,11 +134,6 @@ export default function ThemeNavbar() {
               />
             </div>
           </button>
-
-          {/* <div className="kpmg-ai-badge" aria-label="AI-powered tool">
-            <span className="kpmg-ai-dot" aria-hidden="true" />
-            AI Active
-          </div> */}
         </div>
       </div>
     </nav>

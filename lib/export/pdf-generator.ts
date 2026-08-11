@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 // import { svg2pdf } from "svg2pdf.js";
 import autoTable from "jspdf-autotable";
+import sharp from "sharp";
 import { AuditResult, AccessibilityIssue, GroupedIssue } from "../types/audit";
 import type { DarkPatternFinding } from "../types/darkpattern";
 import type { RecommendationItem } from "../types/performance";
@@ -203,7 +204,10 @@ function compLabel(l: string): string {
     )[l] || l
   );
 }
-type IssueLike = Pick<AccessibilityIssue, 'wcagCriterion' | 'severity' | 'category'> & { source?: string; occurrenceCount?: number };
+type IssueLike = Pick<
+  AccessibilityIssue,
+  "wcagCriterion" | "severity" | "category"
+> & { source?: string; occurrenceCount?: number };
 
 function deriveTeam(issue: IssueLike): string {
   const c = issue.wcagCriterion;
@@ -393,7 +397,11 @@ function getPerfActionSteps(type: string, ri: any): string[] {
   const isCSS = url.match(/\.css/);
   const isCDN = url.match(/cdn|static|assets/);
 
-  if (t.includes("render block") || t.includes("render-block") || t.includes("blocking")) {
+  if (
+    t.includes("render block") ||
+    t.includes("render-block") ||
+    t.includes("blocking")
+  ) {
     return [
       "Move <script> tags to bottom of <body> or add `defer` / `async` attribute to non-critical scripts.",
       "Inline critical CSS required for above-the-fold content; load remaining stylesheets asynchronously using `media='print'` flip pattern.",
@@ -401,7 +409,10 @@ function getPerfActionSteps(type: string, ri: any): string[] {
       "Audit third-party tag manager / analytics scripts — defer or load via web worker (e.g. Partytown).",
     ];
   }
-  if (t.includes("large image") || (isImage && (t.includes("size") || t.includes("unoptimized")))) {
+  if (
+    t.includes("large image") ||
+    (isImage && (t.includes("size") || t.includes("unoptimized")))
+  ) {
     return [
       "Convert images to modern formats: WebP (80% smaller than PNG) or AVIF for hero/product images.",
       "Implement responsive `srcset` + `sizes` attributes so mobile devices download appropriately sized images.",
@@ -498,8 +509,16 @@ function drawManagementResponse(
     doc.setFont("helvetica", "italic");
     doc.setFontSize(7.5);
     doc.setTextColor(...K.midGrey);
-    doc.text("Management Response — to be completed by team owner", x + 5, y + 5);
-    doc.text("Owner: ________________________   Target Date: ________________   Status: ________________", x + 5, y + 9.5);
+    doc.text(
+      "Management Response — to be completed by team owner",
+      x + 5,
+      y + 5,
+    );
+    doc.text(
+      "Owner: ________________________   Target Date: ________________   Status: ________________",
+      x + 5,
+      y + 9.5,
+    );
     return y + boxH + 6;
   }
 
@@ -513,10 +532,7 @@ function drawManagementResponse(
     : [];
   const ownerLineHeight = owner || target ? 6 : 0;
   const notesBlockHeight = notesLines.length * notesLineHeight;
-  const contentHeight = Math.max(
-    10,
-    ownerLineHeight + notesBlockHeight + 6,
-  );
+  const contentHeight = Math.max(10, ownerLineHeight + notesBlockHeight + 6);
   const totalBlockHeight = headerHeight + contentHeight;
 
   if (y + totalBlockHeight > ph - 18) {
@@ -678,8 +694,12 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         : "Article";
   const col3V = (iss: IssueLike & { wcagCriterion: string }) =>
     isA11y ? iss.wcagCriterion : (iss as any).ruleId || "—";
-  const col4V = (iss: IssueLike & { wcagCriterion: string; wcagLevel?: string }) =>
-    isA11y ? (iss as any).wcagLevel || "—" : (iss as any).regulation?.[0] || "—";
+  const col4V = (
+    iss: IssueLike & { wcagCriterion: string; wcagLevel?: string },
+  ) =>
+    isA11y
+      ? (iss as any).wcagLevel || "—"
+      : (iss as any).regulation?.[0] || "—";
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
@@ -824,8 +844,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     badgeW - 4,
   ) as string[];
   const labelLineHeight = badgeLabelFontSize * 0.42;
-  const extraLabelHeight =
-    (badgeLabelLines.length - 1) * labelLineHeight;
+  const extraLabelHeight = (badgeLabelLines.length - 1) * labelLineHeight;
   const badgeH = 26 + extraLabelHeight;
   const badgeY = phCover - 65 - extraLabelHeight;
 
@@ -863,11 +882,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(...scoreColor);
-  doc.text(
-    "/100",
-    badgeX + doc.getTextWidth(String(coverScore)) - 1,
-    scoreY,
-  );
+  doc.text("/100", badgeX + doc.getTextWidth(String(coverScore)) - 1, scoreY);
 
   // Tiny lower status status pill indicator box
   doc.setFillColor(...scoreColor);
@@ -1042,7 +1057,9 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
 
   // ── EXECUTIVE SUMMARY: KPI METRIC TILES ──
   {
-    const exCritCount = groupedIssues.filter((g) => g.severity === "critical").length;
+    const exCritCount = groupedIssues.filter(
+      (g) => g.severity === "critical",
+    ).length;
     const isA11yOnly = isA11y && (pillars?.length ?? 0) <= 1;
     const dpResultCover = (audit as any).pillarResults?.darkpatterns as any;
     const privResultCover = (audit as any).pillarResults?.privacy as any;
@@ -1065,21 +1082,81 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
           isPriv2 ? (privResultCover?.findingsBySeverity?.critical ?? 0) : 0,
         ].reduce((a, b) => a + b, 0);
 
-    const tiles = perfOnly && perfResultCover
-      ? [
-          { label: "PERFORMANCE SCORE", value: `${perfResultCover.overallScore ?? 0}`, sub: "out of 100", col: K.navy as [number, number, number] },
-          { label: "GRADE", value: perfGradeStr(perfResultCover.overallScore ?? 0).charAt(0), sub: perfGradeStr(perfResultCover.overallScore ?? 0).split("—")[1]?.trim() ?? "", col: [0, 91, 130] as [number, number, number] },
-          { label: "RESOURCE ISSUES", value: `${perfResultCover.totalResourceIssues ?? 0}`, sub: "Identified", col: [180, 90, 0] as [number, number, number] },
-          { label: "P0 CRITICAL", value: `${(perfResultCover.recommendations || []).filter((r: any) => r.priority === "P0").length}`, sub: "Immediate Action", col: [200, 35, 35] as [number, number, number] },
-          { label: "PAGES AUDITED", value: `${perfResultCover.pages?.length ?? audit.pages.length}`, sub: perfResultCover.targetedPagesAudited ? `${perfResultCover.basePagesAudited ?? 0} crawled + ${perfResultCover.targetedPagesAudited} targeted` : "Evaluated", col: [0, 100, 90] as [number, number, number] },
-        ]
-      : [
-          { label: displayInfo.badgeLabel, value: `${displayInfo.score ?? 0}`, sub: "out of 100", col: K.navy as [number, number, number] },
-          { label: "STATUS", value: isA11yOnly ? `${(score as any).grade ?? "—"}` : displayInfo.statusLabel.charAt(0).toUpperCase(), sub: displayInfo.statusLabel, col: [0, 91, 130] as [number, number, number] },
-          { label: "UNIQUE VIOLATIONS", value: `${combinedUniqueCount}`, sub: "Distinct Issues", col: [180, 90, 0] as [number, number, number] },
-          { label: "CRITICAL ISSUES", value: `${combinedCriticalCount}`, sub: "Need Immediate Fix", col: [200, 35, 35] as [number, number, number] },
-          { label: "PAGES AUDITED", value: `${audit.pages.length}`, sub: perfResultCover?.targetedPagesAudited ? `${perfResultCover.basePagesAudited ?? 0} crawled + ${perfResultCover.targetedPagesAudited} targeted` : "Evaluated", col: [0, 100, 90] as [number, number, number] },
-        ];
+    const tiles =
+      perfOnly && perfResultCover
+        ? [
+            {
+              label: "PERFORMANCE SCORE",
+              value: `${perfResultCover.overallScore ?? 0}`,
+              sub: "out of 100",
+              col: K.navy as [number, number, number],
+            },
+            {
+              label: "GRADE",
+              value: perfGradeStr(perfResultCover.overallScore ?? 0).charAt(0),
+              sub:
+                perfGradeStr(perfResultCover.overallScore ?? 0)
+                  .split("—")[1]
+                  ?.trim() ?? "",
+              col: [0, 91, 130] as [number, number, number],
+            },
+            {
+              label: "RESOURCE ISSUES",
+              value: `${perfResultCover.totalResourceIssues ?? 0}`,
+              sub: "Identified",
+              col: [180, 90, 0] as [number, number, number],
+            },
+            {
+              label: "P0 CRITICAL",
+              value: `${(perfResultCover.recommendations || []).filter((r: any) => r.priority === "P0").length}`,
+              sub: "Immediate Action",
+              col: [200, 35, 35] as [number, number, number],
+            },
+            {
+              label: "PAGES AUDITED",
+              value: `${perfResultCover.pages?.length ?? audit.pages.length}`,
+              sub: perfResultCover.targetedPagesAudited
+                ? `${perfResultCover.basePagesAudited ?? 0} crawled + ${perfResultCover.targetedPagesAudited} targeted`
+                : "Evaluated",
+              col: [0, 100, 90] as [number, number, number],
+            },
+          ]
+        : [
+            {
+              label: displayInfo.badgeLabel,
+              value: `${displayInfo.score ?? 0}`,
+              sub: "out of 100",
+              col: K.navy as [number, number, number],
+            },
+            {
+              label: "STATUS",
+              value: isA11yOnly
+                ? `${(score as any).grade ?? "—"}`
+                : displayInfo.statusLabel.charAt(0).toUpperCase(),
+              sub: displayInfo.statusLabel,
+              col: [0, 91, 130] as [number, number, number],
+            },
+            {
+              label: "UNIQUE VIOLATIONS",
+              value: `${combinedUniqueCount}`,
+              sub: "Distinct Issues",
+              col: [180, 90, 0] as [number, number, number],
+            },
+            {
+              label: "CRITICAL ISSUES",
+              value: `${combinedCriticalCount}`,
+              sub: "Need Immediate Fix",
+              col: [200, 35, 35] as [number, number, number],
+            },
+            {
+              label: "PAGES AUDITED",
+              value: `${audit.pages.length}`,
+              sub: perfResultCover?.targetedPagesAudited
+                ? `${perfResultCover.basePagesAudited ?? 0} crawled + ${perfResultCover.targetedPagesAudited} targeted`
+                : "Evaluated",
+              col: [0, 100, 90] as [number, number, number],
+            },
+          ];
 
     if (y + 34 > ph - 40) {
       doc.addPage("a4", "landscape");
@@ -1130,7 +1207,9 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.setTextColor(...K.white);
       doc.text(
         `CRITICAL ALERT: ${combinedCriticalCount} critical violation${combinedCriticalCount !== 1 ? "s" : ""} require immediate remediation before next release.`,
-        pw / 2, y + 4.5, { align: "center", baseline: "middle" },
+        pw / 2,
+        y + 4.5,
+        { align: "center", baseline: "middle" },
       );
       y += 13;
     }
@@ -1420,7 +1499,16 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     autoTable(doc, {
       startY: y,
       head: [
-        ["#", "Issue Title", col3H, col4H, "Severity", "Instances", "Team Owner", "Effort"],
+        [
+          "#",
+          "Issue Title",
+          col3H,
+          col4H,
+          "Severity",
+          "Instances",
+          "Team Owner",
+          "Effort",
+        ],
       ],
       body: groupedIssues.map((iss, idx) => [
         `#${String(idx + 1).padStart(3, "0")}`,
@@ -1490,6 +1578,29 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       y,
     );
 
+    // Pre-rotate portrait element screenshots to landscape before rendering
+    for (const issue of groupedIssues) {
+      for (const inst of issue.instances || []) {
+        if (!inst.elementScreenshot) continue;
+        const dims = getImageDimensionsFromBase64(
+          inst.elementScreenshot,
+          "PNG",
+        );
+        if (!dims || dims.height <= dims.width) continue;
+        try {
+          const rotated = await sharp(
+            Buffer.from(inst.elementScreenshot, "base64"),
+          )
+            .rotate(90)
+            .png()
+            .toBuffer();
+          inst.elementScreenshot = rotated.toString("base64");
+        } catch {
+          // leave original if rotation fails
+        }
+      }
+    }
+
     groupedIssues.forEach((issue, idx) => {
       const issueId = `#${String(idx + 1).padStart(3, "0")}`;
       const team = deriveTeam(issue);
@@ -1512,7 +1623,11 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(7);
       doc.setTextColor(...navyLight);
-      doc.text(isA11y ? "WCAG CRITERION" : "RULE REFERENCE", cardX + 4, y + 4.5);
+      doc.text(
+        isA11y ? "WCAG CRITERION" : "RULE REFERENCE",
+        cardX + 4,
+        y + 4.5,
+      );
 
       const criterionLabel = isA11y
         ? `${issue.wcagCriterion} -- ${issue.wcagName} (Level ${issue.wcagLevel})`
@@ -1563,7 +1678,9 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(6.5);
       doc.setTextColor(...K.white);
-      doc.text(issue.severity.toUpperCase(), cardX + cardW - 16, y + 7, { align: "center" });
+      doc.text(issue.severity.toUpperCase(), cardX + cardW - 16, y + 7, {
+        align: "center",
+      });
       y += 14;
 
       // ── TWO-COLUMN BODY ──
@@ -1656,11 +1773,8 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       );
       {
         const instances = issue.instances || [];
-        const distinctElements = new Set(
-          instances.map((i) => i.element),
-        ).size;
-        const isComponentFix =
-          distinctElements === 1 && instances.length > 1;
+        const distinctElements = new Set(instances.map((i) => i.element)).size;
+        const isComponentFix = distinctElements === 1 && instances.length > 1;
 
         let locLines: string[];
         let locHeading: string;
@@ -1711,9 +1825,13 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         let locContinued = false;
         while (remainingLocLines.length > 0) {
           const available = ph - 30 - y;
-          const linesThatFit = Math.floor((available - LOC_BOX_PAD) / LOC_LINE_H);
+          const linesThatFit = Math.floor(
+            (available - LOC_BOX_PAD) / LOC_LINE_H,
+          );
 
-          if (linesThatFit < Math.min(LOC_MIN_LINES, remainingLocLines.length)) {
+          if (
+            linesThatFit < Math.min(LOC_MIN_LINES, remainingLocLines.length)
+          ) {
             doc.addPage("a4", "landscape");
             y = 18;
             continue;
@@ -1815,7 +1933,11 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(7.5);
       doc.setTextColor(30, 60, 160);
-      doc.text(isA11y ? "WCAG 2.2 GUIDELINE REFERENCE" : "RULE REFERENCE", cardX + 4, y + 6);
+      doc.text(
+        isA11y ? "WCAG 2.2 GUIDELINE REFERENCE" : "RULE REFERENCE",
+        cardX + 4,
+        y + 6,
+      );
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
       doc.setTextColor(...K.nearBlack);
@@ -1877,7 +1999,8 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       if (t.includes("nav") || t.includes("link")) return "Navigation";
       if (t.includes("img") || t.includes("alt")) return "Images";
       if (t.includes("heading")) return "Headings";
-      if (t.includes("color") || t.includes("colour") || t.includes("contrast")) return "Colour";
+      if (t.includes("color") || t.includes("colour") || t.includes("contrast"))
+        return "Colour";
       if (t.includes("focus") || t.includes("keyboard")) return "Focus/KB";
       if (t.includes("touch") || t.includes("target")) return "Touch Targets";
       return "General";
@@ -2176,7 +2299,9 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       head: [["#", "Issue", "Severity", "Done When — Acceptance Criteria"]],
       body: groupedIssues.map((iss, idx) => [
         `#${String(idx + 1).padStart(3, "0")}`,
-        iss.occurrenceCount > 1 ? `${iss.title} (×${iss.occurrenceCount})` : iss.title,
+        iss.occurrenceCount > 1
+          ? `${iss.title} (×${iss.occurrenceCount})`
+          : iss.title,
         iss.severity.toUpperCase(),
         getAcceptance(iss),
       ]),
@@ -2624,6 +2749,33 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       y,
     );
 
+    // Pre-crop portrait screenshots to center-cover into card frame before rendering
+    // Block 2 card target: width = pw - 44 = 253, height = 50
+    const coverFrameW = pw - 10;
+    const coverFrameH = 50;
+    for (const f of dpDeduped) {
+      const ev = (f.evidence as any)?.screenshotDataUrl;
+      if (!ev) continue;
+      const match = ev.match(/^data:image\/(\w+);base64,(.+)$/);
+      if (!match) continue;
+      const fmt = match[1].toLowerCase() === "png" ? "PNG" : "JPEG";
+      const dims = getImageDimensionsFromBase64(match[2], fmt);
+      if (!dims) continue;
+      try {
+        const cropped = await sharp(Buffer.from(match[2], "base64"))
+          .resize(coverFrameW, coverFrameH, {
+            fit: "cover",
+            position: "center",
+          })
+          .png()
+          .toBuffer();
+        (f.evidence as any).screenshotDataUrl =
+          `data:image/png;base64,${cropped.toString("base64")}`;
+      } catch {
+        // leave original if crop fails
+      }
+    }
+
     dpDeduped.forEach((f, idx) => {
       if (y > ph - 100) {
         doc.addPage("a4", "landscape");
@@ -2633,7 +2785,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       const purple: [number, number, number] = [106, 40, 155];
       const purpleLight: [number, number, number] = [237, 225, 250];
       const tealDark: [number, number, number] = [0, 91, 130];
-      const colW = (pw - 44) / 2;   // half-width for two-column layout
+      const colW = (pw - 44) / 2; // half-width for two-column layout
       const cardX = 20;
       const cardW = pw - 40;
 
@@ -2648,7 +2800,9 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.text("CCPA CATEGORIZATION", cardX + 4, y + 4.5);
       const ccpaLabel = f.brignullPattern
         ? `#${f.brignullNumber} — ${f.brignullPattern}`
-        : f.category.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+        : f.category
+            .replace(/-/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase());
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
       doc.setTextColor(...K.white);
@@ -2677,10 +2831,12 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9.5);
       doc.setTextColor(...sevColor(f.severity));
-      const instanceTag = f._instanceCount > 1 ? `  ×${f._instanceCount} instances` : "";
+      const instanceTag =
+        f._instanceCount > 1 ? `  ×${f._instanceCount} instances` : "";
       doc.text(
         `${String(idx + 1).padStart(2, "0")}.  ${f.title}${instanceTag}`,
-        cardX + 5, y + 7,
+        cardX + 5,
+        y + 7,
       );
 
       // Severity badge right-aligned
@@ -2689,7 +2845,9 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(6.5);
       doc.setTextColor(...K.white);
-      doc.text(f.severity.toUpperCase(), cardX + cardW - 16, y + 7, { align: "center" });
+      doc.text(f.severity.toUpperCase(), cardX + cardW - 16, y + 7, {
+        align: "center",
+      });
       y += 14;
 
       // ── TWO-COLUMN BODY ──
@@ -2762,7 +2920,9 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         doc.setTextColor(...K.navy);
         doc.text("Priority: ", cardX + 105, y);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(...sevColor(f.fixPriority === "P0" ? "critical" : "high"));
+        doc.setTextColor(
+          ...sevColor(f.fixPriority === "P0" ? "critical" : "high"),
+        );
         doc.text(f.fixPriority, cardX + 122, y);
       }
       if (f.estimatedEffort) {
@@ -2784,7 +2944,8 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.setFontSize(7);
       const indiaLines = doc.splitTextToSize(indiaText, regBoxW - 10);
       const europeLines = doc.splitTextToSize(europeText, regBoxW - 10);
-      const regBoxH = Math.max(indiaLines.length, europeLines.length) * 3.3 + 14;
+      const regBoxH =
+        Math.max(indiaLines.length, europeLines.length) * 3.3 + 14;
 
       if (y + regBoxH + 10 > ph - 20) {
         doc.addPage("a4", "landscape");
@@ -2827,13 +2988,8 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         const match = imgData.match(/^data:image\/(\w+);base64,(.+)$/);
         const imgFormat: "PNG" | "JPEG" =
           match?.[1]?.toLowerCase() === "png" ? "PNG" : "JPEG";
-        const imgDims = match
-          ? getImageDimensionsFromBase64(match[2], imgFormat)
-          : null;
-        const maxImgH = 50;
-        const fitted = fitImageBoxPdf(imgDims, cardW - 4, maxImgH);
-        const imgW = fitted.width;
-        const imgH = fitted.height;
+        const imgW = pw - 44;
+        const imgH = 50;
 
         if (y + imgH + 18 > ph - 20) {
           doc.addPage("a4", "landscape");
@@ -2847,7 +3003,9 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         doc.setFontSize(7.5);
         doc.setTextColor(...K.white);
         doc.text("VISUAL EVIDENCE CAPTURE", cardX + 4, y + 5.5);
-        const urlLabel = (f.pageUrl || "").replace(/^https?:\/\//, "").substring(0, 70);
+        const urlLabel = (f.pageUrl || "")
+          .replace(/^https?:\/\//, "")
+          .substring(0, 70);
         doc.setFont("helvetica", "italic");
         doc.setFontSize(6.5);
         doc.text(urlLabel, cardX + cardW - 4, y + 5.5, { align: "right" });
@@ -2862,15 +3020,27 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         doc.roundedRect(frameX, y, frameW, imgH + 2, 0, 0, "FD");
         try {
           const imgX = frameX + 1 + (frameW - 2 - imgW) / 2;
-          doc.addImage(imgData, imgFormat, imgX, y + 1, imgW, imgH, undefined, "MEDIUM");
-        } catch (_) { /* skip invalid image */ }
+          doc.addImage(
+            imgData,
+            imgFormat,
+            imgX,
+            y + 1,
+            imgW,
+            imgH,
+            undefined,
+            "MEDIUM",
+          );
+        } catch (_) {
+          /* skip invalid image */
+        }
 
         doc.setFont("helvetica", "italic");
         doc.setFontSize(6);
         doc.setTextColor(...K.midGrey);
         doc.text(
           "Red border marks exact dark pattern element  |  Screenshot captured by TrustLens audit engine",
-          cardX + 4, y + imgH + 6,
+          cardX + 4,
+          y + imgH + 6,
         );
         y += imgH + 10;
       }
@@ -2881,7 +3051,8 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.setTextColor(...purple);
       doc.text(
         "Please refer to the Annexure for supporting evidence and full element details.",
-        cardX + 4, y,
+        cardX + 4,
+        y,
       );
       y += 5;
 
@@ -3106,13 +3277,19 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
           doc.setFont("helvetica", "bold");
           doc.setFontSize(9.5);
           doc.setTextColor(...sevColor(sev));
-          doc.text((ri.url || ri.description || typeLabel).substring(0, 70), cardX + 5, y + 7);
+          doc.text(
+            (ri.url || ri.description || typeLabel).substring(0, 70),
+            cardX + 5,
+            y + 7,
+          );
           doc.setFillColor(...sevColor(sev));
           doc.roundedRect(cardX + cardW - 28, y + 2, 24, 7, 1, 1, "F");
           doc.setFont("helvetica", "bold");
           doc.setFontSize(6.5);
           doc.setTextColor(...K.white);
-          doc.text(sev.toUpperCase(), cardX + cardW - 16, y + 7, { align: "center" });
+          doc.text(sev.toUpperCase(), cardX + cardW - 16, y + 7, {
+            align: "center",
+          });
           y += 14;
 
           // ── TWO-COLUMN BODY ──
@@ -3120,7 +3297,8 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
           doc.setFontSize(7.5);
           const perfObsLines = doc.splitTextToSize(descText, perfColW - 8);
           const perfRecLines = doc.splitTextToSize(recText, perfColW - 8);
-          const perfBodyH = Math.max(perfObsLines.length, perfRecLines.length) * 3.8 + 14;
+          const perfBodyH =
+            Math.max(perfObsLines.length, perfRecLines.length) * 3.8 + 14;
 
           if (y + perfBodyH > ph - 30) {
             doc.addPage("a4", "landscape");
@@ -3194,9 +3372,12 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
           if (actionSteps.length > 0) {
             doc.setFont("helvetica", "normal");
             doc.setFontSize(7);
-            const actionLines: string[] = actionSteps.reduce((acc: string[], s) => {
-              return [...acc, ...doc.splitTextToSize(`• ${s}`, cardW - 14)];
-            }, []);
+            const actionLines: string[] = actionSteps.reduce(
+              (acc: string[], s) => {
+                return [...acc, ...doc.splitTextToSize(`• ${s}`, cardW - 14)];
+              },
+              [],
+            );
             const actBoxH = actionLines.length * 3.3 + 14;
             doc.setFillColor(240, 248, 255);
             doc.setDrawColor(...tealDark);
@@ -3312,48 +3493,48 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
           );
           y += 20;
         } else {
-        autoTable(doc, {
-          startY: y,
-          head: [["Metric", "Value"]],
-          body: [
-            ["Status", (af.status || "").toUpperCase()],
-            [
-              "Time to Form (ms)",
-              af.timeToFormMs != null
-                ? String(Math.round(af.timeToFormMs))
-                : "—",
+          autoTable(doc, {
+            startY: y,
+            head: [["Metric", "Value"]],
+            body: [
+              ["Status", (af.status || "").toUpperCase()],
+              [
+                "Time to Form (ms)",
+                af.timeToFormMs != null
+                  ? String(Math.round(af.timeToFormMs))
+                  : "—",
+              ],
+              [
+                "Submit to Response (ms)",
+                af.submitToResponseMs != null
+                  ? String(Math.round(af.submitToResponseMs))
+                  : "—",
+              ],
+              [
+                "Response to Interactive (ms)",
+                af.responseToInteractiveMs != null
+                  ? String(Math.round(af.responseToInteractiveMs))
+                  : "—",
+              ],
+              [
+                "Total Round Trip (ms)",
+                af.totalRoundTripMs != null
+                  ? String(Math.round(af.totalRoundTripMs))
+                  : "—",
+              ],
             ],
-            [
-              "Submit to Response (ms)",
-              af.submitToResponseMs != null
-                ? String(Math.round(af.submitToResponseMs))
-                : "—",
-            ],
-            [
-              "Response to Interactive (ms)",
-              af.responseToInteractiveMs != null
-                ? String(Math.round(af.responseToInteractiveMs))
-                : "—",
-            ],
-            [
-              "Total Round Trip (ms)",
-              af.totalRoundTripMs != null
-                ? String(Math.round(af.totalRoundTripMs))
-                : "—",
-            ],
-          ],
-          headStyles: {
-            fillColor: K.navy,
-            textColor: 255,
-            fontStyle: "bold",
-            fontSize: 9,
-          },
-          bodyStyles: { fontSize: 9, textColor: K.nearBlack },
-          alternateRowStyles: { fillColor: K.offWhite },
-          margin: { left: 20, right: 20 },
-          theme: "grid",
-        });
-        y = (doc as any).lastAutoTable.finalY + 10;
+            headStyles: {
+              fillColor: K.navy,
+              textColor: 255,
+              fontStyle: "bold",
+              fontSize: 9,
+            },
+            bodyStyles: { fontSize: 9, textColor: K.nearBlack },
+            alternateRowStyles: { fillColor: K.offWhite },
+            margin: { left: 20, right: 20 },
+            theme: "grid",
+          });
+          y = (doc as any).lastAutoTable.finalY + 10;
         }
       }
 
@@ -3379,13 +3560,25 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         y += 6;
         autoTable(doc, {
           startY: y,
-          head: [["Condition", "LCP (ms)", "FCP (ms)", "TTFB (ms)", "Score", "Recommendation"]],
+          head: [
+            [
+              "Condition",
+              "LCP (ms)",
+              "FCP (ms)",
+              "TTFB (ms)",
+              "Score",
+              "Recommendation",
+            ],
+          ],
           body: (perfResult.networkSimulation as any[]).map((sim: any) => {
             const lcpStatus =
-              sim.lcp == null ? null
-              : sim.lcp <= CWV_THRESHOLDS.lcp.good ? "Good"
-              : sim.lcp <= CWV_THRESHOLDS.lcp.poor ? "Needs Work"
-              : "Poor";
+              sim.lcp == null
+                ? null
+                : sim.lcp <= CWV_THRESHOLDS.lcp.good
+                  ? "Good"
+                  : sim.lcp <= CWV_THRESHOLDS.lcp.poor
+                    ? "Needs Work"
+                    : "Poor";
             const recommendation =
               lcpStatus === "Poor"
                 ? `LCP exceeds the ${CWV_THRESHOLDS.lcp.poor}ms Poor threshold under ${sim.label || sim.preset} — compress hero images, defer non-critical JS, and enable a CDN.`
@@ -3443,7 +3636,13 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         autoTable(doc, {
           startY: y,
           head: [
-            ["Reported Issue", "Status", "Summary", "Evidence", "Recommendation"],
+            [
+              "Reported Issue",
+              "Status",
+              "Summary",
+              "Evidence",
+              "Recommendation",
+            ],
           ],
           body: (perfResult.confirmedClientIssues as any[]).map((ci: any) => [
             ci.flagLabel || ci.flag,

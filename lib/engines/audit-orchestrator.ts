@@ -2,25 +2,45 @@ import {
   AuditConfig,
   AuditResult,
   AccessibilityIssue,
-  PageData,
   CrawlCoverage,
   TestLogEntry,
+  JourneyTestResult,
 } from "../types/audit";
 import { crawlWebsite, closeCrawler } from "./crawler";
 import { scanWithAxe, PageApplicabilityHints } from "./axe-scanner";
 import { runCustomRules } from "./custom-rules";
-import { analyzePdf } from "./pdf-analyzer";
+import {
+  analyzePdf,
+  analyzePdfDarkPatterns,
+  detectDarkPatternsInPdfText,
+} from "./pdf-analyzer";
 import { analyzeWithAI, assignConfidence } from "./ai-analyzer";
 import { calculateScore, normalizeSelector } from "./scoring";
 import { generateReport } from "./report-generator";
+import type { PillarContext } from "./report-generator";
 import { runJourneyTests, runDarkPatternJourney } from "./journey-tester";
 import { runTestSuite, TEST_CASES } from "./test-runner";
+
+// uuid replacement
+const uuidv4 = (): string => crypto.randomUUID();
+
+import { initDatabase } from "../store/audit-store";
 import {
   getAudit as storeGet,
-  setAudit as storeSet,
-  getAllAudits as storeGetAll,
+  setAuditSync as storeSetSync,
+  setAuditAsync as storeSetAsync,
+  getAllAuditsSync as storeGetAllSync,
+  getAllAuditsAsync as storeGetAllAsync,
 } from "../store/audit-store";
-const uuidv4 = (): string => crypto.randomUUID();
+
+let databaseInitialized = false;
+
+async function ensureDatabaseReady(): Promise<void> {
+  if (!databaseInitialized) {
+    await initDatabase();
+    databaseInitialized = true;
+  }
+}
 // ── TrustLens Pillar Engines ──
 import { runDarkPatternAudit } from "./darkpattern-engine";
 import { runPerformanceAudit } from "./performance-engine";
@@ -32,7 +52,7 @@ import type { PerformanceResult } from "../types/performance";
 import type { PrivacyResult } from "../types/privacy";
 // ── New Phase 2 engines ──
 import { classifySite } from "./site-profiler";
-import { getTransactionalPages } from "./page-intent-classifier";
+import { getTransactionalPages, sortByIntent } from "./page-intent-classifier";
 // ── Gap 3 & 4: Temporal Scanner + CTA Prominence Scorer ──
 import { runTemporalPatternScan } from "./temporal-scanner";
 import { scoreCTAHierarchy } from "./cta-prominence-scorer";
@@ -217,8 +237,16 @@ export function getAudit(id: string): AuditResult | undefined {
   return storeGet(id);
 }
 
+export async function getAuditAsync(id: string): Promise<AuditResult | undefined> {
+  return storeGet(id);
+}
+
 export function getAllAudits(): AuditResult[] {
-  return storeGetAll();
+  return storeGetAllSync();
+}
+
+export async function getAllAuditsAsync(userId?: string): Promise<AuditResult[]> {
+  return storeGetAllAsync(userId);
 }
 
 function createEmptyScore() {
@@ -242,7 +270,8 @@ function createEmptyScore() {
   };
 }
 
-export async function runWebsiteAudit(config: AuditConfig): Promise<string> {
+export async function runWebsiteAudit(config: AuditConfig, userId?: string): Promise<string> {
+  ensureDatabaseReady();
   const id = uuidv4();
   const audit: AuditResult = {
     id,
@@ -258,7 +287,15 @@ export async function runWebsiteAudit(config: AuditConfig): Promise<string> {
     inapplicableCriteria: [],
     startedAt: new Date().toISOString(),
   };
-  storeSet(id, audit);
+  
+  // Store user ID in config for database association
+  if (userId) {
+    audit.config.userId = userId;
+  }
+  
+  storeSetSync(id, audit);
+  // Also asynchronously persist to database
+  storeSetAsync(id, audit).catch(console.error);
 
   // Run pipeline with a 15-minute global timeout so audits never spin forever
   const TIMEOUT_MS = 15 * 60 * 1000;
@@ -274,7 +311,8 @@ export async function runWebsiteAudit(config: AuditConfig): Promise<string> {
       a.status = "error";
       a.error = err.message;
       a.progressMessage = `Error: ${err.message}`;
-      storeSet(id, a);
+      storeSetSync(id, a);
+      storeSetAsync(id, a).catch(console.error);
     }
   });
 
@@ -293,19 +331,19 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
   const updateProgress = (msg: string, pct: number) => {
     audit.progressMessage = msg;
     audit.progress = pct;
-    storeSet(id, audit); // ensure polling always sees fresh progress
+    storeSetSync(id, audit); // ensure polling always sees fresh progress
   };
 
   const addLog = (entry: TestLogEntry) => {
     audit.testLog.push(entry);
     if (entry.status === "running") audit.progressMessage = entry.message;
-    storeSet(id, audit);
+    storeSetSync(id, audit);
   };
 
   // Aggregate N/A and pass data across all pages
   const allInapplicable = new Set<string>();
   const allPassed = new Set<string>();
-  let mergedApplicabilityHints: PageApplicabilityHints = {
+  const mergedApplicabilityHints: PageApplicabilityHints = {
     hasMedia: false,
     hasForms: false,
     hasTimedContent: false,
@@ -434,7 +472,7 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
       crawlResult.pages[0]?.html,
     );
 
-    let journeyResult: { journeyResults: any[]; issues: any[] } = {
+    let journeyResult: { journeyResults: JourneyTestResult[]; issues: AccessibilityIssue[] } = {
       journeyResults: [],
       issues: [],
     };
@@ -477,7 +515,12 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
 
         // axe-core + custom rules — using new return type
         try {
-          const axeResult = await scanWithAxe(crawlResult.context, pg, undefined, wcagLevels);
+          const axeResult = await scanWithAxe(
+            crawlResult.context,
+            pg,
+            undefined,
+            wcagLevels,
+          );
           allIssues.push(...axeResult.issues);
 
           // Merge N/A and pass data
@@ -497,8 +540,12 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
           const customIssues = await runCustomRules(pg);
           // Deduplicate: drop custom rules whose WCAG criterion is already covered by axe-core
           // on this page. axe-core is DOM-based and higher confidence for shared criteria.
-          const axeCriteriaOnPage = new Set(axeResult.issues.map(i => i.wcagCriterion));
-          const deduplicatedCustom = customIssues.filter(ci => !axeCriteriaOnPage.has(ci.wcagCriterion));
+          const axeCriteriaOnPage = new Set(
+            axeResult.issues.map((i) => i.wcagCriterion),
+          );
+          const deduplicatedCustom = customIssues.filter(
+            (ci) => !axeCriteriaOnPage.has(ci.wcagCriterion),
+          );
           allIssues.push(...deduplicatedCustom);
         } catch (err) {
           console.error(`Scanner error for ${pg.url}:`, err);
@@ -643,18 +690,20 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
       message: ` Site profile: ${siteProfile.profile} (${siteProfile.confidence} confidence) — ${siteProfile.highRiskPatterns.slice(0, 3).join(", ")}`,
     });
 
-    // Get transactional pages for dark pattern engine (Bug 2 fix)
+    // Get transactional & high-intent pages for dark pattern engine
     // Cap at 5 pages — each page scan takes 1–3 min; >5 pages risks exceeding the 15-min global budget.
     const transactionalPages = getTransactionalPages(
       crawlResult.pages.map((p) => ({ url: p.url, html: p.html })),
-    ).slice(0, 5);
-    // Pass pre-crawled HTML to DP engine — enables bot-detection fallback (WAF evasion mode)
-    const dpPageList = transactionalPages.map((p) => {
+    );
+    const candidatePages = transactionalPages.length > 0 ? transactionalPages : crawlResult.pages;
+    const sortedPages = sortByIntent(candidatePages);
+    const dpPageList = sortedPages.slice(0, 5).map((p: { url: string; html?: string }) => {
       const crawledPage = crawlResult.pages.find((cp) => cp.url === p.url);
       return {
         url: p.url,
         title: crawledPage?.title || p.url,
         html: crawledPage?.html,
+        screenshot: crawledPage?.screenshot,
       };
     });
     const fullPageList = crawlResult.pages.map((p) => ({
@@ -664,7 +713,7 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
 
     const failedPillars: string[] = [];
     audit.pillarProgress = { accessibility: a11yEnabled ? 100 : undefined };
-    storeSet(id, audit);
+    storeSetSync(id, audit);
 
     // Helper: update per-pillar progress
     // Also maps dark pattern pillar progress (0–100) → overall audit progress (87–97)
@@ -682,7 +731,7 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
             ? `Dark Pattern Engine: ${pct}% complete...`
             : "Dark pattern scan complete — building report...";
       }
-      storeSet(id, audit);
+      storeSetSync(id, audit);
     };
 
     let darkPatternResult: DarkPatternResult | null = null;
@@ -716,6 +765,30 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
           addLog,
         )
           .then(async (result) => {
+            // Apply Minimal Dark Pattern Learning Filter
+            try {
+              const { filterDarkPatternsWithLearning } = await import("./dark-pattern-learning");
+              const { activePatterns, filteredCount } = await filterDarkPatternsWithLearning(
+                result.findings as any[],
+                config.url || ""
+              );
+              if (filteredCount > 0) {
+                result.findings = activePatterns as any[];
+                result.totalFindings = activePatterns.length;
+                addLog({
+                  timestamp: new Date().toISOString(),
+                  testId: "DP-LEARNING",
+                  testName: "Dark Pattern Learning Engine",
+                  wcag: "",
+                  status: "pass",
+                  pillar: "darkpatterns",
+                  message: `🧠 Applied Dark Pattern Learning: Suppressed ${filteredCount} learned false positive(s)`,
+                });
+              }
+            } catch (learningErr) {
+              console.warn('[AuditOrchestrator] Dark Pattern learning filter error:', learningErr);
+            }
+
             darkPatternResult = result;
             setPillarProgress("darkpatterns", 60);
             addLog({
@@ -887,6 +960,30 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
                 });
               }
             }
+            if (result && result.findings && result.findings.length > 0) {
+              const dpConverted: AccessibilityIssue[] = result.findings.map((f) => ({
+                id: f.id || crypto.randomUUID(),
+                testId: f.ruleId || "DP-RULE",
+                title: f.title,
+                description: f.description,
+                element: f.element || "DOM Element",
+                elementHtml: f.elementHtml,
+                elementScreenshot: f.evidence?.screenshotDataUrl,
+                pageUrl: f.pageUrl,
+                wcagCriterion: f.dsaArticle || f.ruleId || "dark-pattern",
+                wcagName: `Dark Pattern: ${f.category}`,
+                wcagLevel: "AA" as const,
+                severity: f.severity === "critical" ? "critical" : f.severity === "high" ? "high" : f.severity === "medium" ? "medium" : "low",
+                impact: f.userImpact || f.description,
+                recommendation: f.recommendation || `Remediate ${f.title}`,
+                codeFix: f.developerFix,
+                category: "darkpatterns" as const,
+                source: "darkpattern" as const,
+                confidence: f.confidence || "high",
+                affectedPages: [f.pageUrl],
+              }));
+              allIssues.push(...dpConverted);
+            }
             setPillarProgress("darkpatterns", 100);
           })
           .catch((err) => {
@@ -994,7 +1091,8 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
               testName: "Engine",
               wcag: "",
               status: result.overallScore >= 80 ? "pass" : "fail",
-              pillar: `${result.totalTrackers} trackers`,
+              pillar: "privacy",
+              message: `Privacy: ${result.overallScore}/100 | ${result.totalTrackers} trackers found`,
             });
           })
           .catch((err) => {
@@ -1132,7 +1230,7 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
     // are best-effort; this guarantees the final issue list matches the config.
     const dedupedRaw = deduplicateIssues(allIssues);
     const wcagLevelSet = new Set(wcagLevels);
-    const deduped = dedupedRaw.filter(i => wcagLevelSet.has(i.wcagLevel));
+    const deduped = dedupedRaw.filter((i) => wcagLevelSet.has(i.wcagLevel));
 
     // Store collected N/A criteria (exclude any that ended up having violations)
     const failedCriteria = new Set(deduped.map((i) => i.wcagCriterion));
@@ -1216,12 +1314,13 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
     audit.progress = 100;
     audit.progressMessage = "Audit complete!";
     audit.completedAt = new Date().toISOString();
-    storeSet(id, audit);
+    storeSetSync(id, audit);
   } catch (error) {
+    console.error("runPdfAudit error:", error);
     audit.status = "error";
     audit.error = error instanceof Error ? error.message : "Unknown error";
     audit.progressMessage = `Error: ${audit.error}`;
-    storeSet(id, audit);
+    storeSetSync(id, audit);
   }
 }
 
@@ -1254,8 +1353,12 @@ function deduplicateIssues(issues: AccessibilityIssue[]): AccessibilityIssue[] {
 export async function runPdfAudit(
   fileBuffer: Buffer,
   fileName: string,
+  pillars?: string[],
 ): Promise<string> {
   const id = uuidv4();
+  const enabledPillars: AuditPillar[] = (pillars || [
+    "accessibility",
+  ]) as AuditPillar[];
   const config: AuditConfig = {
     type: "pdf",
     crawlDepth: 0,
@@ -1263,6 +1366,7 @@ export async function runPdfAudit(
     includeAI: false,
     wcagLevels: ["A", "AA"],
     standard: "WCAG 2.2",
+    enabledPillars,
   };
   const audit: AuditResult = {
     id,
@@ -1285,39 +1389,76 @@ export async function runPdfAudit(
     inapplicableCriteria: [],
     startedAt: new Date().toISOString(),
   };
-  storeSet(id, audit);
+  storeSetSync(id, audit);
 
   try {
-    const result = await analyzePdf(fileBuffer, fileName, (msg) => {
-      audit.progressMessage = msg;
-    });
-    for (const issue of result.issues) {
-      if (!issue.confidence) issue.confidence = assignConfidence(issue);
+    const allIssues: AccessibilityIssue[] = [];
+    let pdfText = "";
+    const pillarResultPayload: PillarContext = { enabledPillars };
+    let darkPatternResult: DarkPatternResult | null = null;
+
+    if (enabledPillars.includes("accessibility")) {
+      const result = await analyzePdf(fileBuffer, fileName, (msg) => {
+        audit.progressMessage = msg;
+      });
+      pdfText = result.text;
+      for (const issue of result.issues) {
+        if (!issue.confidence) issue.confidence = assignConfidence(issue);
+      }
+      allIssues.push(...result.issues);
+    } else if (enabledPillars.includes("darkpatterns")) {
+      const result = await analyzePdf(fileBuffer, fileName, (msg) => {
+        audit.progressMessage = msg;
+      });
+      pdfText = result.text;
     }
-    audit.issues = result.issues;
-    audit.score = calculateScore(result.issues, 1);
+
+    if (enabledPillars.includes("darkpatterns")) {
+      const dpResult = analyzePdfDarkPatterns(pdfText, fileName);
+      const dpIssues = detectDarkPatternsInPdfText(pdfText, fileName);
+      allIssues.push(...dpIssues);
+      pillarResultPayload.darkpatterns = dpResult;
+      audit.pillarResults = { darkpatterns: dpResult };
+      darkPatternResult = dpResult;
+    }
+
+    audit.issues = allIssues;
+    audit.score = calculateScore(allIssues, 1);
     audit.score.testsRun = 0;
     audit.score.testsPassed = 0;
     audit.score.testsFailed = 0;
     audit.report = generateReport(
       id,
-      result.issues,
+      allIssues,
       audit.score,
-      [{ url: fileName, title: result.metadata.title || fileName }],
+      [{ url: fileName, title: fileName }],
       undefined,
       undefined,
       [],
       "AA",
-      { enabledPillars: ["accessibility"] },
+      pillarResultPayload,
+    );
+
+    audit.trustScore = calculateTrustScore(
+      {
+        overall: audit.score.overall,
+        totalIssues: audit.score.totalIssues,
+        uniqueIssues: audit.score.uniqueIssues,
+        issueBySeverity: audit.score.issueBySeverity,
+      },
+      darkPatternResult,
+      null,
+      null,
+      enabledPillars,
     );
     audit.status = "complete";
     audit.progress = 100;
     audit.completedAt = new Date().toISOString();
-    storeSet(id, audit);
+    storeSetSync(id, audit);
   } catch (error) {
     audit.status = "error";
     audit.error = error instanceof Error ? error.message : "Unknown error";
-    storeSet(id, audit);
+    storeSetSync(id, audit);
   }
 
   return id;

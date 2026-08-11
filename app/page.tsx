@@ -1,146 +1,160 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Audit } from "../lib/types";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  PILLAR_META,
+  TRUST_COLORS,
+  TRUST_LABELS,
+  COMPLIANCE_COLORS,
+  COMPLIANCE_LABELS,
+  getPerfGrade,
+  getAuditTitle,
+} from "../lib/constants";
 
 interface PillarScore {
   score: number;
   total: number;
 }
 
-interface Audit {
-  id: string;
-  status: string;
-  config: {
-    url?: string;
-    type: string;
-    wcagLevels?: string[];
-    standard?: string;
-    enabledPillars?: string[];
-  };
-  score: {
-    overall: number;
-    complianceLevel: string;
-    totalIssues: number;
-    testsRun?: number;
-  };
-  displayScore?: number;
-  totalIssues?: number;
-  pillarScores?: Record<string, number>;
-  trustScore?: { overall: number; trustLevel: string };
-  progress: number;
-  startedAt: string;
-  completedAt?: string;
-  crawlCoverage?: {
-    totalPagesFound: number;
-    pagesAudited: number;
-    coveragePercent: number;
-  };
-}
+// interface Audit {
+//   id: string;
+//   status: string;
+//   config: {
+//     url?: string;
+//     type: string;
+//     wcagLevels?: string[];
+//     standard?: string;
+//     enabledPillars?: string[];
+//   };
+//   score: {
+//     overall: number;
+//     complianceLevel: string;
+//     totalIssues: number;
+//     testsRun?: number;
+//   };
+//   displayScore?: number;
+//   totalIssues?: number;
+//   pillarScores?: Record<string, number>;
+//   trustScore?: { overall: number; trustLevel: string };
+//   progress: number;
+//   startedAt: string;
+//   completedAt?: string;
+//   crawlCoverage?: {
+//     totalPagesFound: number;
+//     pagesAudited: number;
+//     coveragePercent: number;
+//   };
+// }
 
-const PILLAR_META: Record<
-  string,
-  {
-    icon: string;
-    label: string;
-    color: string;
-    desc: string;
-    regs: string[];
-    detail: string;
-  }
-> = {
-  accessibility: {
-    icon: "♿",
-    label: "Accessibility",
-    color: "var(--kpmg-dynamic)",
-    desc: "Automated + AI visual + journey testing against WCAG 2.2, EN 301 549 and Section 508.",
-    detail:
-      "Detects contrast failures, missing ARIA labels, keyboard traps, focus order issues, and PDF/UA compliance across every crawled page.",
-    regs: ["WCAG 2.2", "EN 301 549", "Section 508", "WCAG 2.1"],
-  },
-  darkpatterns: {
-    icon: "🕵️",
-    label: "Dark Patterns",
-    color: "var(--kpmg-dynamic)",
-    desc: "CCPA 15-pattern taxonomy, EU DSA Art. 25, FTC §5 — cognitive bias exploitation detection.",
-    detail:
-      "Identifies confirmshaming, hidden costs, roach motels, trick questions and manipulative subscription flows using GPT-4o visual analysis.",
-    regs: ["EU DSA Art.25", "FTC §5", "DPDPA"],
-  },
-  performance: {
-    icon: "⚡",
-    label: "Performance",
-    color: "var(--kpmg-dynamic)",
-    desc: "Core Web Vitals (LCP / INP / CLS), RAIL model, Lighthouse scoring across desktop and mobile 4G.",
-    detail:
-      "Measures LCP, CLS, FCP, TTFB, TBT and INP per page. Detects render-blocking resources, DOM bloat, excessive requests and third-party script impact.",
-    regs: ["Core Web Vitals", "RAIL Model", "Lighthouse", "HTTP/2"],
-  },
-  // privacy: {
-  //   icon: "🔒",
-  //   label: "Privacy",
-  //   color: "#003087",
-  //   desc: " 5–37, CCPA/CPRA, DPDPA 2023, ePrivacy and ICO enforcement pattern detection.",
-  //   detail:
-  //     "Scans for tracking scripts, third-party data leakage, consent banner integrity, cookie classification, and data retention policy gaps.",
-  //   regs: ["CCPA/CPRA", "DPDPA 2023", "ePrivacy"],
-  // },
-};
+// const PILLAR_META: Record<
+//   string,
+//   {
+//     icon: string;
+//     label: string;
+//     color: string;
+//     desc: string;
+//     regs: string[];
+//     detail: string;
+//   }
+// > = {
+//   accessibility: {
+//     icon: "♿",
+//     label: "Accessibility",
+//     color: "var(--kpmg-dynamic)",
+//     desc: "Automated + AI visual + journey testing against WCAG 2.2, EN 301 549 and Section 508.",
+//     detail:
+//       "Detects contrast failures, missing ARIA labels, keyboard traps, focus order issues, and PDF/UA compliance across every crawled page.",
+//     regs: ["WCAG 2.2", "EN 301 549", "Section 508", "WCAG 2.1"],
+//   },
+//   darkpatterns: {
+//     icon: "🕵️",
+//     label: "Dark Patterns",
+//     color: "var(--kpmg-dynamic)",
+//     desc: "CCPA 15-pattern taxonomy, EU DSA Art. 25, FTC §5 — cognitive bias exploitation detection.",
+//     detail:
+//       "Identifies confirmshaming, hidden costs, roach motels, trick questions and manipulative subscription flows using GPT-4o visual analysis.",
+//     regs: ["EU DSA Art.25", "FTC §5", "DPDPA"],
+//   },
+//   performance: {
+//     icon: "⚡",
+//     label: "Performance",
+//     color: "var(--kpmg-dynamic)",
+//     desc: "Core Web Vitals (LCP / INP / CLS), RAIL model, Lighthouse scoring across desktop and mobile 4G.",
+//     detail:
+//       "Measures LCP, CLS, FCP, TTFB, TBT and INP per page. Detects render-blocking resources, DOM bloat, excessive requests and third-party script impact.",
+//     regs: ["Core Web Vitals", "RAIL Model", "Lighthouse", "HTTP/2"],
+//   },
+//   privacy: {
+//     icon: "🔒",
+//     label: "Privacy",
+//     color: "#003087",
+//     desc: " 5–37, CCPA/CPRA, DPDPA 2023, ePrivacy and ICO enforcement pattern detection.",
+//     detail:
+//       "Scans for tracking scripts, third-party data leakage, consent banner integrity, cookie classification, and data retention policy gaps.",
+//     regs: ["CCPA/CPRA", "DPDPA 2023", "ePrivacy"],
+//   },
+// };
 
-const TRUST_COLORS: Record<string, string> = {
-  trusted: "#00BA8C",
-  moderate: "#F0AB00",
-  "at-risk": "#FF8533",
-  critical: "#FF3356",
-};
-const TRUST_LABELS: Record<string, string> = {
-  trusted: "Trusted",
-  moderate: "Moderate Risk",
-  "at-risk": "At Risk",
-  critical: "Critical Risk",
-};
-const COMPLIANCE_COLORS: Record<string, string> = {
-  "non-compliant": "#FF3356",
-  "partially-compliant": "#F0AB00",
-  "aa-compliant": "#0091DA",
-  "aaa-compliant": "#00B2A9",
-};
-const COMPLIANCE_LABELS: Record<string, string> = {
-  "non-compliant": "Non-Compliant",
-  "partially-compliant": "Partially Compliant",
-  "aa-compliant": "AA Compliant",
-  "aaa-compliant": "AAA Compliant",
-};
+// const TRUST_COLORS: Record<string, string> = {
+//   trusted: "#00BA8C",
+//   moderate: "#F0AB00",
+//   "at-risk": "#FF8533",
+//   critical: "#FF3356",
+// };
+// const TRUST_LABELS: Record<string, string> = {
+//   trusted: "Trusted",
+//   moderate: "Moderate Risk",
+//   "at-risk": "At Risk",
+//   critical: "Critical Risk",
+// };
+// const COMPLIANCE_COLORS: Record<string, string> = {
+//   "non-compliant": "#FF3356",
+//   "partially-compliant": "#F0AB00",
+//   "aa-compliant": "#0091DA",
+//   "aaa-compliant": "#00B2A9",
+// };
+// const COMPLIANCE_LABELS: Record<string, string> = {
+//   "non-compliant": "Non-Compliant",
+//   "partially-compliant": "Partially Compliant",
+//   "aa-compliant": "AA Compliant",
+//   "aaa-compliant": "AAA Compliant",
+// };
 
-function getPerfGrade(s: number) {
-  if (s >= 90) return { label: "A", sub: "Excellent", color: "#00BA8C" };
-  if (s >= 75) return { label: "B", sub: "Good", color: "#00B2A9" };
-  if (s >= 50) return { label: "C", sub: "Needs Work", color: "#F0AB00" };
-  if (s >= 25) return { label: "D", sub: "Poor", color: "#FF8533" };
-  return { label: "F", sub: "Critical", color: "#FF3356" };
-}
+// function getPerfGrade(s: number) {
+//   if (s >= 90) return { label: "A", sub: "Excellent", color: "#00BA8C" };
+//   if (s >= 75) return { label: "B", sub: "Good", color: "#00B2A9" };
+//   if (s >= 50) return { label: "C", sub: "Needs Work", color: "#F0AB00" };
+//   if (s >= 25) return { label: "D", sub: "Poor", color: "#FF8533" };
+//   return { label: "F", sub: "Critical", color: "#FF3356" };
+// }
 
-function getAuditTitle(pillars: string[]): string {
-  if (!pillars || pillars.length === 0) return "Accessibility Audit";
-  if (pillars.length === 4) return "TrustLens 4-Pillar Audit";
-  if (pillars.length === 1) {
-    return (
-      (
-        {
-          accessibility: "Accessibility Audit",
-          darkpatterns: "Dark Pattern Audit",
-          performance: "Performance Audit",
-          // privacy: "Privacy Audit",
-        } as Record<string, string>
-      )[pillars[0]] || "Digital Audit"
-    );
-  }
-  return "Multi-Pillar Audit";
-}
+// function getAuditTitle(pillars: string[]): string {
+//   if (!pillars || pillars.length === 0) return "Accessibility Audit";
+//   if (pillars.length === 4) return "TrustLens 3-Pillar Audit";
+//   if (pillars.length === 1) {
+//     return (
+//       (
+//         {
+//           accessibility: "Accessibility Audit",
+//           darkpatterns: "Dark Pattern Audit",
+//           performance: "Performance Audit",
+//           // privacy: "Privacy Audit",
+//         } as Record<string, string>
+//       )[pillars[0]] || "Digital Audit"
+//     );
+//   }
+//   return "Multi-Pillar Audit";
+// }
 
 export default function HomePage() {
   const [audits, setAudits] = useState<Audit[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAllCompleted, setShowAllCompleted] = useState(false);
+  const router = useRouter();
+  const { user } = useAuth();
 
   // --- Typewriter Effect State ---
   const [wordIndex, setWordIndex] = useState(0);
@@ -186,7 +200,7 @@ export default function HomePage() {
   useEffect(() => {
     const fetchAudits = async () => {
       try {
-        const res = await fetch("/api/audit/list");
+        const res = await fetch("/api/audit/list", { credentials: "include" });
         if (res.ok) setAudits(await res.json());
       } catch {
         /* ignore */
@@ -273,12 +287,22 @@ export default function HomePage() {
             marginBottom: 48,
           }}
         >
-          <Link href="/audit" className="btn btn-primary btn-lg">
+          <Link
+            href={user ? "/audit" : "/auth/signin?callbackUrl=/audit"}
+            className="btn btn-primary btn-lg"
+          >
             Start New Audit
           </Link>
-          <a href="#audits" className="btn btn-secondary btn-lg">
-            View Audit History
-          </a>
+          {!loading && user && audits.length > 0 && (
+            <Link href="/audit-history" className="btn btn-secondary btn-lg">
+              View Audit History
+            </Link>
+          )}
+          {/* {audits.length > 0 && (
+            <a href="#audits" className="btn btn-secondary btn-lg">
+              View Audit History
+            </a>
+          )} */}
         </div>
 
         {/* Stats strip */}
@@ -440,7 +464,7 @@ export default function HomePage() {
           >
             {[
               {
-                // icon: "♿",
+                icon: "/accessibility.svg",
                 color: "var(--kpmg-dynamic)",
                 pillar: "Accessibility",
                 // headline: "1 in 6 users cannot use your product today.",
@@ -473,7 +497,7 @@ export default function HomePage() {
                 // ],
               },
               {
-                // icon: "🕵️",
+                icon: "/darkpattern.svg",
                 color: "var(--kpmg-dynamic)",
                 pillar: "Dark Patterns",
                 // headline:
@@ -509,7 +533,7 @@ export default function HomePage() {
                 // ],
               },
               {
-                // icon: "⚡",
+                icon: "/performance.svg",
                 color: "var(--kpmg-dynamic)",
                 pillar: "Performance",
                 // headline: "Every slow page is a revenue leak you can quantify.",
@@ -545,7 +569,7 @@ export default function HomePage() {
                 // ],
               },
               {
-                icon: "🔒",
+                icon: "/compliance.svg",
                 color: "var(--kpmg-dynamic)",
                 pillar: "Design GOVERNANCE",
                 headline: "You have trackers and data flows you cannot see.",
@@ -597,30 +621,42 @@ export default function HomePage() {
                   style={{
                     display: "flex",
                     alignItems: "center",
+                    justifyContent: "space-between",
                     gap: 8,
                     marginBottom: 14,
                   }}
                 >
+                  <div>
+                    <span
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 700,
+                        color: card.color,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.10em",
+                      }}
+                    >
+                      {card.pillar}
+                    </span>
+                    <span
+                      style={{
+                        letterSpacing: "0",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      {card.pillar === "Design GOVERNANCE"
+                        ? "(Coming Soon)"
+                        : ""}
+                    </span>
+                  </div>
                   {/* <span style={{ fontSize: 24 }}>{card.icon}</span> */}
-                  <span
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: card.color,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.10em",
-                    }}
-                  >
-                    {card.pillar}
-                  </span>
-                  <span
-                    style={{
-                      letterSpacing: "0",
-                      color: "var(--text-muted)",
-                    }}
-                  >
-                    {card.pillar === "Design GOVERNANCE" ? "(Coming Soon)" : ""}
-                  </span>
+                  <img
+                    src={card.icon}
+                    alt={`${card.pillar} icon`}
+                    width="40"
+                    height="40"
+                    style={{ marginBottom: 8 }}
+                  />
                 </div>
 
                 {/* Headline */}
@@ -1356,118 +1392,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ══ REGULATION COVERAGE ════════════════════════════════════════ */}
-        <div style={{ marginBottom: 44 }}>
-          <div style={{ textAlign: "center", marginBottom: 16 }}>
-            <h2 style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>
-              Audit History
-            </h2>
-            {/* <p style={{ fontSize: 14, color: "var(--offshade-text)" }}>
-              Every finding is automatically mapped to the applicable regulation
-              or standard
-            </p> */}
-            {completed.length > 0 && (
-              <p
-                style={{
-                  fontSize: 14,
-                  paddingTop: "2px",
-                  color: "var(--offshade-text)",
-                  margin: 0,
-                }}
-              >
-                {completed.length} completed audit
-                {completed.length !== 1 ? "s" : ""} — click any card to view the
-                full report
-              </p>
-            )}
-          </div>
-          {/* <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 18,
-              justifyContent: "center",
-            }}
-          >
-            {[
-              ["♿ WCAG 2.2", "var(--text-secondary)"],
-              ["♿ EN 301 549", "var(--text-secondary)"],
-              ["♿ Section 508", "var(--text-secondary)"],
-              ["♿ WCAG 2.1", "var(--text-secondary)"],
-              // ["🛡️ GDPR Art. 5–37", "var(--text-secondary)"],
-              ["🛡️ CCPA / CPRA", "var(--text-secondary)"],
-              ["🛡️ IN-DPDPA 2023", "var(--text-secondary)"],
-              // ["🛡️ ePrivacy", "var(--text-secondary)"],
-              ["⚖️ EU DSA Art. 25", "var(--text-secondary)"],
-              ["⚖️ FTC §5", "var(--text-secondary)"],
-              ["⚖️ ICO Guidance", "var(--text-secondary)"],
-              ["⚖️ CNIL", "var(--text-secondary)"],
-              ["⚡ Core Web Vitals", "var(--text-secondary)"],
-              ["⚡ RAIL Model", "var(--text-secondary)"],
-              ["⚡ Lighthouse", "var(--text-secondary)"],
-              ["⚡ HTTP/2", "var(--text-secondary)"],
-            ].map(([label, color]) => (
-              <span
-                key={label}
-                style={{display: "inline-flex", alignItems: "center", 
-                  fontSize: 12,
-                  padding: "8px 16px",
-                  borderRadius: 99,
-                  background: `${color}14`,
-                  color,
-                  border: `1px solid var(--text-muted)`,
-                  fontWeight: 600,
-                }}
-              >
-                {label}
-              </span>
-            ))}
-          </div> */}
-        </div>
-
-        {/* ══ AGGREGATE STATS (from real audits) ══════════════════════════ */}
-        {completed.length > 0 && (
-          <div className="grid-4 animate-slide-up" style={{ marginBottom: 28 }}>
-            {[
-              {
-                val: completed.length,
-                label: "Audits Completed",
-                color: "var(--accent-blue)",
-              },
-              {
-                val: `${avgScore}/100`,
-                label: "Average Score",
-                color:
-                  avgScore >= 75
-                    ? "var(--kpmg-dynamic)"
-                    : avgScore >= 50
-                      ? "var(--kpmg-dynamic)"
-                      : "var(--kpmg-dynamic)",
-              },
-              {
-                val: totalIssues,
-                label: "Total Issues Found",
-                color: "var(--kpmg-dynamic)",
-              },
-              {
-                val: pillarsRun.length,
-                label: "Pillars Exercised",
-                color: "var(--kpmg-teal)",
-              },
-            ].map((s) => (
-              <div key={s.label} className="stat-card">
-                <div
-                  className="stat-value"
-                  style={{ color: "var(--kpmg-dynamic)" }}
-                >
-                  {s.val}
-                </div>
-                <div className="stat-label">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* ══ RUNNING AUDITS ══════════════════════════════════════════════ */}
         {running.length < 0 && (
           <div style={{ marginBottom: 28 }}>
@@ -1523,12 +1447,14 @@ export default function HomePage() {
                               return (
                                 <span
                                   key={p}
-                                  style={{display: "inline-flex", alignItems: "center", 
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
                                     fontSize: 9,
                                     padding: "1px 6px",
                                     borderRadius: 99,
-                                    background: `${m.color}18`,
-                                    color: m.color,
+                                    // background: `${m.color}18`,
+                                    // color: m.color,
                                     border: `1px solid ${m.color}40`,
                                     fontWeight: 700,
                                   }}
@@ -1562,533 +1488,6 @@ export default function HomePage() {
             </div>
           </div>
         )}
-
-        {/* ══ AUDIT HISTORY ═══════════════════════════════════════════════ */}
-        <div id="audits" style={{ marginBottom: 44 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 16,
-            }}
-          >
-            <div>
-              {/* <h2 style={{ fontSize: 26, fontWeight: 700, marginBottom: 2 }}>
-                📋 Audit History
-              </h2> */}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              {completed.length > 3 && !showAllCompleted && (
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setShowAllCompleted(true)}
-                >
-                  Show All ({completed.length})
-                </button>
-              )}
-              <Link href="/audit" className="btn btn-primary btn-sm">
-                + New Audit
-              </Link>
-            </div>
-          </div>
-
-          {loading && (
-            <div
-              style={{
-                textAlign: "center",
-                padding: 44,
-              }}
-            >
-              <div
-                className="spinner"
-                style={{ margin: "0 auto", marginBottom: 12 }}
-              />
-              <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-                Loading audits...
-              </p>
-            </div>
-          )}
-
-          {!loading && completed.length === 0 && (
-            <div
-              className="glass-card"
-              style={{ textAlign: "center", padding: 56 }}
-            >
-              <div style={{ fontSize: 52, marginBottom: 16 }}>🛡️</div>
-              <h3 style={{ fontWeight: 700, marginBottom: 8, fontSize: 18 }}>
-                No Audits Yet
-              </h3>
-              <p
-                style={{
-                  color: "var(--text-secondary)",
-                  marginBottom: 10,
-                  fontSize: 14,
-                }}
-              >
-                Start your first TrustLens audit to get enterprise-grade digital
-                trust insights.
-              </p>
-              <p
-                style={{
-                  color: "var(--text-muted)",
-                  fontSize: 12,
-                  marginBottom: 24,
-                }}
-              >
-                Choose any combination of Accessibility · Dark Patterns ·
-                Performance ·
-              </p>
-              <Link href="/audit" className="btn btn-primary btn-lg">
-                🚀 Start First Audit
-              </Link>
-            </div>
-          )}
-
-          <div style={{ display: "grid", gap: 12 }}>
-            {(showAllCompleted ? completed : completed.slice(0, 3)).map((a) => {
-              const pillars = a.config?.enabledPillars || [];
-              const isPerfOnly =
-                pillars.length === 1 && pillars[0] === "performance";
-              const isA11yOnly =
-                pillars.length === 0 ||
-                (pillars.length === 1 && pillars[0] === "accessibility");
-              const displayScore = a.displayScore ?? a.score.overall;
-              const issueCount = a.totalIssues ?? a.score.totalIssues;
-              const pillarScores = a.pillarScores ?? {};
-              const trustColor = a.trustScore
-                ? TRUST_COLORS[a.trustScore.trustLevel] || "#0091DA"
-                : displayScore >= 75
-                  ? "#00BA8C"
-                  : displayScore >= 50
-                    ? "#F0AB00"
-                    : "#FF3356";
-              const level = a.config?.wcagLevels?.includes("AAA")
-                ? "AAA"
-                : a.config?.wcagLevels?.includes("AA")
-                  ? "AA"
-                  : "A";
-              const auditTitle = getAuditTitle(pillars);
-              const perfGrade = isPerfOnly ? getPerfGrade(displayScore) : null;
-
-              return (
-                <Link
-                  key={a.id}
-                  href={`/audit/${a.id}/report`}
-                  style={{
-                    textDecoration: "none",
-                    fontSize: "14px",
-                    color: "var(--kpmg-dynamic)",
-                  }}
-                >
-                  <div
-                    className="glass-card"
-                    style={{
-                      cursor: "pointer",
-                      transition: "transform 0.15s, box-shadow 0.15s",
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLDivElement).style.transform =
-                        "translateY(-2px)";
-                      (e.currentTarget as HTMLDivElement).style.boxShadow =
-                        "0 8px 32px rgba(0,0,0,0.18)";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLDivElement).style.transform = "";
-                      (e.currentTarget as HTMLDivElement).style.boxShadow = "";
-                    }}
-                  >
-                    {/* Top row: score circle + info + badge */}
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 16,
-                        alignItems: "flex-start",
-                      }}
-                    >
-                      {/* Score circle */}
-                      <div
-                        style={{
-                          width: 64,
-                          height: 64,
-                          borderRadius: "50%",
-                          border: `2.5px solid ${trustColor}`,
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          background: `${trustColor}08`,
-                        }}
-                      >
-                        {isPerfOnly && perfGrade ? (
-                          <>
-                            <div
-                              style={{
-                                fontSize: 22,
-                                fontWeight: 700,
-                                color: perfGrade.color,
-                                lineHeight: 1,
-                              }}
-                            >
-                              {perfGrade.label}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 7.5,
-                                color: "var(--text-scondary)",
-                                letterSpacing: "0.03em",
-                              }}
-                            >
-                              {perfGrade.sub}
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div
-                              style={{
-                                fontSize: 18,
-                                fontWeight: 700,
-                                color: trustColor,
-                                lineHeight: 1,
-                              }}
-                            >
-                              {displayScore}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 8,
-                                color: "var(--offshade-text)",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.04em",
-                              }}
-                            >
-                              {a.trustScore ? "Trust" : "Score"}
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Main info */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        {/* URL + audit type */}
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 18,
-                            marginBottom: 5,
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontWeight: 700,
-                              fontSize: 13,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                              maxWidth: 300,
-                            }}
-                          >
-                            {a.config?.url || "PDF Document"}
-                          </span>
-                          <span
-                            style={{display: "inline-flex", alignItems: "center",
-                              fontSize: 13,
-                              padding: "2px 7px",
-                              borderRadius: 99,
-                              background: "rgba(0,145,218,0.1)",
-                              color: "var(--accent-blue)",
-                              border: "1px solid rgba(0,145,218,0.25)",
-                              fontWeight: 700,
-                            }}
-                          >
-                            {auditTitle}
-                          </span>
-                          {isA11yOnly && (
-                            <span
-                              className={`audit-level-chip ${level.toLowerCase()}`}
-                              style={{ fontSize: 12, padding: "2px 7px" }}
-                            >
-                              {a.config?.standard || "WCAG 2.2"} {level}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Pillar badges */}
-                        {pillars.length > 0 && (
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: 8,
-                              flexWrap: "wrap",
-                              marginBottom: 8,
-                            }}
-                          >
-                            {pillars.map((p) => {
-                              const m = PILLAR_META[p];
-                              if (!m) return null;
-                              const ps = pillarScores[p];
-                              const pColor =
-                                ps != null
-                                  ? ps >= 75
-                                    ? "#00BA8C"
-                                    : ps >= 50
-                                      ? "#F0AB00"
-                                      : "#FF3356"
-                                  : m.color;
-                              return (
-                                <span
-                                  key={p}
-                                  style={{
-                                    fontSize: 13,
-                                    padding: "2px 8px",
-                                    borderRadius: 99,
-                                    background: `${m.color}15`,
-                                    color: m.color,
-                                    border: `1px solid ${m.color}35`,
-                                    fontWeight: 700,
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 3,
-                                  }}
-                                >
-                                  {m.icon} {m.label}
-                                  {ps != null && (
-                                    <span
-                                      style={{
-                                        color: pColor,
-                                        fontWeight: 700,
-                                        marginLeft: 3,
-                                      }}
-                                    >
-                                      {ps}/100
-                                    </span>
-                                  )}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Meta row */}
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 18,
-                            fontSize: 13,
-                            color: "var(--offshade-text)",
-                            flexWrap: "wrap",
-                            alignItems: "center",
-                          }}
-                        >
-                          <span
-                            style={{display: "inline-flex", alignItems: "center", 
-                              padding: "2px 7px",
-                              borderRadius: 99,
-                              border: "1px solid var(--kpmg-dynamic)",
-                              // background: "var(--kpmg-dynamic)",
-                              color: "var(--offshade-text)",
-                              fontWeight: 200,
-                              fontSize: 12,
-                            }}
-                          >
-                            {a.crawlCoverage?.pagesAudited ?? "—"} pages
-                          </span>
-                          <span
-                            style={{display: "inline-flex", alignItems: "center", 
-                              padding: "2px 7px",
-                              borderRadius: 99,
-                              border: "1px solid var(--kpmg-dynamic)",
-                              // background: "var(--kpmg-dynamic)",
-                              color: "var(--offshade-text)",
-                              fontWeight: 200,
-                              fontSize: 12,
-                            }}
-                          >
-                            {issueCount} issue{issueCount !== 1 ? "s" : ""}
-                          </span>
-                          {a.crawlCoverage && (
-                            <span
-                              style={{display: "inline-flex", alignItems: "center", 
-                                padding: "2px 7px",
-                                borderRadius: 99,
-                                border: "1px solid var(--kpmg-dynamic)",
-                                // background: "var(--kpmg-dynamic)",
-                                color: "var(--offshade-text)",
-                                fontWeight: 200,
-                                fontSize: 12,
-                              }}
-                            >
-                              {a.crawlCoverage.coveragePercent}% coverage
-                            </span>
-                          )}
-                          <span
-                            style={{display: "inline-flex", alignItems: "center", 
-                              padding: "2px 7px",
-                              borderRadius: 99,
-                              border: "1px solid var(--kpmg-dynamic)",
-                              // background: "var(--kpmg-dynamic)",
-                              color: "var(--offshade-text)",
-                              fontWeight: 200,
-                              fontSize: 12,
-                            }}
-                          >
-                            {" "}
-                            {new Date(a.startedAt).toLocaleDateString("en-GB", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            })}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Right badge — trust level for multi-pillar, compliance for a11y, grade for perf */}
-                      <div
-                        style={{
-                          flexShrink: 0,
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "flex-end",
-                          gap: 6,
-                        }}
-                      >
-                        {a.trustScore ? (
-                          <span
-                            style={{display: "inline-flex", alignItems: "center", 
-                              fontSize: 13,
-                              padding: "4px 10px",
-                              borderRadius: 99,
-                              fontWeight: 700,
-                              background: `${TRUST_COLORS[a.trustScore.trustLevel] || trustColor}18`,
-                              color:
-                                TRUST_COLORS[a.trustScore.trustLevel] ||
-                                trustColor,
-                              border: `1px solid ${TRUST_COLORS[a.trustScore.trustLevel] || trustColor}40`,
-                            }}
-                          >
-                            {TRUST_LABELS[a.trustScore.trustLevel] ||
-                              a.trustScore.trustLevel}
-                          </span>
-                        ) : isPerfOnly ? (
-                          <span
-                            style={{display: "inline-flex", alignItems: "center", 
-                              fontSize: 13,
-                              padding: "4px 10px",
-                              borderRadius: 99,
-                              fontWeight: 700,
-                              background: `${trustColor}18`,
-                              color: trustColor,
-                              border: `1px solid ${trustColor}40`,
-                            }}
-                          >
-                            {getPerfGrade(displayScore).sub}
-                          </span>
-                        ) : (
-                          <span
-                            style={{display: "inline-flex", alignItems: "center", 
-                              fontSize: 13,
-                              padding: "4px 10px",
-                              borderRadius: 99,
-                              fontWeight: 700,
-                              background: `${COMPLIANCE_COLORS[a.score.complianceLevel] || "#0091DA"}18`,
-                              color:
-                                COMPLIANCE_COLORS[a.score.complianceLevel] ||
-                                "#0091DA",
-                              border: `1px solid ${COMPLIANCE_COLORS[a.score.complianceLevel] || "#0091DA"}40`,
-                            }}
-                          >
-                            {COMPLIANCE_LABELS[a.score.complianceLevel] ||
-                              a.score.complianceLevel}
-                          </span>
-                        )}
-                        <span
-                          style={{
-                            fontSize: 12,
-                            marginTop: "12px",
-                            color: "var(--text-secondary)",
-                          }}
-                        >
-                          View Report →
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Per-pillar score bar (multi-pillar only) */}
-                    {Object.keys(pillarScores).length > 1 && (
-                      <div
-                        style={{
-                          marginTop: 12,
-                          paddingTop: 12,
-                          borderTop: "1px solid var(--border)",
-                          display: "flex",
-                          gap: 8,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        {Object.entries(pillarScores).map(([p, ps]) => {
-                          const m = PILLAR_META[p];
-                          if (!m) return null;
-                          const barColor =
-                            ps >= 75
-                              ? "var(--kpmg-dynamic)"
-                              : ps >= 50
-                                ? "var(--kpmg-dynamic)"
-                                : "var(--kpmg-dynamic)";
-                          return (
-                            <div key={p} style={{ flex: 1, minWidth: 80 }}>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  fontSize: 14,
-                                  marginBottom: 3,
-                                  color: "var(--text-secondary)",
-                                }}
-                              >
-                                <span
-                                  style={{ color: m.color, fontWeight: 700 }}
-                                >
-                                  {/* {m.icon} */}
-                                  {m.label}
-                                </span>
-                                <span
-                                  style={{ color: barColor, fontWeight: 700 }}
-                                >
-                                  {ps}
-                                </span>
-                              </div>
-                              <div
-                                style={{
-                                  height: 4,
-                                  borderRadius: 99,
-                                  background: "var(--border)",
-                                  overflow: "hidden",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    height: "100%",
-                                    width: `${ps}%`,
-                                    background: barColor,
-                                    borderRadius: 99,
-                                    transition: "width 0.6s ease",
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
       </div>
     </div>
   );

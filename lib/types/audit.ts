@@ -46,6 +46,8 @@ export interface AuditConfig {
   aiDirection?: string;
   // ── Performance Problem Context (client-reported issues) ──
   performanceProblemContext?: import("./performance").PerformanceProblemContext;
+  // ── User ID for database association (future auth) ──
+  userId?: string;
 }
 
 export interface PageData {
@@ -190,14 +192,15 @@ export interface AccessibilityIssue {
   impact: string;
   recommendation: string;
   codeFix?: string;
-  category: "perceivable" | "operable" | "understandable" | "robust" | "pdf";
+  category: "perceivable" | "operable" | "understandable" | "robust" | "pdf" | "darkpatterns";
   source:
     | "axe-core"
     | "custom-rule"
     | "pdf-analyzer"
     | "ai-analysis"
     | "journey-test"
-    | "test-runner";
+    | "test-runner"
+    | "darkpattern";
   confidence: ConfidenceLevel;
   occurrenceCount?: number;
   affectedPages?: string[];

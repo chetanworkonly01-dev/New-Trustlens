@@ -1,46 +1,52 @@
-import { NextResponse } from 'next/server';
-import { getAllAudits } from '@/lib/engines/audit-orchestrator';
+import { NextRequest, NextResponse } from "next/server";
+import { getAllAuditsAsync } from "@/lib/store/audit-store";
+import { getSessionFromCookiesAsync } from "@/lib/auth";
+import type { AuditResult } from "@/lib/types/audit";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const audits = getAllAudits();
-  const summary = audits.map(a => {
-    const pillars: string[] = (a.config as any).enabledPillars || [];
-    const perfResult = (a as any).pillarResults?.performance;
-    const dpResult   = (a as any).pillarResults?.darkpatterns;
-    const privResult = (a as any).pillarResults?.privacy;
-    const isPerfOnly = pillars.length === 1 && pillars[0] === 'performance';
+type PillarResults = NonNullable<AuditResult["pillarResults"]>;
+
+export async function GET(request: NextRequest) {
+  const session = await getSessionFromCookiesAsync(request);
+  const userId = session?.user?.id;
+  const audits = await getAllAuditsAsync(userId);
+  const summary = audits.map((a) => {
+    const pillars: string[] = (a.config as { enabledPillars?: string[] }).enabledPillars || [];
+    const pillarResults = a.pillarResults as PillarResults | undefined;
+    const perfResult = pillarResults?.performance as unknown as Record<string, unknown> | undefined;
+    const dpResult = pillarResults?.darkpatterns as unknown as Record<string, unknown> | undefined;
+    const privResult = pillarResults?.privacy as unknown as Record<string, unknown> | undefined;
+    const isPerfOnly = pillars.length === 1 && pillars[0] === "performance";
 
     // Pillar-aware display score
-    const displayScore = isPerfOnly && perfResult?.overallScore != null
-      ? perfResult.overallScore
-      : a.trustScore?.overall ?? a.score.overall;
+    const displayScore =
+      isPerfOnly && (perfResult?.overallScore != null)
+        ? perfResult.overallScore as number
+        : (a.trustScore?.overall ?? a.score.overall);
 
-    // Pillar-aware issue count — uses UNIQUE violation types, not raw per-element
-    // instance counts (a.score.totalIssues is one row per failing DOM node, which
-    // wildly inflates the number shown on the dashboard vs. what's actually distinct).
-    const a11yIssues   = a.score.uniqueIssues ?? a.score.totalIssues;
-    const perfIssues   = perfResult?.totalResourceIssues ?? 0;
-    const dpIssues     = (dpResult?.findings ?? []).length;
-    const privIssues   = (privResult?.findings ?? []).length;
-    const totalIssues  = pillars.length > 0 && !pillars.includes('accessibility')
-      ? perfIssues + dpIssues + privIssues
-      : a11yIssues + perfIssues + dpIssues + privIssues;
+    // Pillar-aware issue count
+    const perfIssues = (perfResult?.totalResourceIssues as number) ?? 0;
+    const dpIssues = ((dpResult?.findings as unknown[] | undefined) ?? []).length;
+    const privIssues = ((privResult?.findings as unknown[] | undefined) ?? []).length;
+    const totalIssues: number =
+      pillars.length > 0 && !pillars.includes("accessibility")
+        ? perfIssues + dpIssues + privIssues
+        : a.score.totalIssues + perfIssues + dpIssues + privIssues;
 
     // Per-pillar scores for the card
     const pillarScores: Record<string, number> = {};
-    if (pillars.includes('accessibility') || pillars.length === 0) {
+    if (pillars.includes("accessibility") || pillars.length === 0) {
       pillarScores.accessibility = a.score.overall;
     }
-    if (pillars.includes('performance') && perfResult?.overallScore != null) {
-      pillarScores.performance = perfResult.overallScore;
+    if (pillars.includes("performance") && perfResult?.overallScore != null) {
+      pillarScores.performance = perfResult.overallScore as number;
     }
-    if (pillars.includes('darkpatterns') && dpResult?.ethicsScore != null) {
-      pillarScores.darkpatterns = dpResult.ethicsScore;
+    if (pillars.includes("darkpatterns") && dpResult?.ethicsScore != null) {
+      pillarScores.darkpatterns = dpResult.ethicsScore as number;
     }
-    if (pillars.includes('privacy') && privResult?.overallScore != null) {
-      pillarScores.privacy = privResult.overallScore;
+    if (pillars.includes("privacy") && privResult?.overallScore != null) {
+      pillarScores.privacy = privResult.overallScore as number;
     }
 
     return {
@@ -77,5 +83,18 @@ export async function GET() {
         : undefined,
     };
   });
+  const limitParam = request.nextUrl.searchParams.get("limit");
+  const limit = limitParam && limitParam !== "all" ? parseInt(limitParam, 10) : undefined;
+  const totalCount = summary.length;
+  const slicedSummary = limit ? summary.slice(0, limit) : summary;
+
+  if (limitParam) {
+    return NextResponse.json({
+      audits: slicedSummary,
+      totalCount,
+      hasMore: totalCount > slicedSummary.length,
+    });
+  }
+
   return NextResponse.json(summary);
 }

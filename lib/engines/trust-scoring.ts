@@ -2,11 +2,16 @@
 // KPMG TrustLens — Unified Trust Scoring Engine
 // ============================================================
 
-import type { AuditPillar, PillarScore, TrustScore, TrustLevel } from '../types/trustscore';
-import { DEFAULT_PILLAR_WEIGHTS, getTrustLevel } from '../types/trustscore';
-import type { DarkPatternResult } from '../types/darkpattern';
-import type { PerformanceResult } from '../types/performance';
-import type { PrivacyResult } from '../types/privacy';
+import type {
+  AuditPillar,
+  PillarScore,
+  TrustScore,
+  TrustLevel,
+} from "../types/trustscore";
+import { DEFAULT_PILLAR_WEIGHTS, getTrustLevel } from "../types/trustscore";
+import type { DarkPatternResult } from "../types/darkpattern";
+import type { PerformanceResult } from "../types/performance";
+import type { PrivacyResult } from "../types/privacy";
 
 interface AccessibilityScoreData {
   overall: number;
@@ -21,7 +26,7 @@ export function calculateTrustScore(
   performanceResult: PerformanceResult | null,
   privacyResult: PrivacyResult | null,
   enabledPillars: AuditPillar[],
-  customWeights?: Partial<Record<AuditPillar, number>>
+  customWeights?: Partial<Record<AuditPillar, number>>,
 ): TrustScore {
   const weights = { ...DEFAULT_PILLAR_WEIGHTS, ...customWeights };
 
@@ -35,9 +40,9 @@ export function calculateTrustScore(
   const pillarScores: Record<AuditPillar, PillarScore> = {} as any;
 
   // Accessibility pillar
-  if (enabledPillars.includes('accessibility') && accessibilityScore) {
+  if (enabledPillars.includes("accessibility") && accessibilityScore) {
     pillarScores.accessibility = {
-      pillar: 'accessibility',
+      pillar: "accessibility",
       score: accessibilityScore.overall,
       weight: normalizedWeights.accessibility || 0,
       totalFindings: accessibilityScore.uniqueIssues,
@@ -47,21 +52,32 @@ export function calculateTrustScore(
   }
 
   // Dark patterns pillar
-  if (enabledPillars.includes('darkpatterns') && darkPatternResult) {
-    pillarScores.darkpatterns = {
-      pillar: 'darkpatterns',
-      score: darkPatternResult.ethicsScore,
-      weight: normalizedWeights.darkpatterns || 0,
-      totalFindings: darkPatternResult.totalFindings,
-      findingsBySeverity: darkPatternResult.findingsBySeverity,
-      status: getStatus(darkPatternResult.ethicsScore),
-    };
+  if (enabledPillars.includes("darkpatterns")) {
+    if (darkPatternResult) {
+      pillarScores.darkpatterns = {
+        pillar: "darkpatterns",
+        score: darkPatternResult.ethicsScore,
+        weight: normalizedWeights.darkpatterns || 0,
+        totalFindings: darkPatternResult.totalFindings,
+        findingsBySeverity: darkPatternResult.findingsBySeverity,
+        status: getStatus(darkPatternResult.ethicsScore),
+      };
+    } else {
+      pillarScores.darkpatterns = {
+        pillar: "darkpatterns",
+        score: 0,
+        weight: normalizedWeights.darkpatterns || 0,
+        totalFindings: 0,
+        findingsBySeverity: {},
+        status: "fail" as const,
+      };
+    }
   }
 
   // Performance pillar
-  if (enabledPillars.includes('performance') && performanceResult) {
+  if (enabledPillars.includes("performance") && performanceResult) {
     pillarScores.performance = {
-      pillar: 'performance',
+      pillar: "performance",
       score: performanceResult.overallScore,
       weight: normalizedWeights.performance || 0,
       totalFindings: performanceResult.totalResourceIssues,
@@ -71,9 +87,9 @@ export function calculateTrustScore(
   }
 
   // Privacy pillar
-  if (enabledPillars.includes('privacy') && privacyResult) {
+  if (enabledPillars.includes("privacy") && privacyResult) {
     pillarScores.privacy = {
-      pillar: 'privacy',
+      pillar: "privacy",
       score: privacyResult.overallScore,
       weight: normalizedWeights.privacy || 0,
       totalFindings: privacyResult.findings.length,
@@ -100,8 +116,8 @@ export function calculateTrustScore(
   };
 }
 
-function getStatus(score: number): 'pass' | 'warning' | 'fail' {
-  if (score >= 80) return 'pass';
-  if (score >= 50) return 'warning';
-  return 'fail';
+function getStatus(score: number): "pass" | "warning" | "fail" {
+  if (score >= 80) return "pass";
+  if (score >= 50) return "warning";
+  return "fail";
 }

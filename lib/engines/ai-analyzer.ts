@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { AccessibilityIssue, ConfidenceLevel } from '../types/audit';
+import { saveAILearningData } from '../store/audit-store';
 // uuid replaced with Node.js built-in
 const uuidv4 = (): string => crypto.randomUUID();
 
@@ -170,7 +171,32 @@ Return at most 8 issues not already in the existing list. Return {"issues": []} 
       confidence: mapConfidence(ai.confidence),
     }));
 
-    onProgress?.(`AI found ${issues.length} additional issues (${issues.filter(i => i.confidence === 'high').length} high confidence).`);
+     onProgress?.(`AI found ${issues.length} additional issues (${issues.filter(i => i.confidence === 'high').length} high confidence).`);
+    
+    // Save AI learning data for model improvement
+    if (process.env.STORAGE_MODE === 'database' && input.pageUrl) {
+      try {
+        await saveAILearningData({
+          auditId: (input as any).auditId || 'unknown',
+          findingId: issues.length > 0 ? issues[0].id : undefined,
+          aiModelVersion: 'gpt-4o',
+          aiConfidenceScore: issues.filter(i => i.confidence === 'high').length / (issues.length || 1),
+          findingType: 'accessibility',
+          promptUsed: prompt,
+          rawResponse: {
+            totalIssues: issues.length,
+            highConfidenceIssues: issues.filter(i => i.confidence === 'high').length,
+            existingIssuesCount: input.existingIssues.length,
+            pageUrl: input.pageUrl,
+            pageTitle: input.pageTitle,
+          },
+        });
+      } catch (learningErr) {
+        // Non-fatal - AI analysis should still work without learning data
+        console.warn('[AIAnalyzer] Failed to save learning data:', learningErr);
+      }
+    }
+    
     return issues;
   } catch (error) {
     console.error('AI analysis error:', error);
