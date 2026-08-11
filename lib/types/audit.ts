@@ -192,14 +192,15 @@ export interface AccessibilityIssue {
   impact: string;
   recommendation: string;
   codeFix?: string;
-  category: "perceivable" | "operable" | "understandable" | "robust" | "pdf";
+  category: "perceivable" | "operable" | "understandable" | "robust" | "pdf" | "darkpatterns";
   source:
     | "axe-core"
     | "custom-rule"
     | "pdf-analyzer"
     | "ai-analysis"
     | "journey-test"
-    | "test-runner";
+    | "test-runner"
+    | "darkpattern";
   confidence: ConfidenceLevel;
   occurrenceCount?: number;
   affectedPages?: string[];

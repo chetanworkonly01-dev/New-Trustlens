@@ -2113,20 +2113,10 @@ const PREDEFINED_JOURNEYS: PredefinedJourneyTemplate[] = [
       }
     }, [user, authLoading, router]);
 
-    if (authLoading || !user) {
-      return (
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-            <p className="text-gray-600">Loading...</p>
-          </div>
-        </div>
-      );
-    }
-
   const [tab, setTab] = useState<"website" | "pdf" | "image" | "video">(
     "website",
   );
+
   const [url, setUrl] = useState("");
 
   const [maxPages, setMaxPages] = useState(5);
@@ -2506,7 +2496,21 @@ const PREDEFINED_JOURNEYS: PredefinedJourneyTemplate[] = [
     ? PREDEFINED_JOURNEYS.find((j) => j.id === selectedJourney)
     : null;
 
+  if (authLoading || !user) {
+
+
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
+
     <div
       className="container"
       style={{

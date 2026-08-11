@@ -2114,7 +2114,10 @@ export default function FinalReportPage() {
   const issues = data.issues || [];
   const score = data.score;
   const perfResult: PerfResult | undefined = data.pillarResults?.performance;
-  const perfScore = perfResult?.overallScore ?? score.overall;
+  const perfScore = data.trustScore?.pillarScores?.performance?.score ?? perfResult?.overallScore ?? score.overall;
+  const dpScore = data.trustScore?.pillarScores?.darkpatterns?.score ?? data.pillarResults?.darkpatterns?.ethicsScore ?? score.overall;
+  const a11yScore = data.trustScore?.pillarScores?.accessibility?.score ?? score.overall;
+  const privacyScore = data.trustScore?.pillarScores?.privacy?.score ?? data.pillarResults?.privacy?.overallScore ?? score.overall;
   const perfGradeInfo = perfGrade(perfScore);
   const testedLevel = data.report?.testedLevel || "AA";
   const standard = data.config?.standard || "WCAG 2.2";
@@ -2297,7 +2300,7 @@ export default function FinalReportPage() {
     recs.forEach((r) => {
       rows.push([
         `"${data.config?.url || ""}"`,
-        r.issueType || r.title,
+        r.title,
         r.impact,
         `"${r.detail.replace(/"/g, '""')}"`,
         `"${r.detail.replace(/"/g, '""')}"`,
@@ -2341,15 +2344,17 @@ export default function FinalReportPage() {
       : pillarNames.length === 3
         ? null
         : pillarNames.join(" & ");
-  const displayScore = isMultiPillar
-    ? (data.trustScore?.overall ?? score.overall)
-    : perfOnly
+  const displayScore = data.trustScore?.overall ?? (
+    perfOnly
       ? perfScore
       : isDP
-        ? (data.pillarResults?.darkpatterns?.ethicsScore ?? score.overall)
+        ? dpScore
         : isPriv && !isA11y
-          ? (data.pillarResults?.privacy?.overallScore ?? score.overall)
-          : score.overall;
+          ? privacyScore
+          : isA11y && !isMultiPillar
+            ? a11yScore
+            : score.overall
+  );
   const scoreColor =
     displayScore >= 75 ? "#00BA8C" : displayScore >= 50 ? "#F0AB00" : "#FF3356";
   // const reportTitle = isMultiPillar
@@ -3330,7 +3335,7 @@ export default function FinalReportPage() {
                   }}
                 >
                   <Tile
-                    val={score.overall}
+                    val={displayScore}
                     label="Overall Score"
                     color={scoreColor}
                     sub="/100"
@@ -3376,7 +3381,7 @@ export default function FinalReportPage() {
                     >
                       Business Impact
                     </h3>
-                    {score.overall < 50 && (
+                    {displayScore < 50 && (
                       <div
                         style={{
                           padding: "10px 14px",
@@ -7053,12 +7058,12 @@ export default function FinalReportPage() {
               }}
             >
               <Tile
-                val={perfResult.overallScore}
+                val={perfScore}
                 label="Performance Score"
                 color={
-                  perfResult.overallScore >= 75
+                  perfScore >= 75
                     ? "#00BA8C"
-                    : perfResult.overallScore >= 50
+                    : perfScore >= 50
                       ? "#F0AB00"
                       : "#E8002D"
                 }

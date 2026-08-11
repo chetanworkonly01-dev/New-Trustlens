@@ -33,6 +33,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const checkSession = async () => {
+    if (process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true') {
+      setUser({
+        id: 'dev-user-0000-0000',
+        email: 'dev@trustlens.local',
+        name: 'Dev User (Bypassed)',
+        role: 'admin',
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/auth/session', {
         credentials: 'include',
@@ -49,6 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
   };
+
+
 
   useEffect(() => {
     checkSession();

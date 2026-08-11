@@ -83,5 +83,18 @@ export async function GET(request: NextRequest) {
         : undefined,
     };
   });
+  const limitParam = request.nextUrl.searchParams.get("limit");
+  const limit = limitParam && limitParam !== "all" ? parseInt(limitParam, 10) : undefined;
+  const totalCount = summary.length;
+  const slicedSummary = limit ? summary.slice(0, limit) : summary;
+
+  if (limitParam) {
+    return NextResponse.json({
+      audits: slicedSummary,
+      totalCount,
+      hasMore: totalCount > slicedSummary.length,
+    });
+  }
+
   return NextResponse.json(summary);
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAudit } from '@/lib/store/audit-store';
+import { getAuditAsync } from '@/lib/store/audit-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing id or url' }, { status: 400 });
   }
 
-  const audit = getAudit(id);
+  const audit = await getAuditAsync(id);
   if (!audit) {
     return NextResponse.json({ error: 'Audit not found' }, { status: 404 });
   }

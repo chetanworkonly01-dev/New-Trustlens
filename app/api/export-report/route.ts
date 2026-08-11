@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAudit } from '@/lib/engines/audit-orchestrator';
+import { getAuditAsync } from '@/lib/store/audit-store';
 import { generateDocx } from '@/lib/export/docx-generator';
 import { generatePdf } from '@/lib/export/pdf-generator';
 import { generatePptx } from '@/lib/export/pptx-generator';
+import { sanitizeAuditForExport } from '@/lib/export/report-helpers';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -20,18 +21,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid format. Use: docx, pdf, pptx' }, { status: 400 });
   }
 
-  const audit = getAudit(auditId);
-  if (!audit) {
+  const auditRaw = await getAuditAsync(auditId);
+  if (!auditRaw) {
     return NextResponse.json({ error: 'Audit not found' }, { status: 404 });
   }
 
-  if (audit.status !== 'complete') {
-    return NextResponse.json({ error: 'Audit not yet complete', status: audit.status }, { status: 202 });
+  if (auditRaw.status !== 'complete') {
+    return NextResponse.json({ error: 'Audit not yet complete', status: auditRaw.status }, { status: 202 });
   }
 
-  if (!audit.report) {
+  if (!auditRaw.report) {
     return NextResponse.json({ error: 'No report data available' }, { status: 404 });
   }
+
+  // Filter out false positive/rejected findings and recalculate score for export
+  const audit = sanitizeAuditForExport(auditRaw);
 
   try {
     let buffer: Buffer;
@@ -41,6 +45,7 @@ export async function GET(request: NextRequest) {
     switch (format) {
       case 'docx':
         buffer = await generateDocx(audit);
+
         contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
         fileExtension = 'docx';
         break;

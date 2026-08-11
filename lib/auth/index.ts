@@ -15,11 +15,13 @@ interface SessionUser {
   role?: string;
 }
 
+
 interface Session {
   user: SessionUser;
   expires: string;
   token: string;
 }
+
 
 // Generate a cryptographically secure random token
 function generateToken(size: number = 32): string {
@@ -90,16 +92,25 @@ export async function createUser(
   email: string,
   password: string,
   name?: string,
-  role: string = 'user'
-): Promise<{ id: string; email: string; name?: string } | null> {
+  requestedRole: string = 'user'
+): Promise<{ id: string; email: string; name?: string; role: string } | null> {
   const passwordHash = hashPassword(password);
   try {
-    const result = await executeQuery<{ id: string; email: string; name: string }>(
-      `INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name`,
-      [email.toLowerCase(), name || null, passwordHash, role]
+    const currentCount = await userCount();
+    // First user is automatically assigned 'admin' role!
+    const assignedRole = currentCount === 0 ? 'admin' : requestedRole;
+
+    const result = await executeQuery<{ id: string; email: string; name: string; role: string }>(
+      `INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role`,
+      [email.toLowerCase(), name || null, passwordHash, assignedRole]
     );
     if (result.length > 0) {
-      return { id: result[0].id, email: result[0].email, name: result[0].name };
+      return { 
+        id: result[0].id, 
+        email: result[0].email, 
+        name: result[0].name,
+        role: result[0].role || assignedRole
+      };
     }
     return null;
   } catch (err: unknown) {
@@ -140,8 +151,19 @@ export async function authenticateUser(email: string, password: string): Promise
   };
 }
 
+export const DEV_MOCK_USER: SessionUser = {
+  id: 'dev-user-0000-0000',
+  email: 'dev@trustlens.local',
+  name: 'Dev User (Bypassed)',
+  role: 'admin',
+};
+
 // Get user by ID
 export async function getUserById(id: string): Promise<SessionUser | null> {
+  if (process.env.DEV_BYPASS_AUTH === 'true') {
+    return DEV_MOCK_USER;
+  }
+
   const result = await executeQuery<{ id: string; email: string; name: string; role: string }>(
     `SELECT id, email, name, role FROM users WHERE id = $1`,
     [id]
@@ -215,6 +237,9 @@ export function createSession(user: SessionUser): Session {
 
 // Verify session token
 export async function verifySession(token: string | undefined): Promise<SessionUser | null> {
+  if (process.env.DEV_BYPASS_AUTH === 'true') {
+    return DEV_MOCK_USER;
+  }
   if (!token) return null;
 
   const payload = verifyJWT(token) as { userId?: string } | null;
@@ -225,6 +250,9 @@ export async function verifySession(token: string | undefined): Promise<SessionU
 
 // Extract session from request cookies (for server-side use)
 export function getSessionFromCookies(request: Request): { user: SessionUser } | null {
+  if (process.env.DEV_BYPASS_AUTH === 'true') {
+    return { user: DEV_MOCK_USER };
+  }
   const cookies = request.headers.get('cookie');
   const tokenMatch = cookies?.match(/auth-token=([^;]+)/);
   const token = tokenMatch ? tokenMatch[1] : undefined;
@@ -234,7 +262,6 @@ export function getSessionFromCookies(request: Request): { user: SessionUser } |
   if (!payload || !payload.userId) return null;
 
   // Synchronous verification - return the payload info immediately
-  // Full user lookup can be done async if needed
   return {
     user: {
       id: payload.userId,
@@ -247,16 +274,25 @@ export function getSessionFromCookies(request: Request): { user: SessionUser } |
 
 // Extract session from request cookies (async version with full user lookup)
 export async function getSessionFromCookiesAsync(request: Request): Promise<{ user: SessionUser } | null> {
+  if (process.env.DEV_BYPASS_AUTH === 'true') {
+    return { user: DEV_MOCK_USER };
+  }
   const cookies = request.headers.get('cookie');
   const tokenMatch = cookies?.match(/auth-token=([^;]+)/);
   const token = tokenMatch ? tokenMatch[1] : undefined;
   if (!token) return null;
 
-  const user = await verifySession(token);
-  if (!user) return null;
-
-  return { user };
+  try {
+    const user = await verifySession(token);
+    if (!user) return null;
+    return { user };
+  } catch {
+    return null;
+  }
 }
+
+
+
 
 // Hash password utility for direct export
 export { hashPassword, verifyPassword, generateToken, generateJWT, verifyJWT };
@@ -267,25 +303,129 @@ export type { SessionUser, Session };
 // ── System Settings ──────────────────────────────────────────────────────────
 
 export async function getSetting(key: string): Promise<string | null> {
-  const result = await executeQuery<{ value: string }>(
-    `SELECT value FROM system_settings WHERE key = $1`,
-    [key]
-  );
-  return result.length > 0 ? result[0].value : null;
+  if (process.env.DEV_BYPASS_DB === 'true') {
+    if (key === 'is_signup_allowed') return 'true';
+    return null;
+  }
+  try {
+    const result = await executeQuery<{ value: string }>(
+      `SELECT value FROM system_settings WHERE key = $1`,
+      [key]
+    );
+    return result.length > 0 ? result[0].value : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function setSetting(key: string, value: string): Promise<void> {
-  await executeQuery(
-    `INSERT INTO system_settings (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
-    [key, value]
-  );
+  if (process.env.DEV_BYPASS_DB === 'true') {
+    return;
+  }
+  try {
+    await executeQuery(
+      `INSERT INTO system_settings (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+      [key, value]
+    );
+  } catch {
+    // Ignore error in bypass mode
+  }
 }
 
 export async function isSignupAllowed(): Promise<boolean> {
-  const value = await getSetting('is_signup_allowed');
-  return value === 'true';
+  try {
+    const currentCount = await userCount();
+    if (currentCount === 0) {
+      return true; // First user signup is always allowed for admin bootstrap
+    }
+    const value = await getSetting('is_signup_allowed');
+    return value === 'true';
+  } catch {
+    return false;
+  }
 }
 
 export async function setSignupAllowed(allowed: boolean): Promise<void> {
   await setSetting('is_signup_allowed', allowed ? 'true' : 'false');
+}
+
+// ── User Management ────────────────────────────────────────────────────────────
+
+export interface AdminUserListItem {
+  id: string;
+  email: string;
+  name?: string;
+  role: string;
+  createdAt: string;
+}
+
+export async function getAllUsers(): Promise<AdminUserListItem[]> {
+  if (process.env.DEV_BYPASS_DB === 'true') {
+    return [
+      {
+        id: 'dev-admin-id',
+        email: 'admin@kpmg.com',
+        name: 'KPMG Admin',
+        role: 'admin',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+  }
+
+  try {
+    const rows = await executeQuery<{
+      id: string;
+      email: string;
+      name?: string;
+      role: string;
+      created_at: string;
+    }>(
+      `SELECT id, email, name, role, created_at FROM users ORDER BY created_at DESC`
+    );
+
+    return rows.map((r) => ({
+      id: r.id,
+      email: r.email,
+      name: r.name || undefined,
+      role: r.role || 'user',
+      createdAt: r.created_at,
+    }));
+  } catch (err) {
+    console.error('[Auth] Failed to fetch users list:', err);
+    return [];
+  }
+}
+
+export async function deleteNonAdminUser(id: string): Promise<boolean> {
+  if (process.env.DEV_BYPASS_DB === 'true') {
+    return true;
+  }
+
+  try {
+    const result = await executeQuery(
+      `DELETE FROM users WHERE id = $1 AND role != 'admin'`,
+      [id]
+    );
+    return true;
+  } catch (err) {
+    console.error(`[Auth] Failed to delete user ${id}:`, err);
+    return false;
+  }
+}
+
+export async function updateUserRole(userId: string, newRole: string): Promise<boolean> {
+  if (process.env.DEV_BYPASS_DB === 'true') {
+    return true;
+  }
+
+  try {
+    await executeQuery(
+      `UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2`,
+      [newRole, userId]
+    );
+    return true;
+  } catch (err) {
+    console.error(`[Auth] Failed to update role for user ${userId}:`, err);
+    return false;
+  }
 }

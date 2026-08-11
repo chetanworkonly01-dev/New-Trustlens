@@ -1,27 +1,35 @@
 import { AuditResult } from "../types/audit";
 import * as fs from "fs";
 import * as path from "path";
-import { getAudit as dbGetAudit, setAudit as dbSetAudit, getAllAudits as dbGetAllAudits, deleteAudit as dbDeleteAudit, deleteAllAudits as dbDeleteAllAudits, saveAILearningData } from "./audit-store-db";
+import { 
+  getAudit as dbGetAudit, 
+  setAudit as dbSetAudit, 
+  getAllAudits as dbGetAllAudits, 
+  deleteAudit as dbDeleteAudit, 
+  deleteAllAudits as dbDeleteAllAudits, 
+  saveAILearningData 
+} from "./audit-store-db";
 import { initializeDatabase as dbInitialize } from "../db";
 
 /**
- * Persistent Audit Store
+ * Audit Store Dispatcher
  *
- * Primary storage: PostgreSQL database (via lib/store/audit-store-db.ts)
- * Fallback storage: Local file system (.audit-data/) for resilience
+ * When STORAGE_MODE='database' in .env.local:
+ *   Strictly uses Neon PostgreSQL database (audits table).
+ *   No local disk fallback (.audit-data/) is performed.
  *
- * The store uses an in-memory cache for active (in-progress) audits to avoid
- * excessive database I/O during polling. When the storage mode is set to
- * 'database' in environment variables, the database is the primary store.
- * If the database is unavailable, it gracefully falls back to file-based storage.
+ * When STORAGE_MODE='file':
+ *   Uses local disk storage (.audit-data/).
  */
 
 const DATA_DIR = path.join(process.cwd(), ".audit-data");
 
-// Check if database mode is enabled
-const STORAGE_MODE = process.env.STORAGE_MODE || "file"; // 'database' or 'file'
-
-let dbAvailable = false;
+/**
+ * Returns true if database storage mode is active.
+ */
+function isDatabaseMode(): boolean {
+  return process.env.STORAGE_MODE === "database";
+}
 
 function ensureDataDir(): void {
   if (!fs.existsSync(DATA_DIR)) {
@@ -41,26 +49,20 @@ const activeCache = new Map<string, AuditResult>();
 const pendingFlush = new Map<string, NodeJS.Timeout>();
 
 /**
- * Get a single audit by ID.
- * Returns from memory cache if in-progress, otherwise reads from database (or file fallback).
+ * Get a single audit by ID (sync call).
+ * Reads from in-memory cache if active.
  */
 export function getAudit(id: string): AuditResult | undefined {
   // Check active cache first (for in-progress audits being polled)
   const cached = activeCache.get(id);
   if (cached) return cached;
 
-  // Try database first if enabled
-  if (STORAGE_MODE === "database" && dbAvailable) {
-    try {
-      // Synchronous read from database - this is a limitation
-      // In practice, we need to handle this differently for synchronous compatibility
-      // For now, fall back to cached or file system for synchronous operations
-    } catch {
-      // Fall through to file system
-    }
+  if (isDatabaseMode()) {
+    // In database mode, async getAuditAsync should be used for DB reads.
+    return undefined;
   }
 
-  // Read from disk (fallback or file-based mode)
+  // Read from disk in file-based mode
   const filePath = auditPath(id);
   try {
     if (fs.existsSync(filePath)) {
@@ -75,20 +77,18 @@ export function getAudit(id: string): AuditResult | undefined {
 
 /**
  * Save/update an audit.
- * In-progress audits are kept in memory cache for fast polling.
- * Completed/errored audits are flushed to database (or file) and removed from cache.
  */
 export function setAudit(id: string, audit: AuditResult): void {
-  // Always keep in active cache for fast access
+  // Always keep in active cache for fast access during polling
   activeCache.set(id, audit);
 
-  if (STORAGE_MODE === "database") {
-    // Async database save - fire-and-forget with error handling
+  if (isDatabaseMode()) {
+    // Strictly save to Neon PostgreSQL database without writing local files
     dbSetAudit(id, audit).catch((err) => {
-      console.error(`[AuditStore] Database save failed for ${id}, falling back to file:`, err);
-      saveToFile(id, audit);
+      console.error(`[AuditStoreDB] Database save failed for ${id}:`, err);
     });
   } else {
+    // File-based mode: save to .audit-data/ disk storage
     saveToFile(id, audit);
   }
 
@@ -98,37 +98,29 @@ export function setAudit(id: string, audit: AuditResult): void {
   }
 }
 
-// Async version for explicit use in async contexts
+/**
+ * Async version for saving audit data directly to active store mode.
+ */
 export async function setAuditSync(id: string, audit: AuditResult): Promise<void> {
-  // Always keep in active cache for fast access
   activeCache.set(id, audit);
 
-  if (STORAGE_MODE === "database") {
-    try {
-      await dbSetAudit(id, audit);
-    } catch (err) {
-      console.error(`[AuditStore] Database save failed for ${id}, falling back to file:`, err);
-      saveToFile(id, audit);
-    }
+  if (isDatabaseMode()) {
+    await dbSetAudit(id, audit);
   } else {
     saveToFile(id, audit);
   }
 
-  // Remove from active cache after terminal state to free memory
   if (audit.status === "complete" || audit.status === "error") {
     setTimeout(() => activeCache.delete(id), 10000);
   }
 }
 
-// Async alias for the async orchestrator
 export const setAuditAsync = setAuditSync;
 
 /**
- * Write audit to disk as JSON file.
- * Uses debouncing to avoid excessive I/O during rapid polling.
+ * Write audit to disk as JSON file (File mode only).
  */
 function saveToFile(id: string, audit: AuditResult): void {
-  // For terminal states, flush immediately
   if (audit.status === "complete" || audit.status === "error") {
     clearTimeout(pendingFlush.get(id));
     pendingFlush.delete(id);
@@ -136,7 +128,6 @@ function saveToFile(id: string, audit: AuditResult): void {
     return;
   }
 
-  // For in-progress, debounce writes (max once per 2s)
   if (pendingFlush.has(id)) return;
   pendingFlush.set(
     id,
@@ -158,25 +149,20 @@ function writeToDisk(id: string, audit: AuditResult): void {
 }
 
 /**
- * Get all audits (active + persisted).
- * Returns most recent first.
+ * Get all audits (Sync call).
  */
 export function getAllAudits(): AuditResult[] {
   return getAllAuditsSync();
 }
 
-// Sync version for in-process use (file fallback)
 export function getAllAuditsSync(): AuditResult[] {
   const audits = new Map<string, AuditResult>();
 
-  if (STORAGE_MODE === "database") {
-    // For database mode, we need to use async methods
-    // But this function is synchronous - we'll need to change calling code
-    // For now, load from file system as fallback
-    console.warn("[AuditStore] getAllAudits is synchronous but database mode requires async. Using file cache.");
+  if (isDatabaseMode()) {
+    // In database mode, getAllAuditsAsync must be used to fetch from Neon DB.
+    return Array.from(activeCache.values());
   }
 
-  // Load all persisted audits from disk
   ensureDataDir();
   try {
     const files = fs.readdirSync(DATA_DIR).filter((f) => f.endsWith(".json"));
@@ -193,22 +179,26 @@ export function getAllAuditsSync(): AuditResult[] {
     /* data dir may not exist yet */
   }
 
-  // Overlay active cache (in-progress audits override disk versions)
   for (const [id, audit] of activeCache) {
     audits.set(id, audit);
   }
 
-  // Sort by startedAt descending
   return Array.from(audits.values()).sort(
     (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
   );
 }
 
 /**
- * Delete an audit from both cache and storage.
+ * Delete an audit (Sync call).
  */
 export function deleteAudit(id: string): boolean {
   activeCache.delete(id);
+
+  if (isDatabaseMode()) {
+    dbDeleteAudit(id).catch(console.error);
+    return true;
+  }
+
   const filePath = auditPath(id);
   try {
     if (fs.existsSync(filePath)) {
@@ -222,7 +212,7 @@ export function deleteAudit(id: string): boolean {
 }
 
 /**
- * Deletes ALL audits from the cache and storage.
+ * Delete all audits (Sync call).
  */
 export function deleteAllAudits(): boolean {
   activeCache.clear();
@@ -232,9 +222,16 @@ export function deleteAllAudits(): boolean {
   }
   pendingFlush.clear();
 
+  if (isDatabaseMode()) {
+    dbDeleteAllAudits().catch(console.error);
+    return true;
+  }
+
   try {
-    fs.rmSync(DATA_DIR, { recursive: true, force: true });
-    ensureDataDir();
+    if (fs.existsSync(DATA_DIR)) {
+      fs.rmSync(DATA_DIR, { recursive: true, force: true });
+      ensureDataDir();
+    }
     return true;
   } catch (err) {
     console.error(`[AuditStore] Failed to delete all audits:`, err);
@@ -243,26 +240,20 @@ export function deleteAllAudits(): boolean {
 }
 
 // ===== ASYNC DATABASE METHODS =====
-// These are used by API routes that can be async
 
+/**
+ * Reads single audit by ID.
+ * In database mode: strictly queries Neon PostgreSQL database.
+ */
 export async function getAuditAsync(id: string): Promise<AuditResult | undefined> {
-  // Check active cache first
   const cached = activeCache.get(id);
   if (cached) return cached;
 
-  if (STORAGE_MODE === "database") {
-    try {
-      const audit = await dbGetAudit(id);
-      if (audit) {
-        activeCache.set(id, audit);
-        return audit;
-      }
-    } catch (err) {
-      console.error(`[AuditStore] Database read failed for ${id}, trying file:`, err);
-    }
+  if (isDatabaseMode()) {
+    return await dbGetAudit(id);
   }
 
-  // Fallback to file system
+  // File-mode fallback
   const filePath = auditPath(id);
   try {
     if (fs.existsSync(filePath)) {
@@ -277,28 +268,28 @@ export async function getAuditAsync(id: string): Promise<AuditResult | undefined
   return undefined;
 }
 
+/**
+ * Reads all audits.
+ * In database mode: strictly queries Neon PostgreSQL database.
+ */
 export async function getAllAuditsAsync(userId?: string): Promise<AuditResult[]> {
-  if (STORAGE_MODE === "database") {
-    try {
-      return await dbGetAllAudits(userId);
-    } catch (err) {
-      console.error('[AuditStore] Database query failed, falling back to file system:', err);
-    }
+  if (isDatabaseMode()) {
+    return await dbGetAllAudits(userId);
   }
 
-  // Fallback to file-based getAllAudits
-  return getAllAudits();
+  // File-mode fallback
+  return getAllAuditsSync();
 }
 
+/**
+ * Deletes single audit.
+ * In database mode: strictly deletes from Neon PostgreSQL database.
+ */
 export async function deleteAuditAsync(id: string): Promise<boolean> {
   activeCache.delete(id);
 
-  if (STORAGE_MODE === "database") {
-    try {
-      return await dbDeleteAudit(id);
-    } catch (err) {
-      console.error(`[AuditStore] Database delete failed for ${id}:`, err);
-    }
+  if (isDatabaseMode()) {
+    return await dbDeleteAudit(id);
   }
 
   const filePath = auditPath(id);
@@ -313,13 +304,16 @@ export async function deleteAuditAsync(id: string): Promise<boolean> {
   return false;
 }
 
+/**
+ * Deletes all audits.
+ * In database mode: strictly deletes from Neon PostgreSQL database.
+ */
 export async function deleteAllAuditsAsync(userId?: string): Promise<boolean> {
-  // Clear in-memory cache
   if (!userId) {
     activeCache.clear();
   } else {
     for (const [id, audit] of activeCache) {
-      if (audit.config?.userId === userId) {
+      if (!audit.config?.userId || audit.config?.userId === userId) {
         activeCache.delete(id);
       }
     }
@@ -330,23 +324,21 @@ export async function deleteAllAuditsAsync(userId?: string): Promise<boolean> {
   }
   pendingFlush.clear();
 
-  if (STORAGE_MODE === "database") {
-    try {
-      return await dbDeleteAllAudits(userId);
-    } catch (err) {
-      console.error('[AuditStore] Database delete all failed:', err);
-    }
+  if (isDatabaseMode()) {
+    return await dbDeleteAllAudits(userId);
   }
 
   try {
+    if (!fs.existsSync(DATA_DIR)) {
+      return true;
+    }
     if (userId) {
-      // File-based: filter by userId in config
       const files = fs.readdirSync(DATA_DIR).filter((f) => f.endsWith(".json"));
       for (const file of files) {
         try {
           const data = fs.readFileSync(path.join(DATA_DIR, file), "utf-8");
           const audit = JSON.parse(data) as AuditResult;
-          if (audit.config?.userId === userId) {
+          if (!audit.config?.userId || audit.config?.userId === userId) {
             fs.unlinkSync(path.join(DATA_DIR, file));
           }
         } catch {
@@ -369,14 +361,12 @@ export { saveAILearningData };
 
 // Initialize database connection
 export async function initDatabase(): Promise<void> {
-  if (STORAGE_MODE === "database") {
+  if (isDatabaseMode() && process.env.DEV_BYPASS_DB !== "true") {
     try {
       await dbInitialize();
-      dbAvailable = true;
-      console.log("[AuditStore] Database storage initialized");
+      console.log("[AuditStore] Neon DB storage mode initialized");
     } catch (err) {
       console.error("[AuditStore] Database initialization failed:", err);
-      dbAvailable = false;
     }
   }
 }

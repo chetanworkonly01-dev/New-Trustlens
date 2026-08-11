@@ -13,6 +13,7 @@ export default function SignUpPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSignupAllowed, setIsSignupAllowed] = useState(false);
+  const [isFirstAdmin, setIsFirstAdmin] = useState(false);
   const [checking, setChecking] = useState(true);
   const router = useRouter();
   const { signup, user } = useAuth();
@@ -24,6 +25,7 @@ export default function SignUpPage() {
         if (res.ok) {
           const data = await res.json();
           setIsSignupAllowed(data.isSignupAllowed);
+          setIsFirstAdmin(Boolean(data.isFirstAdmin));
         }
       } catch {
         setIsSignupAllowed(false);
@@ -36,7 +38,7 @@ export default function SignUpPage() {
 
   useEffect(() => {
     if (user) {
-      router.replace("/");
+      router.replace("/audit");
     }
   }, [user, router]);
 
@@ -53,7 +55,7 @@ export default function SignUpPage() {
 
     try {
       await signup(email, password, name);
-      router.replace("/");
+      router.replace("/audit");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -161,7 +163,7 @@ export default function SignUpPage() {
             padding: "32px",
           }}
         >
-          <div style={{ textAlign: "center", marginBottom: "32px" }}>
+          <div style={{ textAlign: "center", marginBottom: "28px" }}>
             <h1
               style={{
                 fontSize: "28px",
@@ -176,6 +178,26 @@ export default function SignUpPage() {
               Sign up to access TrustLens
             </p>
           </div>
+
+          {isFirstAdmin && (
+            <div
+              style={{
+                marginBottom: "24px",
+                padding: "12px 14px",
+                borderRadius: "8px",
+                backgroundColor: "rgba(0, 178, 169, 0.15)",
+                border: "1px solid rgba(0, 178, 169, 0.4)",
+                textAlign: "center",
+              }}
+            >
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#00B2A9", marginBottom: "4px" }}>
+                🛡️ Initial System Setup
+              </div>
+              <div style={{ fontSize: "12px", color: "#9ca3af" }}>
+                As the first user, your account will be granted <strong>System Administrator</strong> access.
+              </div>
+            </div>
+          )}
 
           {error && (
             <div

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAudit, setAudit } from '@/lib/store/audit-store';
+import { getAuditAsync, setAuditAsync } from '@/lib/store/audit-store';
 import { generateAIPerformanceReport } from '@/lib/engines/perf-ai-analyzer';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
     }
 
-    const audit = getAudit(id);
+    const audit = await getAuditAsync(id);
     if (!audit) {
       return NextResponse.json({ error: 'Audit not found' }, { status: 404 });
     }
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         performance: updatedPerfResult,
       },
     };
-    setAudit(id, updatedAudit);
+    await setAuditAsync(id, updatedAudit);
 
     return NextResponse.json({ success: true, aiReport });
   } catch (err) {
