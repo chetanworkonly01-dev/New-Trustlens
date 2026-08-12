@@ -273,9 +273,21 @@ function createEmptyScore() {
 export async function runWebsiteAudit(config: AuditConfig, userId?: string): Promise<string> {
   ensureDatabaseReady();
   const id = uuidv4();
+
+  // Create clean persistent config (without ephemeral storageState tokens)
+  const persistentConfig: AuditConfig = {
+    ...config,
+    loginConfig: config.loginConfig
+      ? {
+          ...config.loginConfig,
+          storageState: undefined,
+        }
+      : undefined,
+  };
+
   const audit: AuditResult = {
     id,
-    config,
+    config: persistentConfig,
     status: "pending",
     progress: 0,
     progressMessage: "Initializing...",
@@ -297,15 +309,8 @@ export async function runWebsiteAudit(config: AuditConfig, userId?: string): Pro
   // Also asynchronously persist to database
   storeSetAsync(id, audit).catch(console.error);
 
-  // Run pipeline with a 15-minute global timeout so audits never spin forever
-  const TIMEOUT_MS = 15 * 60 * 1000;
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(
-      () => reject(new Error("Audit timed out after 15 minutes")),
-      TIMEOUT_MS,
-    ),
-  );
-  Promise.race([runAuditPipeline(id, config), timeoutPromise]).catch((err) => {
+  // Run audit pipeline asynchronously until 100% completion
+  runAuditPipeline(id, config).catch((err) => {
     const a = storeGet(id);
     if (a && a.status !== "complete" && a.status !== "error") {
       a.status = "error";

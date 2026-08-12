@@ -107,7 +107,19 @@ export async function crawlWebsite(options: CrawlOptions): Promise<CrawlResult> 
     throw new Error(`Failed to launch browser: ${msg}`);
   }
 
+  let parsedStorageState: any = undefined;
+  if (loginConfig?.storageState) {
+    try {
+      parsedStorageState = typeof loginConfig.storageState === 'string'
+        ? JSON.parse(loginConfig.storageState)
+        : loginConfig.storageState;
+    } catch {
+      /* ignore invalid JSON */
+    }
+  }
+
   const context = await browser.newContext({
+    storageState: parsedStorageState,
     viewport: { width: 1280, height: 720 },
     userAgent,
     locale: 'en-US',
@@ -129,9 +141,13 @@ export async function crawlWebsite(options: CrawlOptions): Promise<CrawlResult> 
   await context.addInitScript(STEALTH_INIT_SCRIPT);
 
   if (loginConfig) {
-    onProgress?.('Performing login...', 5);
-    await performLogin(context, loginConfig);
-    onProgress?.('Login successful', 10);
+    if (loginConfig.storageState) {
+      onProgress?.('Active session storage state injected', 10);
+    } else if (loginConfig.loginUrl && loginConfig.username && loginConfig.password) {
+      onProgress?.('Performing login...', 5);
+      await performLogin(context, loginConfig);
+      onProgress?.('Login successful', 10);
+    }
   }
 
   const visitedUrls       = new Set<string>();   // normalised URLs we've already queued/crawled
@@ -727,6 +743,9 @@ function shouldSkipUrl(url: string, baseOrigin: string): string | null {
 }
 
 async function performLogin(context: BrowserContext, config: LoginConfig): Promise<void> {
+  if (!config.loginUrl || !config.usernameSelector || !config.passwordSelector || !config.username || !config.password || !config.submitSelector) {
+    return;
+  }
   const page = await context.newPage();
   try {
     await page.goto(config.loginUrl, { waitUntil: 'networkidle', timeout: 30000 });

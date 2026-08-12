@@ -1,33 +1,12 @@
 "use client";
-import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useTheme } from "./ThemeProvider";
 import { useAuth } from "@/contexts/AuthContext";
-import { Audit } from "../lib/types";
 
 export default function ThemeNavbar() {
   const { isDark, toggleTheme } = useTheme();
   const { user, loading, signout } = useAuth();
-  const [audits, setAudits] = useState<Audit[]>([]);
-
-  useEffect(() => {
-    setAudits([]);
-  }, [user?.id]);
-
-  useEffect(() => {
-    const fetchAudits = async () => {
-      try {
-        const res = await fetch("/api/audit/list", { credentials: "include" });
-        if (res.ok) setAudits(await res.json());
-      } catch {
-        /* ignore */
-      }
-    };
-    if (user?.id) {
-      fetchAudits();
-    }
-  }, [user?.id]);
 
   const handleSignOut = async () => {
     await signout();
@@ -71,7 +50,7 @@ export default function ThemeNavbar() {
           <Link href="/audit" className="navbar-link">
             New Audit
           </Link>
-          {!loading && user && audits.length > 0 && (
+          {!loading && user && (
             <Link href="/audit-history" className="navbar-link">
               View Audit History
             </Link>

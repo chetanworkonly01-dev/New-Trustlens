@@ -6,9 +6,22 @@
  */
 import { AuditResult, AuditConfig, AuditScore, AccessibilityIssue } from '../types/audit';
 import { executeQuery, initializeDatabase } from '../db';
+import { compressPayload, decompressPayload } from '../db/compression';
 
 // In-memory cache for active (in-progress) audits to avoid excessive database I/O
 const activeCache = new Map<string, AuditResult>();
+
+// LRU memory cache for completed audit reports (served in 0.1ms with 0 DB network calls)
+const completedReportCache = new Map<string, AuditResult>();
+const MAX_COMPLETED_CACHE_SIZE = 50;
+
+function setCompletedCache(id: string, audit: AuditResult) {
+  if (completedReportCache.size >= MAX_COMPLETED_CACHE_SIZE) {
+    const oldestKey = completedReportCache.keys().next().value;
+    if (oldestKey) completedReportCache.delete(oldestKey);
+  }
+  completedReportCache.set(id, audit);
+}
 
 // Initialize database on module load
 let dbInitialized = false;
@@ -31,7 +44,7 @@ function ensureDatabase(): void {
  * 
  * Reduces JSON payload size by 99% (~30KB vs 15MB) for ultra-fast load and save.
  */
-function sanitizeAuditForStorage(audit: AuditResult): AuditResult {
+export function sanitizeAuditForStorage(audit: AuditResult): AuditResult {
   const sanitizedReport = audit.report
     ? {
         ...audit.report,
@@ -78,22 +91,25 @@ function sanitizeAuditForStorage(audit: AuditResult): AuditResult {
               })),
             }
           : undefined,
-        darkpatterns: audit.pillarResults.darkpatterns
-          ? {
-              ...audit.pillarResults.darkpatterns,
-              findings: (audit.pillarResults.darkpatterns.findings || []).map((f) => ({
-                ...f,
-                evidence: f.evidence
-                  ? ({ ...f.evidence, screenshotDataUrl: undefined } as any)
-                  : (f.evidence as any),
-              })),
-            }
-          : undefined,
+        darkpatterns: audit.pillarResults.darkpatterns,
       }
     : undefined;
 
+  const sanitizedConfig = audit.config
+    ? {
+        ...audit.config,
+        loginConfig: audit.config.loginConfig
+          ? {
+              ...audit.config.loginConfig,
+              storageState: undefined, // Strip raw cookie/token payload after audit completion
+            }
+          : undefined,
+      }
+    : audit.config;
+
   return {
     ...audit,
+    config: sanitizedConfig as any,
     pillarResults: sanitizedPillarResults as any,
     pages: (audit.pages || []).map((p) => ({
       url: p.url,
@@ -135,9 +151,13 @@ function hydrateAudit(fullAudit: AuditResult): AuditResult {
 export async function getAudit(id: string): Promise<AuditResult | undefined> {
   ensureDatabase();
 
-  // Check active cache first
-  const cached = activeCache.get(id);
-  if (cached) return cached;
+  // 1. Check active cache first (0ms)
+  const cachedActive = activeCache.get(id);
+  if (cachedActive) return cachedActive;
+
+  // 2. Check completed report memory cache (0.1ms)
+  const cachedCompleted = completedReportCache.get(id);
+  if (cachedCompleted) return cachedCompleted;
 
   try {
     const auditRows = await executeQuery<Record<string, unknown>>(
@@ -149,9 +169,9 @@ export async function getAudit(id: string): Promise<AuditResult | undefined> {
     
     const row = auditRows[0] as Record<string, unknown>;
     
-    // 1. If full audit JSONB is stored in audit_data, parse and return directly
-    if (row.audit_data && typeof row.audit_data === 'object') {
-      const fullAudit = row.audit_data as unknown as AuditResult;
+    // 1. Decompress & parse full audit data from audit_data column
+    const fullAudit = decompressPayload<AuditResult>(row.audit_data);
+    if (fullAudit && typeof fullAudit === 'object') {
       // Self-heal status: if completed_at is populated, status is complete
       fullAudit.status = (row.completed_at || row.status === 'complete') 
         ? 'complete' 
@@ -159,7 +179,11 @@ export async function getAudit(id: string): Promise<AuditResult | undefined> {
       fullAudit.progress = fullAudit.status === 'complete' ? 100 : ((row.progress as number) ?? fullAudit.progress);
       if (row.completed_at) fullAudit.completedAt = row.completed_at as string;
       if (row.error) fullAudit.error = row.error as string;
-      return hydrateAudit(fullAudit);
+      const hydrated = hydrateAudit(fullAudit);
+      if (hydrated.status === 'complete' || hydrated.status === 'error') {
+        setCompletedCache(id, hydrated);
+      }
+      return hydrated;
     }
 
     // 2. Backwards compatibility fallback for older DB rows without audit_data column
@@ -191,6 +215,10 @@ export async function getAudit(id: string): Promise<AuditResult | undefined> {
       audit.report = scoreData.report as unknown as AuditResult['report'];
     }
 
+    if (audit.status === 'complete' || audit.status === 'error') {
+      setCompletedCache(id, audit);
+    }
+
     return audit;
   } catch (err) {
     console.error(`[AuditStoreDB] Failed to read audit ${id}:`, err);
@@ -208,6 +236,9 @@ export async function setAudit(id: string, audit: AuditResult): Promise<void> {
 
   // Always keep in active cache for fast access
   activeCache.set(id, audit);
+  if (audit.status === 'complete' || audit.status === 'error') {
+    setCompletedCache(id, audit);
+  }
 
   try {
     if (audit.status === 'complete' || audit.status === 'error') {
@@ -261,7 +292,7 @@ async function upsertAuditProgress(id: string, audit: AuditResult): Promise<void
       audit.status,
       audit.progress,
       audit.progressMessage,
-      JSON.stringify(audit.config || {}),
+      JSON.stringify(sanitized.config || {}),
       JSON.stringify({
         score: audit.score,
         trustScore: audit.trustScore,
@@ -271,7 +302,7 @@ async function upsertAuditProgress(id: string, audit: AuditResult): Promise<void
         auditIntegrity: audit.auditIntegrity,
         siteProfile: audit.siteProfile,
       }),
-      JSON.stringify(sanitized),
+      compressPayload(sanitized),
       audit.startedAt,
     ]
   );
@@ -317,13 +348,13 @@ async function saveFullAudit(id: string, audit: AuditResult): Promise<void> {
       audit.progress,
       audit.progressMessage,
       audit.siteProfile || null,
-      JSON.stringify(audit.config || {}),
+      JSON.stringify(sanitized.config || {}),
       JSON.stringify({
         score: audit.score,
         report: audit.report,
         trustScore: audit.trustScore,
       }),
-      JSON.stringify(sanitized),
+      compressPayload(sanitized),
       JSON.stringify(audit.crawlCoverage || null),
       JSON.stringify(audit.trustScore || null),
       JSON.stringify(audit.pillarResults || null),
@@ -341,28 +372,33 @@ async function saveFullAudit(id: string, audit: AuditResult): Promise<void> {
  * HYPER-OPTIMIZED SUMMARY QUERY for audit history cards:
  * Self-heals status to 'complete' (and progress=100) if completed_at is populated.
  */
-export async function getAllAudits(userId?: string): Promise<AuditResult[]> {
+export async function getAllAudits(userId?: string, limit?: number): Promise<AuditResult[]> {
   ensureDatabase();
 
   try {
-    const query = userId
-      ? `SELECT id, user_id, url, type, status, progress, progress_message, 
-                started_at, completed_at, error, score_data, audit_config, 
-                crawl_coverage, trust_score, site_profile, pillar_results
-         FROM audits WHERE user_id = $1 ORDER BY started_at DESC`
-      : `SELECT id, user_id, url, type, status, progress, progress_message, 
-                started_at, completed_at, error, score_data, audit_config, 
-                crawl_coverage, trust_score, site_profile, pillar_results
-         FROM audits ORDER BY started_at DESC`;
+    const params: unknown[] = [];
+    let query = `SELECT id, user_id, url, type, status, progress, progress_message, 
+                        started_at, completed_at, error, score_data, audit_config, 
+                        crawl_coverage, trust_score, site_profile
+                 FROM audits`;
 
-    const rows = userId 
-      ? await executeQuery<Record<string, unknown>>(query, [userId])
-      : await executeQuery<Record<string, unknown>>(query);
+    if (userId) {
+      params.push(userId);
+      query += ` WHERE user_id = $${params.length}`;
+    }
+
+    query += ` ORDER BY started_at DESC`;
+
+    if (limit && limit > 0) {
+      params.push(limit);
+      query += ` LIMIT $${params.length}`;
+    }
+
+    const rows = await executeQuery<Record<string, unknown>>(query, params);
 
     return rows.map(row => {
       const scoreData = (row.score_data || {}) as Record<string, unknown>;
       const trustScore = row.trust_score as Record<string, unknown>;
-      const pillarResults = row.pillar_results as Record<string, unknown>;
       const auditConfig = (row.audit_config || {}) as AuditConfig;
       const isComplete = Boolean(row.completed_at || row.status === 'complete');
       
@@ -388,6 +424,26 @@ export async function getAllAudits(userId?: string): Promise<AuditResult[]> {
   } catch (err) {
     console.error('[AuditStoreDB] Failed to list audits:', err);
     return [];
+  }
+}
+
+/**
+ * Get total audit count (optionally filtered by user ID).
+ * Fast COUNT(*) query for pagination.
+ */
+export async function getAuditCount(userId?: string): Promise<number> {
+  ensureDatabase();
+  try {
+    const query = userId
+      ? `SELECT COUNT(*)::int as count FROM audits WHERE user_id = $1`
+      : `SELECT COUNT(*)::int as count FROM audits`;
+    const rows = userId
+      ? await executeQuery<{ count: number }>(query, [userId])
+      : await executeQuery<{ count: number }>(query);
+    return rows[0]?.count || 0;
+  } catch (err) {
+    console.error('[AuditStoreDB] Failed to count audits:', err);
+    return 0;
   }
 }
 

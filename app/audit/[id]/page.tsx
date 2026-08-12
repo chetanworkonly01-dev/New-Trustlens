@@ -1491,7 +1491,8 @@ export default function AuditResultPage() {
   const tabs: string[] = ["overview"];
   // Accessibility-specific tabs — only when accessibility pillar is enabled
   if (a11yEnabled) {
-    tabs.push("tests", "issues");
+    // tabs.push("tests", "issues");
+    tabs.push("issues");
     if (data.report?.journeyResults && data.report.journeyResults.length > 0)
       tabs.push("journeys");
     tabs.push("wcag-map", "remediation");
@@ -2675,21 +2676,19 @@ export default function AuditResultPage() {
                 ? " WCAG Map"
                 : t === "journeys"
                   ? " Journeys"
-                  : t === "tests"
-                    ? " Tests"
-                    : t === "issues"
-                      ? " Issues"
-                      : t === "remediation"
-                        ? " Remediation"
-                        : t === "dark-patterns"
-                          ? " Dark Patterns"
-                          : t === "perf"
-                            ? " Performance"
-                            : t === "privacy"
-                              ? ""
-                              : t === "pages"
-                                ? " Pages"
-                                : t}
+                  : t === "issues"
+                    ? " Issues"
+                    : t === "remediation"
+                      ? " Remediation"
+                      : t === "dark-patterns"
+                        ? " Dark Patterns"
+                        : t === "perf"
+                          ? " Performance"
+                          : t === "privacy"
+                            ? ""
+                            : t === "pages"
+                              ? " Pages"
+                              : t}
           </button>
         ))}
       </div>
@@ -3116,7 +3115,7 @@ export default function AuditResultPage() {
       {/* ══════════════════════════════════════════════════════
            TESTS TAB
          ══════════════════════════════════════════════════════ */}
-      {activeTab === "tests" && (
+      {/* {activeTab === "tests" && (
         <div className="animate-fade-in">
           <div
             style={{
@@ -3154,7 +3153,7 @@ export default function AuditResultPage() {
                 className="stat-card"
                 style={{
                   textAlign: "center",
-                  // borderTop: `3px solid ${s.color}`,
+                  
                 }}
               >
                 <div className="stat-value" style={{ color: s.color }}>
@@ -3175,13 +3174,7 @@ export default function AuditResultPage() {
                   display: "flex",
                   alignItems: "flex-start",
                   gap: 12,
-                  // borderLeft: `3px solid ${statusColors[tr.status] || "#5B7198"}`,
-                  // background:
-                  //   tr.status === "pass"
-                  //     ? "rgba(0,186,140,0.03)"
-                  //     : tr.status === "fail"
-                  //       ? "rgba(232,0,45,0.03)"
-                  //       : undefined,
+                  
                 }}
               >
                 <span style={{ fontSize: 18, flexShrink: 0, marginTop: 2 }}>
@@ -3200,18 +3193,7 @@ export default function AuditResultPage() {
                     <span style={{ fontWeight: 700, fontSize: 13 }}>
                       {tr.testName}
                     </span>
-                    {/* <span
-                      style={{display: "inline-flex", alignItems: "center", 
-                        fontSize: 10,
-                        padding: "2px 7px",
-                        borderRadius: 99,
-                        background: "rgba(0,145,218,0.1)",
-                        color: "#0091DA",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {tr.testId}
-                    </span> */}
+                    
                     <span
                       style={{ fontSize: 10, color: "var(--text-secondary)" }}
                     >
@@ -3257,9 +3239,7 @@ export default function AuditResultPage() {
                         : " All passed"}
                     </span>
                     <span> {tr.executionTime}ms</span>
-                    {/* <span style={{ color: confColors[tr.confidence] }}>
-                      {tr.confidence}
-                    </span> */}
+                    
                   </div>
                   {tr.evidence.details.length > 0 && tr.status === "fail" && (
                     <details style={{ marginTop: 7 }}>
@@ -3310,7 +3290,7 @@ export default function AuditResultPage() {
             ))}
           </div>
         </div>
-      )}
+      )} */}
 
       {/* ══════════════════════════════════════════════════════
            ISSUES TAB

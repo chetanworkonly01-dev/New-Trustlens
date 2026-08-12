@@ -185,16 +185,16 @@ export default function SignUpPage() {
                 marginBottom: "24px",
                 padding: "12px 14px",
                 borderRadius: "8px",
-                backgroundColor: "rgba(0, 178, 169, 0.15)",
-                border: "1px solid rgba(0, 178, 169, 0.4)",
+                // backgroundColor: "rgba(243, 248, 248, 0.73)",
+                border: "1px solid var(--dynamic-border)",
                 textAlign: "center",
               }}
             >
-              <div style={{ fontSize: "13px", fontWeight: 700, color: "#00B2A9", marginBottom: "4px" }}>
-                🛡️ Initial System Setup
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "4px" }}>
+                Initial System Setup
               </div>
-              <div style={{ fontSize: "12px", color: "#9ca3af" }}>
-                As the first user, your account will be granted <strong>System Administrator</strong> access.
+              <div style={{ fontSize: "12px", color: "var(--text-primary)" }}>
+                As the first user, your account will be granted System Administrator access.
               </div>
             </div>
           )}

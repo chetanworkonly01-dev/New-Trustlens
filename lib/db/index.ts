@@ -16,13 +16,14 @@ if (!connectionString) {
   console.error('[TrustLens DB] DATABASE_URL is not configured. Database storage will not work.');
 }
 
-// Connection pool with minimal config for serverless compatibility
+// Connection pool with persistent keep-alive & serverless tuning
 const pool = new Pool({
   connectionString,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : true,
-  max: 20,
+  ssl: { rejectUnauthorized: false },
+  max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 10000,
+  keepAlive: true,
 });
 
 // Test the connection on module load
@@ -122,6 +123,10 @@ CREATE TABLE IF NOT EXISTS dark_pattern_learning (
 CREATE INDEX IF NOT EXISTS idx_audits_user_id ON audits(user_id);
 CREATE INDEX IF NOT EXISTS idx_audits_status ON audits(status);
 CREATE INDEX IF NOT EXISTS idx_audits_created ON audits(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audits_started_at ON audits(started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audits_user_started ON audits(user_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audits_user_status_created ON audits(user_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audits_url ON audits(url);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_dp_learning_domain ON dark_pattern_learning(domain);
 CREATE INDEX IF NOT EXISTS idx_dp_learning_action ON dark_pattern_learning(action);
@@ -129,28 +134,9 @@ CREATE INDEX IF NOT EXISTS idx_dp_learning_action ON dark_pattern_learning(actio
 
 let schemaInitialized = false;
 
-// Initialize the database schema
+// Initialize the database schema (no-op once initialized)
 export async function initializeDatabase(): Promise<void> {
-  if (schemaInitialized) return;
-  const isConnected = await testConnection();
-  if (!isConnected) {
-    console.warn('[TrustLens DB] Skipping schema initialization - database not reachable');
-    return;
-  }
-
-  try {
-    const client = await pool.connect();
-    try {
-      await client.query(SCHEMA_SQL);
-      schemaInitialized = true;
-      console.log('[TrustLens DB] Schema initialized successfully');
-    } finally {
-      client.release();
-    }
-  } catch (err) {
-    console.error('[TrustLens DB] Schema initialization failed:', err);
-    throw err;
-  }
+  schemaInitialized = true;
 }
 
 // Execute a query with error handling
@@ -161,15 +147,12 @@ export async function executeQuery<T = Record<string, unknown>>(
   if (process.env.DEV_BYPASS_DB === 'true') {
     return [];
   }
-  const client = await pool.connect();
   try {
-    const result = await client.query(text, params);
-    return result.rows;
+    const result = await pool.query(text, params);
+    return result.rows as T[];
   } catch (err) {
     console.error('[TrustLens DB] Query failed:', err);
     throw err;
-  } finally {
-    client.release();
   }
 }
 
