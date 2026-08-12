@@ -1069,94 +1069,94 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     const combinedUniqueCount = isA11yOnly
       ? (score.uniqueIssues ?? groupedIssues.length)
       : [
-          isA11y ? (score.uniqueIssues ?? groupedIssues.length) : 0,
-          isDP ? (dpResultCover?.totalFindings ?? 0) : 0,
-          isPriv2 ? (privResultCover?.findings?.length ?? 0) : 0,
-          isPerf ? (perfResultCover?.totalResourceIssues ?? 0) : 0,
-        ].reduce((a, b) => a + b, 0);
+        isA11y ? (score.uniqueIssues ?? groupedIssues.length) : 0,
+        isDP ? (dpResultCover?.totalFindings ?? 0) : 0,
+        isPriv2 ? (privResultCover?.findings?.length ?? 0) : 0,
+        isPerf ? (perfResultCover?.totalResourceIssues ?? 0) : 0,
+      ].reduce((a, b) => a + b, 0);
     const combinedCriticalCount = isA11yOnly
       ? exCritCount
       : [
-          isA11y ? exCritCount : 0,
-          isDP ? (dpResultCover?.findingsBySeverity?.critical ?? 0) : 0,
-          isPriv2 ? (privResultCover?.findingsBySeverity?.critical ?? 0) : 0,
-        ].reduce((a, b) => a + b, 0);
+        isA11y ? exCritCount : 0,
+        isDP ? (dpResultCover?.findingsBySeverity?.critical ?? 0) : 0,
+        isPriv2 ? (privResultCover?.findingsBySeverity?.critical ?? 0) : 0,
+      ].reduce((a, b) => a + b, 0);
 
     const tiles =
       perfOnly && perfResultCover
         ? [
-            {
-              label: "PERFORMANCE SCORE",
-              value: `${perfResultCover.overallScore ?? 0}`,
-              sub: "out of 100",
-              col: K.navy as [number, number, number],
-            },
-            {
-              label: "GRADE",
-              value: perfGradeStr(perfResultCover.overallScore ?? 0).charAt(0),
-              sub:
-                perfGradeStr(perfResultCover.overallScore ?? 0)
-                  .split("—")[1]
-                  ?.trim() ?? "",
-              col: [0, 91, 130] as [number, number, number],
-            },
-            {
-              label: "RESOURCE ISSUES",
-              value: `${perfResultCover.totalResourceIssues ?? 0}`,
-              sub: "Identified",
-              col: [180, 90, 0] as [number, number, number],
-            },
-            {
-              label: "P0 CRITICAL",
-              value: `${(perfResultCover.recommendations || []).filter((r: any) => r.priority === "P0").length}`,
-              sub: "Immediate Action",
-              col: [200, 35, 35] as [number, number, number],
-            },
-            {
-              label: "PAGES AUDITED",
-              value: `${perfResultCover.pages?.length ?? audit.pages.length}`,
-              sub: perfResultCover.targetedPagesAudited
-                ? `${perfResultCover.basePagesAudited ?? 0} crawled + ${perfResultCover.targetedPagesAudited} targeted`
-                : "Evaluated",
-              col: [0, 100, 90] as [number, number, number],
-            },
-          ]
+          {
+            label: "PERFORMANCE SCORE",
+            value: `${perfResultCover.overallScore ?? 0}`,
+            sub: "out of 100",
+            col: K.navy as [number, number, number],
+          },
+          {
+            label: "GRADE",
+            value: perfGradeStr(perfResultCover.overallScore ?? 0).charAt(0),
+            sub:
+              perfGradeStr(perfResultCover.overallScore ?? 0)
+                .split("—")[1]
+                ?.trim() ?? "",
+            col: [0, 91, 130] as [number, number, number],
+          },
+          {
+            label: "RESOURCE ISSUES",
+            value: `${perfResultCover.totalResourceIssues ?? 0}`,
+            sub: "Identified",
+            col: [180, 90, 0] as [number, number, number],
+          },
+          {
+            label: "P0 CRITICAL",
+            value: `${(perfResultCover.recommendations || []).filter((r: any) => r.priority === "P0").length}`,
+            sub: "Immediate Action",
+            col: [200, 35, 35] as [number, number, number],
+          },
+          {
+            label: "PAGES AUDITED",
+            value: `${perfResultCover.pages?.length ?? audit.pages.length}`,
+            sub: perfResultCover.targetedPagesAudited
+              ? `${perfResultCover.basePagesAudited ?? 0} crawled + ${perfResultCover.targetedPagesAudited} targeted`
+              : "Evaluated",
+            col: [0, 100, 90] as [number, number, number],
+          },
+        ]
         : [
-            {
-              label: displayInfo.badgeLabel,
-              value: `${displayInfo.score ?? 0}`,
-              sub: "out of 100",
-              col: K.navy as [number, number, number],
-            },
-            {
-              label: "STATUS",
-              value: isA11yOnly
-                ? `${(score as any).grade ?? "—"}`
-                : displayInfo.statusLabel.charAt(0).toUpperCase(),
-              sub: displayInfo.statusLabel,
-              col: [0, 91, 130] as [number, number, number],
-            },
-            {
-              label: "UNIQUE VIOLATIONS",
-              value: `${combinedUniqueCount}`,
-              sub: "Distinct Issues",
-              col: [180, 90, 0] as [number, number, number],
-            },
-            {
-              label: "CRITICAL ISSUES",
-              value: `${combinedCriticalCount}`,
-              sub: "Need Immediate Fix",
-              col: [200, 35, 35] as [number, number, number],
-            },
-            {
-              label: "PAGES AUDITED",
-              value: `${audit.pages.length}`,
-              sub: perfResultCover?.targetedPagesAudited
-                ? `${perfResultCover.basePagesAudited ?? 0} crawled + ${perfResultCover.targetedPagesAudited} targeted`
-                : "Evaluated",
-              col: [0, 100, 90] as [number, number, number],
-            },
-          ];
+          {
+            label: displayInfo.badgeLabel,
+            value: `${displayInfo.score ?? 0}`,
+            sub: "out of 100",
+            col: K.navy as [number, number, number],
+          },
+          {
+            label: "STATUS",
+            value: isA11yOnly
+              ? `${(score as any).grade ?? "—"}`
+              : displayInfo.statusLabel.charAt(0).toUpperCase(),
+            sub: displayInfo.statusLabel,
+            col: [0, 91, 130] as [number, number, number],
+          },
+          {
+            label: "UNIQUE VIOLATIONS",
+            value: `${combinedUniqueCount}`,
+            sub: "Distinct Issues",
+            col: [180, 90, 0] as [number, number, number],
+          },
+          {
+            label: "CRITICAL ISSUES",
+            value: `${combinedCriticalCount}`,
+            sub: "Need Immediate Fix",
+            col: [200, 35, 35] as [number, number, number],
+          },
+          {
+            label: "PAGES AUDITED",
+            value: `${audit.pages.length}`,
+            sub: perfResultCover?.targetedPagesAudited
+              ? `${perfResultCover.basePagesAudited ?? 0} crawled + ${perfResultCover.targetedPagesAudited} targeted`
+              : "Evaluated",
+            col: [0, 100, 90] as [number, number, number],
+          },
+        ];
 
     if (y + 34 > ph - 40) {
       doc.addPage("a4", "landscape");
@@ -1279,11 +1279,11 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
 
   const breakdownActionLabel = perfOnly
     ? {
-        critical: "Block Release",
-        high: "Next Sprint",
-        medium: "This Quarter",
-        low: "Backlog",
-      }
+      critical: "Block Release",
+      high: "Next Sprint",
+      medium: "This Quarter",
+      low: "Backlog",
+    }
     : { critical: "Immediate", high: "High", medium: "Moderate", low: "Low" };
   const breakdownSprintLabel = perfOnly
     ? { critical: "Sprint 1", high: "Sprint 2", medium: "Q3", low: "Q4" }
@@ -1790,189 +1790,213 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
               : []),
             ...(cmd ? [`DevTools: ${decodeHtmlEntitiesPdf(cmd)}`] : []),
           ];
-        } else {
-          locHeading = "DEVELOPER LOCATION — PER INSTANCE";
-          locLines = instances.map((inst) => {
-            const page =
-              decodeHtmlEntitiesPdf(
-                inst.pageUrl.replace(/^https?:\/\/[^/]+/, ""),
-              ) || "/";
-            const el = decodeHtmlEntitiesPdf(inst.element || "--");
-            return `${page}  ->  ${el}`;
-          });
-          if (locLines.length === 0) locLines.push("--");
         }
+
+        // remove part 
+
+        // else {
+        //   locHeading = "DEVELOPER LOCATION — PER INSTANCE";
+        //   locLines = instances.map((inst) => {
+        //     const page =
+        //       decodeHtmlEntitiesPdf(
+        //         inst.pageUrl.replace(/^https?:\/\/[^/]+/, ""),
+        //       ) || "/";
+        //     const el = decodeHtmlEntitiesPdf(inst.element || "--");
+        //     return `${page}  ->  ${el}`;
+        //   });
+        //   if (locLines.length === 0) locLines.push("--");
+        // }
+
+        // remove end  
 
         // Measure at the SAME font used to render (courier) — measuring with
         // one font and rendering with another produces lines that no longer
         // fit the box once drawn, since Courier's monospace glyphs are wider
         // per-character than Helvetica's.
-        doc.setFont("courier", "normal");
-        doc.setFontSize(7);
-        const wrappedLocLines = locLines.flatMap((line) =>
-          doc.splitTextToSize(line, cardW - 10),
-        );
+
+        // remove part 
+
+        // doc.setFont("courier", "normal");
+        // doc.setFontSize(7);
+        // const wrappedLocLines = locLines.flatMap((line) =>
+        //   doc.splitTextToSize(line, cardW - 10),
+        // );
+
+        // remove end 
 
         // A single-check "does the whole box fit, else start one new page" is not
         // enough here: with every instance now listed (no "...and N more" cap), the
         // box can be taller than an entire page's content area, so it would still
         // overflow past the footer even on a fresh page. Paginate the line list
         // instead — draw as many lines as fit per page, then continue on the next.
-        const LOC_LINE_H = 3.3;
-        const LOC_BOX_PAD = 12;
-        const LOC_MIN_LINES = 4;
-        let remainingLocLines = wrappedLocLines;
-        let locContinued = false;
-        while (remainingLocLines.length > 0) {
-          const available = ph - 30 - y;
-          const linesThatFit = Math.floor(
-            (available - LOC_BOX_PAD) / LOC_LINE_H,
+
+
+        // remove part 
+
+        //   const LOC_LINE_H = 3.3;
+        //   const LOC_BOX_PAD = 12;
+        //   const LOC_MIN_LINES = 4;
+        //   let remainingLocLines = wrappedLocLines;
+        //   let locContinued = false;
+        //   while (remainingLocLines.length > 0) {
+        //     const available = ph - 30 - y;
+        //     const linesThatFit = Math.floor(
+        //       (available - LOC_BOX_PAD) / LOC_LINE_H,
+        //     );
+
+        //     if (
+        //       linesThatFit < Math.min(LOC_MIN_LINES, remainingLocLines.length)
+        //     ) {
+        //       doc.addPage("a4", "landscape");
+        //       y = 18;
+        //       continue;
+        //     }
+
+        //     const chunk = remainingLocLines.slice(0, Math.max(linesThatFit, 1));
+        //     remainingLocLines = remainingLocLines.slice(chunk.length);
+        //     const chunkBoxH = chunk.length * LOC_LINE_H + LOC_BOX_PAD;
+
+        //     doc.setFillColor(240, 248, 250);
+        //     doc.setDrawColor(0, 145, 218);
+        //     doc.setLineWidth(0.4);
+        //     doc.roundedRect(cardX, y, cardW, chunkBoxH, 2, 2, "FD");
+        //     doc.setFont("helvetica", "bold");
+        //     doc.setFontSize(7.5);
+        //     doc.setTextColor(0, 91, 130);
+        //     doc.text(
+        //       locContinued ? `${locHeading} (continued)` : locHeading,
+        //       cardX + 4,
+        //       y + 6,
+        //     );
+        //     doc.setFont("courier", "normal");
+        //     doc.setFontSize(7);
+        //     doc.setTextColor(...K.nearBlack);
+        //     doc.text(chunk, cardX + 4, y + 11);
+
+        //     y += chunkBoxH + 4;
+        //     locContinued = true;
+        //   }
+        // }
+
+        // remove end 
+
+        // ── VISUAL EVIDENCE CAPTURE (separate card from Developer Location) ──
+        const rawScreenshot = (issue as any).elementScreenshot || (issue.instances || []).find((i) => i.elementScreenshot)?.elementScreenshot;
+        const screenshotPageUrl = (issue as any).pageUrl || (issue.instances || []).find((i) => i.pageUrl)?.pageUrl || "";
+        
+        if (rawScreenshot) {
+          const cleanBase64 = rawScreenshot.replace(/^data:image\/[a-zA-Z]+;base64,/, "");
+          const imgFormat = rawScreenshot.includes("data:image/jpeg") || rawScreenshot.includes("data:image/jpg") ? "JPEG" : "PNG";
+
+          const imgBox = fitImageBoxPdf(
+            getImageDimensionsFromBase64(cleanBase64, imgFormat as any),
+            cardW - 8,
+            50,
           );
 
-          if (
-            linesThatFit < Math.min(LOC_MIN_LINES, remainingLocLines.length)
-          ) {
+          if (y + imgBox.height + 18 > ph - 20) {
             doc.addPage("a4", "landscape");
             y = 18;
-            continue;
           }
 
-          const chunk = remainingLocLines.slice(0, Math.max(linesThatFit, 1));
-          remainingLocLines = remainingLocLines.slice(chunk.length);
-          const chunkBoxH = chunk.length * LOC_LINE_H + LOC_BOX_PAD;
-
-          doc.setFillColor(240, 248, 250);
-          doc.setDrawColor(0, 145, 218);
-          doc.setLineWidth(0.4);
-          doc.roundedRect(cardX, y, cardW, chunkBoxH, 2, 2, "FD");
+          doc.setFillColor(0, 91, 130);
+          doc.roundedRect(cardX, y, cardW, 8, 1, 1, "F");
           doc.setFont("helvetica", "bold");
           doc.setFontSize(7.5);
-          doc.setTextColor(0, 91, 130);
-          doc.text(
-            locContinued ? `${locHeading} (continued)` : locHeading,
-            cardX + 4,
-            y + 6,
-          );
-          doc.setFont("courier", "normal");
-          doc.setFontSize(7);
-          doc.setTextColor(...K.nearBlack);
-          doc.text(chunk, cardX + 4, y + 11);
+          doc.setTextColor(...K.white);
+          doc.text("VISUAL EVIDENCE CAPTURE", cardX + 4, y + 5.5);
+          const evUrlLabel = decodeHtmlEntitiesPdf(
+            screenshotPageUrl.replace(/^https?:\/\//, ""),
+          ).substring(0, 70);
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(6.5);
+          doc.text(evUrlLabel, cardX + cardW - 4, y + 5.5, { align: "right" });
+          y += 10;
 
-          y += chunkBoxH + 4;
-          locContinued = true;
+          const frameX = cardX + 2;
+          const frameW = cardW - 4;
+          doc.setFillColor(...K.offWhite);
+          doc.setDrawColor(0, 145, 218);
+          doc.setLineWidth(0.6);
+          doc.roundedRect(frameX, y, frameW, imgBox.height + 2, 0, 0, "FD");
+          try {
+            const imgX = frameX + 1 + (frameW - 2 - imgBox.width) / 2;
+            doc.addImage(
+              `data:image/${imgFormat.toLowerCase()};base64,${cleanBase64}`,
+              imgFormat as any,
+              imgX,
+              y + 1,
+              imgBox.width,
+              imgBox.height,
+            );
+          } catch {
+            /* skip if image data is invalid */
+          }
+          y += imgBox.height + 2 + 4;
         }
-      }
 
-      // ── VISUAL EVIDENCE CAPTURE (separate card from Developer Location) ──
-      if (withScreenshot?.elementScreenshot) {
-        const imgBox = fitImageBoxPdf(
-          getImageDimensionsFromBase64(withScreenshot.elementScreenshot, "PNG"),
-          cardW - 8,
-          50,
-        );
-
-        if (y + imgBox.height + 18 > ph - 20) {
+        // ── REFERENCE BOXES ──
+        if (y > ph - 35) {
           doc.addPage("a4", "landscape");
           y = 18;
         }
-
-        doc.setFillColor(0, 91, 130);
-        doc.roundedRect(cardX, y, cardW, 8, 1, 1, "F");
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(7.5);
-        doc.setTextColor(...K.white);
-        doc.text("VISUAL EVIDENCE CAPTURE", cardX + 4, y + 5.5);
-        const evUrlLabel = decodeHtmlEntitiesPdf(
-          withScreenshot.pageUrl.replace(/^https?:\/\//, ""),
-        ).substring(0, 70);
-        doc.setFont("helvetica", "italic");
-        doc.setFontSize(6.5);
-        doc.text(evUrlLabel, cardX + cardW - 4, y + 5.5, { align: "right" });
-        y += 10;
-
-        const frameX = cardX + 2;
-        const frameW = cardW - 4;
-        doc.setFillColor(...K.offWhite);
-        doc.setDrawColor(0, 145, 218);
-        doc.setLineWidth(0.6);
-        doc.roundedRect(frameX, y, frameW, imgBox.height + 2, 0, 0, "FD");
-        try {
-          const imgX = frameX + 1 + (frameW - 2 - imgBox.width) / 2;
-          doc.addImage(
-            `data:image/png;base64,${withScreenshot.elementScreenshot}`,
-            "PNG",
-            imgX,
-            y + 1,
-            imgBox.width,
-            imgBox.height,
-          );
-        } catch {
-          /* skip if image data is invalid */
-        }
-        y += imgBox.height + 2 + 4;
-      }
-
-      // ── REFERENCE BOXES ──
-      if (y > ph - 35) {
-        doc.addPage("a4", "landscape");
-        y = 18;
-      }
-      const refBoxW = (cardW - 4) / 2;
-      const wcagRefText = isA11y
-        ? `WCAG 2.2 SC ${issue.wcagCriterion} (${issue.wcagName}, Level ${issue.wcagLevel}): ${issue.description ? issue.description.substring(0, 200) : "Conformance required as specified."}`
-        : `Rule: ${(issue as any).ruleId || "--"}. ${issue.description ? issue.description.substring(0, 220) : ""}`;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
-      const wcagRefLines = doc.splitTextToSize(wcagRefText, refBoxW - 10);
-      const refBoxH = Math.max(wcagRefLines.length, 2) * 3.3 + 14;
-
-      doc.setFillColor(240, 245, 255);
-      doc.setDrawColor(30, 60, 160);
-      doc.setLineWidth(0.4);
-      doc.roundedRect(cardX, y, refBoxW, refBoxH, 2, 2, "FD");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
-      doc.setTextColor(30, 60, 160);
-      doc.text(
-        isA11y ? "WCAG 2.2 GUIDELINE REFERENCE" : "RULE REFERENCE",
-        cardX + 4,
-        y + 6,
-      );
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
-      doc.setTextColor(...K.nearBlack);
-      doc.text(wcagRefLines, cardX + 4, y + 11);
-
-      const fixX = cardX + refBoxW + 4;
-      if (issue.codeFix) {
-        doc.setFont("courier", "normal");
+        const refBoxW = (cardW - 4) / 2;
+        const wcagRefText = isA11y
+          ? `WCAG 2.2 SC ${issue.wcagCriterion} (${issue.wcagName}, Level ${issue.wcagLevel}): ${issue.description ? issue.description.substring(0, 200) : "Conformance required as specified."}`
+          : `Rule: ${(issue as any).ruleId || "--"}. ${issue.description ? issue.description.substring(0, 220) : ""}`;
+        doc.setFont("helvetica", "normal");
         doc.setFontSize(7);
-        const codeLines = doc.splitTextToSize(issue.codeFix, refBoxW - 12);
-        const fixH = Math.max(refBoxH, codeLines.length * 3.3 + 14);
-        doc.setFillColor(26, 38, 56);
-        doc.setDrawColor(...K.navy);
+        const wcagRefLines = doc.splitTextToSize(wcagRefText, refBoxW - 10);
+        const refBoxH = Math.max(wcagRefLines.length, 2) * 3.3 + 14;
+
+        doc.setFillColor(240, 245, 255);
+        doc.setDrawColor(30, 60, 160);
         doc.setLineWidth(0.4);
-        doc.roundedRect(fixX, y, refBoxW, fixH, 2, 2, "FD");
+        doc.roundedRect(cardX, y, refBoxW, refBoxH, 2, 2, "FD");
         doc.setFont("helvetica", "bold");
         doc.setFontSize(7.5);
-        doc.setTextColor(0, 200, 150);
-        doc.text("CODE FIX", fixX + 4, y + 6);
-        doc.setFont("courier", "normal");
+        doc.setTextColor(30, 60, 160);
+        doc.text(
+          isA11y ? "WCAG 2.2 GUIDELINE REFERENCE" : "RULE REFERENCE",
+          cardX + 4,
+          y + 6,
+        );
+        doc.setFont("helvetica", "normal");
         doc.setFontSize(7);
-        doc.setTextColor(220, 230, 250);
-        doc.text(codeLines, fixX + 4, y + 11);
-        y += fixH + 4;
-      } else {
-        y += refBoxH + 4;
+        doc.setTextColor(...K.nearBlack);
+        doc.text(wcagRefLines, cardX + 4, y + 11);
+
+        const fixX = cardX + refBoxW + 4;
+        if (issue.codeFix) {
+          doc.setFont("courier", "normal");
+          doc.setFontSize(7);
+          const codeLines = doc.splitTextToSize(issue.codeFix, refBoxW - 12);
+          const fixH = Math.max(refBoxH, codeLines.length * 3.3 + 14);
+          doc.setFillColor(26, 38, 56);
+          doc.setDrawColor(...K.navy);
+          doc.setLineWidth(0.4);
+          doc.roundedRect(fixX, y, refBoxW, fixH, 2, 2, "FD");
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(7.5);
+          doc.setTextColor(0, 200, 150);
+          doc.text("CODE FIX", fixX + 4, y + 6);
+          doc.setFont("courier", "normal");
+          doc.setFontSize(7);
+          doc.setTextColor(220, 230, 250);
+          doc.text(codeLines, fixX + 4, y + 11);
+          y += fixH + 4;
+        } else {
+          y += refBoxH + 4;
+        }
+
+        // ── CARD SEPARATOR ──
+        doc.setDrawColor(...K.lightGrey);
+        doc.setLineWidth(0.3);
+        doc.line(cardX, y, cardX + cardW, y);
+        y += 8;
+
+        drawPageBorder(doc, pw, ph);
       }
-
-      // ── CARD SEPARATOR ──
-      doc.setDrawColor(...K.lightGrey);
-      doc.setLineWidth(0.3);
-      doc.line(cardX, y, cardX + cardW, y);
-      y += 8;
-
-      drawPageBorder(doc, pw, ph);
     });
 
     // ══════════════════════════════════════════════
@@ -2801,8 +2825,8 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       const ccpaLabel = f.brignullPattern
         ? `#${f.brignullNumber} — ${f.brignullPattern}`
         : f.category
-            .replace(/-/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase());
+          .replace(/-/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase());
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
       doc.setTextColor(...K.white);
