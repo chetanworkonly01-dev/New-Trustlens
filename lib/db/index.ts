@@ -1,9 +1,9 @@
-/**
- * Database connection and initialization for TrustLens
- * 
- * Uses PostgreSQL (compatible with Neon, Supabase, etc.)
- * Replaces file-based storage in lib/store/audit-store.ts
- */
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+dotenv.config();
+
 import { Pool } from 'pg';
 
 const connectionString = process.env.DATABASE_URL ||
@@ -136,7 +136,14 @@ let schemaInitialized = false;
 
 // Initialize the database schema (no-op once initialized)
 export async function initializeDatabase(): Promise<void> {
-  schemaInitialized = true;
+  if (schemaInitialized) return;
+  try {
+    await executeQuery(SCHEMA_SQL);
+    schemaInitialized = true;
+    console.log('[TrustLens DB] Database schema initialized successfully');
+  } catch (err) {
+    console.error('[TrustLens DB] Schema initialization error:', err);
+  }
 }
 
 // Execute a query with error handling

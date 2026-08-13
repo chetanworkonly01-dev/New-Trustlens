@@ -2,7 +2,7 @@ import { executeQuery } from '../db';
 import { DarkPatternFinding } from '../types/darkpattern';
 
 export interface DarkPatternFeedbackInput {
-  domain: string;
+  domain?: string;
   patternType: string;
   elementSelector: string;
   action: 'false_positive' | 'verified';
@@ -28,7 +28,7 @@ export function extractDomain(url: string): string {
  * Record an auditor's feedback (e.g. False Positive or Verified Dark Pattern) into PostgreSQL
  */
 export async function recordDarkPatternFeedback(input: DarkPatternFeedbackInput): Promise<boolean> {
-  const cleanDomain = extractDomain(input.domain);
+  const cleanDomain = extractDomain(input.domain || 'global');
 
   if (process.env.DEV_BYPASS_DB === 'true') {
     console.log(`[DP Learning] Dev bypass: recorded ${input.action} for ${cleanDomain}`);

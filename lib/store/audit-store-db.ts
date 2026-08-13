@@ -262,7 +262,7 @@ async function upsertAuditProgress(id: string, audit: AuditResult): Promise<void
   await executeQuery(
     `INSERT INTO audits (id, user_id, url, type, status, progress, progress_message, 
      audit_config, score_data, audit_data, started_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+     VALUES ($1, (SELECT id FROM users WHERE id = $2), $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
      ON CONFLICT (id) DO UPDATE SET
        user_id = EXCLUDED.user_id,
        status = CASE 
@@ -318,7 +318,7 @@ async function saveFullAudit(id: string, audit: AuditResult): Promise<void> {
     `INSERT INTO audits (id, user_id, url, type, status, progress, progress_message,
            site_profile, audit_config, score_data, audit_data, crawl_coverage, trust_score,
            pillar_results, pillar_progress, audit_integrity, started_at, completed_at, error, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW())
+     VALUES ($1, (SELECT id FROM users WHERE id = $2), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW())
      ON CONFLICT (id) DO UPDATE SET
        user_id = EXCLUDED.user_id,
        url = EXCLUDED.url,

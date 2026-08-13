@@ -12,11 +12,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { domain, patternType, elementSelector, action, reason } = body;
+    const { patternType, elementSelector, action, reason } = body;
 
-    if (!domain || !patternType || !elementSelector || !action) {
+    if (!patternType || !elementSelector || !action) {
       return NextResponse.json(
-        { error: 'Missing required fields: domain, patternType, elementSelector, and action are required.' },
+        { error: 'Missing required fields: patternType, elementSelector, and action are required.' },
         { status: 400 }
       );
     }
@@ -29,7 +29,6 @@ export async function POST(request: Request) {
     }
 
     const feedbackInput: DarkPatternFeedbackInput = {
-      domain,
       patternType,
       elementSelector,
       action,
@@ -41,7 +40,7 @@ export async function POST(request: Request) {
     if (success) {
       return NextResponse.json({
         success: true,
-        message: `Dark pattern feedback (${action}) recorded successfully for ${domain}.`,
+        message: `Dark pattern global feedback (${action}) recorded successfully.`,
       });
     } else {
       return NextResponse.json(
