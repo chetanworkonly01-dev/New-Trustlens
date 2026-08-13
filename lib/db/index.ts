@@ -111,13 +111,15 @@ ON CONFLICT (key) DO NOTHING;
 -- 4. Dark Pattern Learning table (Minimal feedback store)
 CREATE TABLE IF NOT EXISTS dark_pattern_learning (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    domain VARCHAR(255) NOT NULL,
+    domain VARCHAR(255) NOT NULL DEFAULT '*',
     pattern_type VARCHAR(100) NOT NULL,
     element_selector TEXT NOT NULL,
     action VARCHAR(20) NOT NULL,
     reason TEXT,
     created_at TIMESTAMP DEFAULT NOW() NOT NULL
 );
+
+ALTER TABLE dark_pattern_learning ADD COLUMN IF NOT EXISTS domain VARCHAR(255) DEFAULT '*';
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_audits_user_id ON audits(user_id);

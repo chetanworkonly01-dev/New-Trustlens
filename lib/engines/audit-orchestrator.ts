@@ -770,28 +770,31 @@ async function runAuditPipeline(id: string, config: AuditConfig) {
           addLog,
         )
           .then(async (result) => {
-            // Apply Minimal Dark Pattern Learning Filter
+            // Apply OpenAI LLM AI Dark Pattern Judge with Cross-Domain Learning
             try {
-              const { filterDarkPatternsWithLearning } = await import("./dark-pattern-learning");
-              const { activePatterns, filteredCount } = await filterDarkPatternsWithLearning(
-                result.findings as any[],
-                config.url || ""
+              const { adjudicateDarkPatternsWithAI } = await import("./ai-dark-pattern-judge");
+              const { activePatterns, learningSummary } = await adjudicateDarkPatternsWithAI(
+                (result.findings || []) as any[],
+                config.url || "",
+                (msg) => console.log(`[AuditOrchestrator] ${msg}`)
               );
-              if (filteredCount > 0) {
-                result.findings = activePatterns as any[];
-                result.totalFindings = activePatterns.length;
-                addLog({
-                  timestamp: new Date().toISOString(),
-                  testId: "DP-LEARNING",
-                  testName: "Dark Pattern Learning Engine",
-                  wcag: "",
-                  status: "pass",
-                  pillar: "darkpatterns",
-                  message: `🧠 Applied Dark Pattern Learning: Suppressed ${filteredCount} learned false positive(s)`,
-                });
-              }
+
+              result.findings = activePatterns as any[];
+              result.totalFindings = activePatterns.length;
+              (result as any).aiLearningSummary = learningSummary;
+              (result as any).aiSuppressedFindings = learningSummary.suppressedPatterns;
+
+              addLog({
+                timestamp: new Date().toISOString(),
+                testId: "DP-LEARNING",
+                testName: "TrustLens AI Learning Engine",
+                wcag: "",
+                status: "pass",
+                pillar: "darkpatterns",
+                message: `🧠 ${learningSummary.dynamicAIDecisionText}`,
+              });
             } catch (learningErr) {
-              console.warn('[AuditOrchestrator] Dark Pattern learning filter error:', learningErr);
+              console.warn('[AuditOrchestrator] AI Dark Pattern adjudication error:', learningErr);
             }
 
             darkPatternResult = result;
