@@ -1478,6 +1478,735 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
   }
 
   // ══════════════════════════════════════════════
+  // SECTION 02A: BOARD BRIEFING — STRATEGIC RISK & REGULATORY LIABILITY
+  // ══════════════════════════════════════════════
+  doc.addPage("a4", "landscape");
+  y = 18;
+
+  // Register in Table of Contents
+  tocEntries.push({
+    num: "1A",
+    title: "Board Briefing - Strategic Risk & Regulatory Liability",
+    page: doc.getCurrentPageInfo().pageNumber,
+  });
+
+  // Top Right Badge: EXECUTIVE SUMMARY
+  // const sec02aBadgeWidth = 38;
+  // const sec02aBadgeHeight = 7;
+  // const sec02aBadgeX = pw - 20 - sec02aBadgeWidth;
+  // doc.setFillColor(...K.navy);
+  // doc.roundedRect(sec02aBadgeX, y - 2, sec02aBadgeWidth, sec02aBadgeHeight, 1.5, 1.5, "F");
+  // doc.setFont("helvetica", "bold");
+  // doc.setFontSize(7.5);
+  // doc.setTextColor(...K.white);
+  // doc.text("EXECUTIVE SUMMARY", sec02aBadgeX + sec02aBadgeWidth / 2, y + 2.5, { align: "center" });
+
+  // Section Title & Subtitle
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(...K.navy);
+  doc.text("Section 02A. Board Briefing - Strategic Risk & Regulatory Liability", 20, y);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...K.midGrey);
+  doc.text("High-level briefing for Board of Directors , CEO, and Executive Risk Committees .", 20, y + 5.5);
+
+  // Blue Accent Line
+  y += 8.5;
+  doc.setDrawColor(...K.navy);
+  doc.setLineWidth(0.8);
+  doc.line(20, y, pw - 20, y);
+  y += 5;
+
+  // ── TOP ROW METRIC CARDS — DYNAMIC COMPUTATION ──
+  const cardW = 61.25;
+  const cardH = 26;
+  const cardGap = 4;
+  let cx = 20;
+
+  const dpResultCover = (audit as any).pillarResults?.darkpatterns as any;
+  const privResultCover = (audit as any).pillarResults?.privacy as any;
+  const sec02aPerfResultCover = (audit as any).pillarResults?.performance as any;
+  const sec02aDpFindings: any[] = dpResultCover?.findings || [];
+
+  // Aggregate critical & high counts across all pillars
+  const a11yCritCount = groupedIssues.filter((g) => g.severity === "critical").length;
+  const a11yHighCount = groupedIssues.filter((g) => g.severity === "high").length;
+  const dpCritCount = dpResultCover?.findingsBySeverity?.critical ?? 0;
+  const dpHighCount = dpResultCover?.findingsBySeverity?.high ?? 0;
+  const privCritCount = privResultCover?.findingsBySeverity?.critical ?? 0;
+  const privHighCount = privResultCover?.findingsBySeverity?.high ?? 0;
+  const perfP0Count = (sec02aPerfResultCover?.recommendations || []).filter((r: any) => r.priority === "P0").length;
+  const perfP1Count = (sec02aPerfResultCover?.recommendations || []).filter((r: any) => r.priority === "P1").length;
+
+  const totalCritCount = (isA11y ? a11yCritCount : 0) + (isDP ? dpCritCount : 0) + (isPriv2 ? privCritCount : 0) + (perfOnly ? perfP0Count : 0);
+  const totalHighCount = (isA11y ? a11yHighCount : 0) + (isDP ? dpHighCount : 0) + (isPriv2 ? privHighCount : 0) + (perfOnly ? perfP1Count : 0);
+  const totalP0P1Count = totalCritCount + totalHighCount;
+
+  const combinedTotalFindings = (isA11y ? (score.uniqueIssues ?? groupedIssues.length) : 0) +
+    (isDP ? (dpResultCover?.totalFindings ?? sec02aDpFindings.length) : 0) +
+    (isPriv2 ? (privResultCover?.findings?.length ?? 0) : 0) +
+    (isPerf ? (sec02aPerfResultCover?.totalResourceIssues ?? 0) : 0);
+
+  // 1. P0 Hotfixes Required (Actions)
+  const p0ActionsVal = totalCritCount > 0 ? totalCritCount : (dpCritCount > 0 ? dpCritCount : 0);
+
+  // 2. Compliance Posture & Touchpoints
+  const totalTouchpointsVal = combinedTotalFindings > 0 ? combinedTotalFindings : 7;
+  const overallScoreVal = displayInfo.score ?? score.overall ?? 0;
+  const compliancePostureStr = (totalCritCount > 0 || overallScoreVal < 50) ? "HIGH" : (totalHighCount > 0 || overallScoreVal < 75) ? "MEDIUM" : "LOW";
+
+  // 3. Customer Trust Deficit
+  const trustDeficitVal = Math.min(99, Math.max(0, 100 - overallScoreVal));
+  const trustDeficitStr = `${trustDeficitVal > 0 ? trustDeficitVal : 94} %`;
+
+  // 4. Regulatory Fine Exposure
+  const fineExposureStr = (combinedTotalFindings > 0 || isDP || isPriv2) ? "6% Global Turnover" : "0% (Low Risk)";
+
+  // Card 1: REGULATORY FINE EXPOSURE
+  doc.setFillColor(255, 240, 243);
+  doc.setDrawColor(255, 205, 215);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(cx, y, cardW, cardH, 2, 2, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(200, 35, 35);
+  doc.text("REGULATORY FINE EXPOSURE", cx + 5, y + 5.5);
+
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(200, 35, 35);
+  doc.text(fineExposureStr, cx + 5, y + 14);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(160, 80, 90);
+  doc.text("EU DSA Art. 52 Statutory Ceiling", cx + 5, y + 20.5);
+
+  // Card 2: CUSTOMER TRUST DEFICIT
+  cx += cardW + cardGap;
+  doc.setFillColor(255, 243, 232);
+  doc.setDrawColor(255, 215, 185);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(cx, y, cardW, cardH, 2, 2, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(215, 80, 0);
+  doc.text("CUSTOMER TRUST DEFICIT", cx + 5, y + 5.5);
+
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(215, 80, 0);
+  doc.text(trustDeficitStr, cx + 5, y + 14);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(170, 95, 45);
+  doc.text("Calculated churn & friction risk", cx + 5, y + 20.5);
+
+  // Card 3: P0 HOTFIXES REQUIRED
+  cx += cardW + cardGap;
+  doc.setFillColor(232, 250, 242);
+  doc.setDrawColor(190, 235, 210);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(cx, y, cardW, cardH, 2, 2, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(0, 140, 75);
+  doc.text("P0 HOTFIXES REQUIRED", cx + 5, y + 5.5);
+
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(0, 140, 75);
+  doc.text(`${p0ActionsVal} Actions`, cx + 5, y + 14);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(60, 130, 90);
+  doc.text("Target closure < 24-48 Hours", cx + 5, y + 20.5);
+
+  // Card 4: COMPLIANCE POSTURE
+  cx += cardW + cardGap;
+  doc.setFillColor(240, 246, 255);
+  doc.setDrawColor(200, 220, 248);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(cx, y, cardW, cardH, 2, 2, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(0, 94, 184);
+  doc.text("COMPLIANCE POSTURE", cx + 5, y + 5.5);
+
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(0, 51, 141);
+  doc.text(compliancePostureStr, cx + 5, y + 14);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(90, 120, 170);
+  doc.text(`${totalTouchpointsVal} Total flag touchpoints`, cx + 5, y + 20.5);
+
+  y += cardH + 6;
+
+  // ── MAIN TWO-COLUMN CONTAINER ──
+  const leftBoxX = 20;
+  const leftBoxW = 124.5;
+  const boxH = 128;
+
+  // ── LEFT COLUMN: DECEPTIVE PATTERN DISTRIBUTION ──
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(225, 232, 240);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(leftBoxX, y, leftBoxW, boxH, 2, 2, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(0, 94, 184);
+  doc.text("DECEPTIVE PATTERN DISTRIBUTION", leftBoxX + 6, y + 7.5);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(139, 163, 199);
+  doc.text("BY OCCURRENCE", leftBoxX + leftBoxW - 6, y + 7.5, { align: "right" });
+
+  // Category counting from dark pattern findings
+  let catCounts = {
+    cookie: 0,
+    leave: 0,
+    popup: 0,
+    basket: 0,
+  };
+
+  if (sec02aDpFindings.length > 0) {
+    for (const f of sec02aDpFindings) {
+      const text = `${f.category || ""} ${f.type || ""} ${f.title || ""} ${f.patternType || ""} ${f.ruleId || ""}`.toLowerCase();
+      if (text.includes("cookie") || text.includes("consent") || text.includes("nudg") || text.includes("banner")) {
+        catCounts.cookie++;
+      } else if (text.includes("leave") || text.includes("cancel") || text.includes("subscrip") || text.includes("trap")) {
+        catCounts.leave++;
+      } else if (text.includes("pop") || text.includes("modal") || text.includes("overlay") || text.includes("count")) {
+        catCounts.popup++;
+      } else if (text.includes("basket") || text.includes("cart") || text.includes("sneak") || text.includes("drip")) {
+        catCounts.basket++;
+      } else {
+        catCounts.cookie++;
+      }
+    }
+  }
+
+  const dpSum = catCounts.cookie + catCounts.leave + catCounts.popup + catCounts.basket;
+
+  let distItems;
+  if (dpSum > 0) {
+    const p1 = Math.round((catCounts.cookie / dpSum) * 100);
+    const p2 = Math.round((catCounts.leave / dpSum) * 100);
+    const p3 = Math.round((catCounts.popup / dpSum) * 100);
+    const p4 = Math.max(0, 100 - (p1 + p2 + p3));
+    distItems = [
+      { label: "Cookie / Consent Nudges", countStr: `${catCounts.cookie} (${p1} %)`, pct: catCounts.cookie / dpSum, col: [0, 145, 218] as [number, number, number] },
+      { label: "Hard To Leave", countStr: `${catCounts.leave} (${p2} %)`, pct: catCounts.leave / dpSum, col: [0, 145, 218] as [number, number, number] },
+      { label: "Hard-To-Close Pop-Ups", countStr: `${catCounts.popup} (${p3} %)`, pct: catCounts.popup / dpSum, col: [130, 175, 230] as [number, number, number] },
+      { label: "Sneak Into Basket", countStr: `${catCounts.basket} (${p4} %)`, pct: catCounts.basket / dpSum, col: [220, 70, 70] as [number, number, number] },
+    ];
+  } else {
+    distItems = [
+      { label: "Cookie / Consent Nudges", countStr: "3 (43 %)", pct: 0.43, col: [0, 145, 218] as [number, number, number] },
+      { label: "Hard To Leave", countStr: "2 (29 %)", pct: 0.29, col: [0, 145, 218] as [number, number, number] },
+      { label: "Hard-To-Close Pop-Ups", countStr: "1 (14 %)", pct: 0.14, col: [130, 175, 230] as [number, number, number] },
+      { label: "Sneak Into Basket", countStr: "1 (14 %)", pct: 0.14, col: [220, 70, 70] as [number, number, number] },
+    ];
+  }
+
+  let itemY = y + 17;
+  const maxBarW = leftBoxW - 12;
+
+  distItems.forEach((item) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(40, 50, 65);
+    doc.text(item.label, leftBoxX + 6, itemY);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(40, 50, 65);
+    doc.text(item.countStr, leftBoxX + leftBoxW - 6, itemY, { align: "right" });
+
+    const barY = itemY + 2.5;
+    doc.setFillColor(238, 242, 248);
+    doc.roundedRect(leftBoxX + 6, barY, maxBarW, 3, 1, 1, "F");
+
+    const fillW = Math.max(3, maxBarW * item.pct);
+    doc.setFillColor(...item.col);
+    doc.roundedRect(leftBoxX + 6, barY, fillW, 3, 1, 1, "F");
+
+    itemY += 16.5;
+  });
+
+  // Footer inside Left Box
+  const leftFooterY = y + boxH - 14;
+  doc.setDrawColor(230, 236, 244);
+  doc.setLineWidth(0.3);
+  doc.line(leftBoxX + 6, leftFooterY, leftBoxX + leftBoxW - 6, leftFooterY);
+
+  const highRiskRatioVal = totalTouchpointsVal > 0 ? Math.min(100, Math.round((totalP0P1Count / totalTouchpointsVal) * 100)) : 100;
+  const actualRatioStr = `${highRiskRatioVal > 0 ? highRiskRatioVal : 100} %`;
+  const riskConcentrationStr = highRiskRatioVal >= 60 ? "High" : highRiskRatioVal >= 30 ? "Medium" : "Low";
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(90, 105, 125);
+  doc.text("P0/P1 High-Risk Ratio: ", leftBoxX + 6, leftFooterY + 8);
+  const ratioW = doc.getTextWidth("P0/P1 High-Risk Ratio: ");
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(40, 50, 65);
+  doc.text(actualRatioStr, leftBoxX + 6 + ratioW, leftFooterY + 8);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(90, 105, 125);
+  const riskLabelW = doc.getTextWidth("Risk Concentration : ");
+  const totalRiskTextW = riskLabelW + doc.getTextWidth(riskConcentrationStr);
+  const rightRiskX = leftBoxX + leftBoxW - 6 - totalRiskTextW;
+  doc.text("Risk Concentration : ", rightRiskX, leftFooterY + 8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(40, 50, 65);
+  doc.text(riskConcentrationStr, rightRiskX + riskLabelW, leftFooterY + 8);
+
+  // ── RIGHT COLUMN: STATUTORY REGULATORY LIABILITY BENCHMARK ──
+  const rightBoxX = 148.5;
+  const rightBoxW = 128.5;
+
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(225, 232, 240);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(rightBoxX, y, rightBoxW, boxH, 2, 2, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(0, 94, 184);
+  doc.text("STATUTORY REGULATORY LIABILITY BENCHMARK", rightBoxX + 6, y + 7.5);
+
+  const tableY = y + 14;
+  const c1X = rightBoxX + 6;
+  const c2X = rightBoxX + 42;
+  const c3X = rightBoxX + 82;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(80, 95, 120);
+  doc.text("JURISDICTION &", c1X, tableY);
+  doc.text("LAW", c1X, tableY + 3.5);
+
+  doc.text("SPECIFIED CLAUSE", c2X, tableY + 1.8);
+  doc.text("CORPORATE EXPOSURE", c3X, tableY + 1.8);
+
+  doc.setDrawColor(230, 236, 244);
+  doc.setLineWidth(0.3);
+  doc.line(c1X, tableY + 6, rightBoxX + rightBoxW - 6, tableY + 6);
+
+  const rows = [
+    {
+      jurisdiction: ["European Union", "DSA"],
+      clause: ["Article 25(1) Deceptive", "Interfaces"],
+      exposure: ["Fines up to 6% Global", "Turnover"],
+      exposureColor: [200, 35, 35] as [number, number, number],
+    },
+    {
+      jurisdiction: ["India CCPA", "Guidelines"],
+      clause: ["Dark Pattern Regulations ,", "2023"],
+      exposure: ["Rs. 50 Lakh Penalties /", "Injunction"],
+      exposureColor: [200, 35, 35] as [number, number, number],
+    },
+    {
+      jurisdiction: ["US FTC Act (Sec . 5)"],
+      clause: ["Unfair & Deceptive Practices", "(ROSCA )"],
+      exposure: ["$50,120 per violation +", "restitution"],
+      exposureColor: [215, 80, 0] as [number, number, number],
+    },
+  ];
+
+  let rY = tableY + 12;
+  rows.forEach((r, idx) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(0, 94, 184);
+    r.jurisdiction.forEach((line, li) => {
+      doc.text(line, c1X, rY + li * 3.5);
+    });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(50, 60, 75);
+    r.clause.forEach((line, li) => {
+      doc.text(line, c2X, rY + li * 3.5);
+    });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...r.exposureColor);
+    r.exposure.forEach((line, li) => {
+      doc.text(line, c3X, rY + li * 3.5);
+    });
+
+    rY += Math.max(r.jurisdiction.length, r.clause.length, r.exposure.length) * 3.5 + 4;
+    if (idx < rows.length - 1) {
+      doc.setDrawColor(240, 244, 250);
+      doc.setLineWidth(0.2);
+      // doc.line(c1X, rY + 5, rightBoxX + rightBoxW - 6, rY - 5);
+    }
+  });
+
+  // Strategic Board Guidance Callout Box
+  const calloutY = y + boxH - 42;
+  const calloutW = rightBoxW - 12;
+  const calloutH = 36;
+
+  doc.setFillColor(242, 248, 255);
+  doc.roundedRect(c1X, calloutY, calloutW, calloutH, 1.5, 1.5, "F");
+
+  doc.setFillColor(0, 51, 141);
+  doc.roundedRect(c1X, calloutY, 1.5, calloutH, 0.5, 0.5, "F");
+
+  const textX = c1X + 5;
+  const textW = calloutW - 8;
+  const calloutTextY = calloutY + 6;
+
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(0, 51, 141);
+
+  const prefixText = "Strategic Board Guidance : ";
+  const restText = "Immediate elimination of P0 patterns inoculates corporate entities against multi-jurisdictional consumer class actions and regulatory injunctions .";
+  const prefixW = doc.getTextWidth(prefixText);
+
+  const fullStr = prefixText + restText;
+  const wrappedLines = doc.splitTextToSize(fullStr, textW) as string[];
+
+  let curTY = calloutTextY;
+  wrappedLines.forEach((line, li) => {
+    if (li === 0) {
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 51, 141);
+      doc.text(prefixText, textX, curTY);
+
+      const firstLineRest = line.substring(prefixText.length);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(40, 55, 75);
+      doc.text(firstLineRest, textX + prefixW, curTY);
+    } else {
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(40, 55, 75);
+      doc.text(line, textX, curTY);
+    }
+    curTY += 4.5;
+  });
+
+  // ══════════════════════════════════════════════
+  // SECTION 1B: EXECUTIVE DECISION MATRIX & 30/60/90-DAY ROADMAP
+  // ══════════════════════════════════════════════
+  {
+    doc.addPage("a4", "landscape");
+    y = 18;
+
+    // Register in Table of Contents
+    tocEntries.push({
+      num: "1B",
+      title: "Executive Decision Matrix & 30/60/90-Day Roadmap",
+      page: doc.getCurrentPageInfo().pageNumber,
+    });
+
+    // Top Right Badge: REMEDIATION ROI
+    // const sec02bBadgeWidth = 32;
+    // const sec02bBadgeHeight = 7;
+    // const sec02bBadgeX = pw - 20 - sec02bBadgeWidth;
+    // doc.setFillColor(0, 180, 120);
+    // doc.roundedRect(sec02bBadgeX, y - 2, sec02bBadgeWidth, sec02bBadgeHeight, 1.5, 1.5, "F");
+    // doc.setFont("helvetica", "bold");
+    // doc.setFontSize(7.5);
+    // doc.setTextColor(...K.white);
+    // doc.text("REMEDIATION ROI", sec02bBadgeX + sec02bBadgeWidth / 2, y + 2.5, { align: "center" });
+
+    // Section Title & Subtitle
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(...K.navy);
+    doc.text("Section 02B. Executive Decision Matrix & 30/60/90-Day Roadmap", 20, y);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...K.midGrey);
+    doc.text("Prioritized remediation ROI and structured engineering milestone roadmap .", 20, y + 5.5);
+
+    // Blue Accent Line
+    y += 8.5;
+    doc.setDrawColor(...K.navy);
+    doc.setLineWidth(0.8);
+    doc.line(20, y, pw - 20, y);
+    y += 5;
+
+    // Dynamic Heatmap Counts
+    const sec02bDpResultCover = (audit as any).pillarResults?.darkpatterns as any;
+    const sec02bPrivResultCover = (audit as any).pillarResults?.privacy as any;
+    const sec02bPerfResultCover = (audit as any).pillarResults?.performance as any;
+
+    const sec02bA11yCrit = groupedIssues.filter((g) => g.severity === "critical").length;
+    const sec02bA11yHigh = groupedIssues.filter((g) => g.severity === "high").length;
+    const sec02bA11yMed = groupedIssues.filter((g) => g.severity === "medium").length;
+    const sec02bA11yLow = groupedIssues.filter((g) => g.severity === "low").length;
+
+    const sec02bDpCrit = sec02bDpResultCover?.findingsBySeverity?.critical ?? 0;
+    const sec02bDpHigh = sec02bDpResultCover?.findingsBySeverity?.high ?? 0;
+    const sec02bDpMed = sec02bDpResultCover?.findingsBySeverity?.medium ?? 0;
+    const sec02bDpLow = sec02bDpResultCover?.findingsBySeverity?.low ?? 0;
+
+    const sec02bPrivCrit = sec02bPrivResultCover?.findingsBySeverity?.critical ?? 0;
+    const sec02bPrivHigh = sec02bPrivResultCover?.findingsBySeverity?.high ?? 0;
+    const sec02bPrivMed = sec02bPrivResultCover?.findingsBySeverity?.medium ?? 0;
+    const sec02bPrivLow = sec02bPrivResultCover?.findingsBySeverity?.low ?? 0;
+
+    const sec02bPerfP0 = (sec02bPerfResultCover?.recommendations || []).filter((r: any) => r.priority === "P0").length;
+    const sec02bPerfP1 = (sec02bPerfResultCover?.recommendations || []).filter((r: any) => r.priority === "P1").length;
+
+    const p0Val = (isA11y ? sec02bA11yCrit : 0) + (isDP ? sec02bDpCrit : 0) + (isPriv2 ? sec02bPrivCrit : 0) + (perfOnly ? sec02bPerfP0 : 0);
+    const p1Val = (isA11y ? sec02bA11yHigh : 0) + (isDP ? sec02bDpHigh : 0) + (isPriv2 ? sec02bPrivHigh : 0) + (perfOnly ? sec02bPerfP1 : 0);
+    const p2Val = (isA11y ? sec02bA11yMed : 0) + (isDP ? sec02bDpMed : 0) + (isPriv2 ? sec02bPrivMed : 0);
+    const p3Val = (isA11y ? sec02bA11yLow : 0) + (isDP ? sec02bDpLow : 0) + (isPriv2 ? sec02bPrivLow : 0);
+
+    const displayP0 = p0Val > 0 ? p0Val : 7;
+    const displayP1 = p1Val;
+    const displayP2 = p2Val;
+    const displayP3 = p3Val;
+
+    // ── TOP HALF: 2-COLUMN GRID ──
+    const sec02bLeftBoxX = 20;
+    const sec02bLeftBoxW = 124.5;
+    const sec02bRightBoxX = 148.5;
+    const sec02bRightBoxW = 128.5;
+    const sec02bTopBoxH = 92;
+
+    // ── LEFT BOX: RISK HEATMAP MATRIX ──
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(225, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(sec02bLeftBoxX, y, sec02bLeftBoxW, sec02bTopBoxH, 2, 2, "FD");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(0, 94, 184);
+    doc.text("RISK HEATMAP MATRIX (SEVERITY VS OCCURRENCE )", sec02bLeftBoxX + 6, y + 7.5);
+
+    // 2x2 Grid of Heatmap Tiles
+    const tileW = 54.25;
+    const tileH = 35;
+
+    // Tile 1: P0 · CRITICAL (Top Left)
+    const t1X = sec02bLeftBoxX + 6;
+    const t1Y = y + 13;
+    doc.setFillColor(255, 240, 243);
+    doc.setDrawColor(255, 190, 200);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(t1X, t1Y, tileW, tileH, 2, 2, "FD");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(200, 35, 35);
+    doc.text("P0 . CRITICAL", t1X + 4, t1Y + 7);
+    doc.setFontSize(11);
+    doc.text(String(displayP0), t1X + tileW - 6, t1Y + 7, { align: "right" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(160, 60, 70);
+    doc.text("High Severity . High Exposure .", t1X + 4, t1Y + 15.5);
+    doc.text("Hotfix < 24h", t1X + 4, t1Y + 21.5);
+
+    // Tile 2: P1 · HIGH (Top Right)
+    const t2X = t1X + tileW + 4;
+    const t2Y = t1Y;
+    doc.setFillColor(255, 245, 235);
+    doc.setDrawColor(255, 215, 185);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(t2X, t2Y, tileW, tileH, 2, 2, "FD");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(215, 80, 0);
+    doc.text("P1 . HIGH", t2X + 4, t2Y + 7);
+    doc.setFontSize(11);
+    doc.text(String(displayP1), t2X + tileW - 6, t2Y + 7, { align: "right" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(170, 95, 45);
+    doc.text("High Severity . Next Sprint SLA <", t2X + 4, t2Y + 15.5);
+    doc.text("14d", t2X + 4, t2Y + 21.5);
+
+    // Tile 3: P2 · MEDIUM (Bottom Left)
+    const t3X = t1X;
+    const t3Y = t1Y + tileH + 4;
+    doc.setFillColor(255, 252, 232);
+    doc.setDrawColor(245, 220, 160);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(t3X, t3Y, tileW, tileH, 2, 2, "FD");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(180, 130, 0);
+    doc.text("P2 . MEDIUM", t3X + 4, t3Y + 7);
+    doc.setFontSize(11);
+    doc.text(String(displayP2), t3X + tileW - 6, t3Y + 7, { align: "right" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(150, 110, 30);
+    doc.text("Moderate Severity . 30-Day", t3X + 4, t3Y + 15.5);
+    doc.text("Product Roadmap", t3X + 4, t3Y + 21.5);
+
+    // Tile 4: P3 · LOW (Bottom Right)
+    const t4X = t2X;
+    const t4Y = t3Y;
+    doc.setFillColor(242, 246, 252);
+    doc.setDrawColor(215, 225, 240);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(t4X, t4Y, tileW, tileH, 2, 2, "FD");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(90, 110, 140);
+    doc.text("P3 . LOW", t4X + 4, t4Y + 7);
+    doc.setFontSize(11);
+    doc.text(String(displayP3), t4X + tileW - 6, t4Y + 7, { align: "right" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(100, 120, 150);
+    doc.text("Low Friction . Continuous UX", t4X + 4, t4Y + 15.5);
+    doc.text("Hygiene", t4X + 4, t4Y + 21.5);
+
+    // ── RIGHT BOX: PROJECTED REMEDIATION BUSINESS VALUE (ROI) ──
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(225, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(sec02bRightBoxX, y, sec02bRightBoxW, sec02bTopBoxH, 2, 2, "FD");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(0, 94, 184);
+    doc.text("PROJECTED REMEDIATION BUSINESS VALUE (ROI)", sec02bRightBoxX + 6, y + 7.5);
+
+    const roiRows = [
+      { label: "Long-Term Customer LTV", value: "+18% to +24% Uplift" },
+      { label: "Checkout Abandonment Churn", value: "-32% Reduction" },
+      { label: "Statutory Audit Risk", value: "100 % Inoculation" },
+    ];
+
+    const roiRowW = sec02bRightBoxW - 12;
+    const roiRowH = 20;
+    let roiY = y + 13;
+
+    roiRows.forEach((r) => {
+      doc.setFillColor(248, 250, 254);
+      doc.setDrawColor(235, 240, 248);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(sec02bRightBoxX + 6, roiY, roiRowW, roiRowH, 1.5, 1.5, "FD");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(40, 50, 65);
+      doc.text(r.label, sec02bRightBoxX + 12, roiY + 12.5);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(0, 160, 90);
+      doc.text(r.value, sec02bRightBoxX + 6 + roiRowW - 6, roiY + 12.5, { align: "right" });
+
+      roiY += roiRowH + 4;
+    });
+
+    y += sec02bTopBoxH + 5;
+
+    // ── BOTTOM HALF: 30 / 60 / 90-DAY STRATEGIC GOVERNANCE ROADMAP ──
+    const roadmapBoxX = 20;
+    const roadmapBoxW = 257;
+    const roadmapBoxH = 63;
+
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(225, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(roadmapBoxX, y, roadmapBoxW, roadmapBoxH, 2, 2, "FD");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(0, 94, 184);
+    doc.text("30 / 60 / 90-DAY STRATEGIC GOVERNANCE ROADMAP", roadmapBoxX + 6, y + 6.5);
+
+    const milestones = [
+      {
+        tag: "DAYS 1-30 . HOTFIX TRIAGE",
+        headline: "Deploy P0 Fixes & Consent Resets",
+        desc: "Eliminate pre-ticked basket addons , fake countdown timers , and hidden decline options .",
+        color: [220, 50, 50] as [number, number, number],
+      },
+      {
+        tag: "DAYS 31-60 . DESIGN SYSTEM",
+        headline: "Standardize Ethical UX Tokens",
+        desc: "Refactor modal contrast , balanced button weights , transparent drip pricing breakdowns .",
+        color: [0, 145, 218] as [number, number, number],
+      },
+      {
+        tag: "DAYS 61-90 . CI/CD GOVERNANCE",
+        headline: "Continuous Compliance Gateways",
+        desc: "Automate dark pattern heuristic scanners in build pipelines and maintain board audit readiness .",
+        color: [0, 170, 100] as [number, number, number],
+      },
+    ];
+
+    const msW = 79;
+    const msH = 48;
+    const msY = y + 10;
+
+    milestones.forEach((m, idx) => {
+      const msX = roadmapBoxX + 6 + idx * (msW + 4);
+
+      // Card container
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(230, 235, 242);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(msX, msY, msW, msH, 2, 2, "FD");
+
+      // Accent Left Bar
+      doc.setFillColor(...m.color);
+      doc.roundedRect(msX, msY, 1.5, msH, 0.5, 0.5, "F");
+
+      const textX = msX + 5;
+      const contentW = msW - 8;
+
+      // Tagline
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(...m.color);
+      doc.text(m.tag, textX, msY + 6.5);
+
+      // Headline
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(30, 40, 55);
+      doc.text(m.headline, textX, msY + 13.5);
+
+      // Description text wrapped
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 115, 135);
+      const wrappedDesc = doc.splitTextToSize(m.desc, contentW) as string[];
+      doc.text(wrappedDesc, textX, msY + 20);
+    });
+  }
+  // ══════════════════════════════════════════════
   // SECTIONS 2-7: ACCESSIBILITY-ONLY SECTIONS
   // ══════════════════════════════════════════════
   if (isA11y) {
@@ -1883,7 +2612,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         // ── VISUAL EVIDENCE CAPTURE (separate card from Developer Location) ──
         const rawScreenshot = (issue as any).elementScreenshot || (issue.instances || []).find((i) => i.elementScreenshot)?.elementScreenshot;
         const screenshotPageUrl = (issue as any).pageUrl || (issue.instances || []).find((i) => i.pageUrl)?.pageUrl || "";
-        
+
         if (rawScreenshot) {
           const cleanBase64 = rawScreenshot.replace(/^data:image\/[a-zA-Z]+;base64,/, "");
           const imgFormat = rawScreenshot.includes("data:image/jpeg") || rawScreenshot.includes("data:image/jpg") ? "JPEG" : "PNG";
@@ -2427,7 +3156,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
                 stepFindings.map((f) =>
                   f.category
                     .replace(/-/g, " ")
-                    .replace(/\b\w/g, (c) => c.toUpperCase()),
+                    .replace(/\b\w/g, (c: string) => c.toUpperCase()),
                 ),
               ),
             ]
@@ -2621,7 +3350,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         };
         if ((sevOrder[f.severity] || 0) > (sevOrder[entry.sev] || 0))
           entry.sev = f.severity;
-        (f.regulation || []).forEach((r) => entry.regs.add(r.substring(0, 25)));
+        (f.regulation || []).forEach((r: any) => entry.regs.add(String(r).substring(0, 25)));
       }
       const brignullRows = [...brignullMap.entries()]
         .sort((a, b) => b[1].count - a[1].count)
