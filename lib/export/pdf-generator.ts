@@ -1864,7 +1864,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
   // Strategic Board Guidance Callout Box
   const calloutY = y + boxH - 42;
   const calloutW = rightBoxW - 12;
-  const calloutH = 36;
+  const calloutH = 18;
 
   doc.setFillColor(242, 248, 255);
   doc.roundedRect(c1X, calloutY, calloutW, calloutH, 1.5, 1.5, "F");
@@ -2002,7 +2002,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
 
     // 2x2 Grid of Heatmap Tiles
     const tileW = 54.25;
-    const tileH = 35;
+    const tileH = 28;
 
     // Tile 1: P0 · CRITICAL (Top Left)
     const t1X = sec02bLeftBoxX + 6;
@@ -2106,7 +2106,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     ];
 
     const roiRowW = sec02bRightBoxW - 12;
-    const roiRowH = 20;
+    const roiRowH = 10;
     let roiY = y + 13;
 
     roiRows.forEach((r) => {
@@ -2167,7 +2167,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     ];
 
     const msW = 79;
-    const msH = 48;
+    const msH = 35;
     const msY = y + 10;
 
     milestones.forEach((m, idx) => {
@@ -3386,10 +3386,10 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
         },
         alternateRowStyles: { fillColor: K.offWhite },
         columnStyles: {
-          0: { cellWidth: 55 },
-          1: { cellWidth: 18, halign: "center", fontStyle: "bold" },
-          2: { cellWidth: 25, halign: "center" },
-          3: { cellWidth: 72 },
+          0: { cellWidth: 80 },
+          1: { cellWidth: 30, halign: "center", fontStyle: "bold" },
+          2: { cellWidth: 40, halign: "center" },
+          3: { cellWidth: 107 },
         },
         didParseCell: (data) => {
           if (data.section === "body" && data.column.index === 2) {
@@ -3463,13 +3463,13 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       },
       alternateRowStyles: { fillColor: K.offWhite },
       columnStyles: {
-        0: { cellWidth: 12, fontStyle: "bold", halign: "center" },
-        1: { cellWidth: 46 },
-        2: { cellWidth: 26 },
-        3: { cellWidth: 28 },
-        4: { cellWidth: 18, halign: "center" },
-        5: { cellWidth: 22 },
-        6: { cellWidth: 10, halign: "center" },
+        0: { cellWidth: 15, fontStyle: "bold", halign: "center" },
+        1: { cellWidth: 75 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 45 },
+        4: { cellWidth: 25, halign: "center" },
+        5: { cellWidth: 40 },
+        6: { cellWidth: 17, halign: "center" },
       },
       didParseCell: (data) => {
         if (data.section === "body" && data.column.index === 4) {
