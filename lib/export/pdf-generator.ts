@@ -2106,8 +2106,8 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     ];
 
     const roiRowW = sec02bRightBoxW - 12;
-    const roiRowH = 10;
-    let roiY = y + 13;
+    const roiRowH = 11;
+    let roiY = y + 14;
 
     roiRows.forEach((r) => {
       doc.setFillColor(248, 250, 254);
@@ -2118,14 +2118,14 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(40, 50, 65);
-      doc.text(r.label, sec02bRightBoxX + 12, roiY + 12.5);
+      doc.text(r.label, sec02bRightBoxX + 12, roiY + 7.2);
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(0, 160, 90);
-      doc.text(r.value, sec02bRightBoxX + 6 + roiRowW - 6, roiY + 12.5, { align: "right" });
+      doc.text(r.value, sec02bRightBoxX + 6 + roiRowW - 6, roiY + 7.2, { align: "right" });
 
-      roiY += roiRowH + 4;
+      roiY += roiRowH + 6;
     });
 
     y += sec02bTopBoxH + 5;
@@ -2167,7 +2167,7 @@ export async function generatePdf(audit: AuditResult): Promise<Buffer> {
     ];
 
     const msW = 79;
-    const msH = 35;
+    const msH = 32;
     const msY = y + 10;
 
     milestones.forEach((m, idx) => {
