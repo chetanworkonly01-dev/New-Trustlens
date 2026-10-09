@@ -5,6 +5,7 @@ import {
   getAudit as dbGetAudit, 
   setAudit as dbSetAudit, 
   getAllAudits as dbGetAllAudits, 
+  getAuditCount as dbGetAuditCount,
   deleteAudit as dbDeleteAudit, 
   deleteAllAudits as dbDeleteAllAudits, 
   saveAILearningData 
@@ -272,13 +273,24 @@ export async function getAuditAsync(id: string): Promise<AuditResult | undefined
  * Reads all audits.
  * In database mode: strictly queries Neon PostgreSQL database.
  */
-export async function getAllAuditsAsync(userId?: string): Promise<AuditResult[]> {
+export async function getAllAuditsAsync(userId?: string, limit?: number): Promise<AuditResult[]> {
   if (isDatabaseMode()) {
-    return await dbGetAllAudits(userId);
+    return await dbGetAllAudits(userId, limit);
   }
 
   // File-mode fallback
-  return getAllAuditsSync();
+  const audits = getAllAuditsSync();
+  return limit && limit > 0 ? audits.slice(0, limit) : audits;
+}
+
+/**
+ * Gets total count of audits.
+ */
+export async function getAuditCountAsync(userId?: string): Promise<number> {
+  if (isDatabaseMode()) {
+    return await dbGetAuditCount(userId);
+  }
+  return getAllAuditsSync().length;
 }
 
 /**

@@ -2122,12 +2122,54 @@ const PREDEFINED_JOURNEYS: PredefinedJourneyTemplate[] = [
   const [maxPages, setMaxPages] = useState(5);
   const [includeAI, setIncludeAI] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [authMode, setAuthMode] = useState<"interactive" | "storage_state" | "credentials">("interactive");
   const [loginUrl, setLoginUrl] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [usernameSelector, setUsernameSelector] = useState("#username");
   const [passwordSelector, setPasswordSelector] = useState("#password");
   const [submitSelector, setSubmitSelector] = useState('button[type="submit"]');
+  const [storageStateJson, setStorageStateJson] = useState<string>("");
+  const [capturedStorageState, setCapturedStorageState] = useState<any>(null);
+  const [authenticatingPortal, setAuthenticatingPortal] = useState(false);
+  const [authStatusMessage, setAuthStatusMessage] = useState<string>("");
+  const [authCookieCount, setAuthCookieCount] = useState<number>(0);
+
+  const handleLaunchInteractiveAuth = async () => {
+    const target = loginUrl.trim() || url.trim();
+    if (!target) {
+      setError("Please enter a Target URL or Login URL first.");
+      return;
+    }
+
+    setAuthenticatingPortal(true);
+    setAuthStatusMessage("🌐 Chrome Window Open! Log in, enter your OTP, and close the Chrome window when finished.");
+    setError("");
+
+    try {
+      const res = await fetch("/api/audit/authenticate-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: target, timeoutSeconds: 180 }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.storageState) {
+        setCapturedStorageState(data.storageState);
+        setStorageStateJson(JSON.stringify(data.storageState, null, 2));
+        setAuthCookieCount(data.cookieCount || 0);
+        setAuthStatusMessage(`✓ Successfully captured ${data.cookieCount} active session cookies & storage tokens!`);
+      } else {
+        setAuthStatusMessage("");
+        setError(data.error || "Failed to capture login session.");
+      }
+    } catch {
+      setAuthStatusMessage("");
+      setError("Failed to launch interactive login window.");
+    } finally {
+      setAuthenticatingPortal(false);
+    }
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -2323,9 +2365,19 @@ const PREDEFINED_JOURNEYS: PredefinedJourneyTemplate[] = [
             ? { flags: perfFlags, freeText: perfText.trim() || undefined }
             : undefined,
       };
-      if (showLogin && username && password) {
+      if (showLogin) {
+        let parsedStorage: any = capturedStorageState;
+        if (!parsedStorage && storageStateJson.trim()) {
+          try {
+            parsedStorage = JSON.parse(storageStateJson);
+          } catch {
+            /* ignore invalid json */
+          }
+        }
         body.loginConfig = {
+          authMode,
           loginUrl: loginUrl || url,
+          storageState: parsedStorage,
           username,
           password,
           usernameSelector,
@@ -4726,87 +4778,193 @@ const PREDEFINED_JOURNEYS: PredefinedJourneyTemplate[] = [
             </div>
             {showLogin && (
               <div className="collapsible-body">
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 12,
-                    marginBottom: 12,
-                  }}
-                >
-                  <div className="input-group">
-                    <label className="input-label">Login URL</label>
-                    <input
-                      className="input-field"
-                      placeholder="https://example.com/login"
-                      value={loginUrl}
-                      onChange={(e) => setLoginUrl(e.target.value)}
-                    />
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">Submit Selector</label>
-                    <input
-                      className="input-field"
-                      placeholder='button[type="submit"]'
-                      value={submitSelector}
-                      onChange={(e) => setSubmitSelector(e.target.value)}
-                    />
-                  </div>
+                {/* Auth Mode Tabs */}
+                <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+                  {[
+                    { id: "interactive", label: "🌐 Interactive Chrome Authenticator (Recommended)" },
+                    { id: "storage_state", label: "🍪 Import Cookies / Storage State" },
+                    { id: "credentials", label: "🔑 Classic Form Credentials" },
+                  ].map((mode) => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setAuthMode(mode.id as any)}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 6,
+                        fontSize: 12,
+                        fontWeight: authMode === mode.id ? 700 : 500,
+                        background: authMode === mode.id ? "rgba(0, 178, 169, 0.18)" : "rgba(255, 255, 255, 0.05)",
+                        color: authMode === mode.id ? "#00B2A9" : "var(--text-secondary)",
+                        border: `1px solid ${authMode === mode.id ? "rgba(0, 178, 169, 0.4)" : "rgba(255, 255, 255, 0.1)"}`,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
                 </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 12,
-                    marginBottom: 12,
-                  }}
-                >
-                  <div className="input-group">
-                    <label className="input-label">Username</label>
-                    <input
-                      className="input-field"
-                      placeholder="user@example.com"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                    />
+
+                {/* Tab 1: Interactive Chrome Authenticator */}
+                {authMode === "interactive" && (
+                  <div style={{ padding: 16, background: "rgba(0, 0, 0, 0.2)", borderRadius: 8, border: "1px solid rgba(255, 255, 255, 0.08)" }}>
+                    <div style={{ marginBottom: 12 }}>
+                      <label className="input-label" style={{ fontSize: 13, fontWeight: 700 }}>
+                        Login / Portal Entry URL
+                      </label>
+                      <input
+                        className="input-field"
+                        placeholder={url || "https://amazon.in/ap/signin or https://flipkart.com/account/login"}
+                        value={loginUrl}
+                        onChange={(e) => setLoginUrl(e.target.value)}
+                        style={{ width: "100%", marginTop: 4 }}
+                      />
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-md"
+                        onClick={handleLaunchInteractiveAuth}
+                        disabled={authenticatingPortal}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                          background: "#00B2A9",
+                          color: "#ffffff",
+                          fontWeight: 700,
+                          padding: "10px 18px",
+                          borderRadius: 6,
+                          border: "none",
+                          cursor: authenticatingPortal ? "default" : "pointer",
+                        }}
+                      >
+                        {authenticatingPortal ? (
+                          <>
+                            <div className="spinner" style={{ width: 14, height: 14 }} />
+                            <span>Chrome Window Active — Log in now...</span>
+                          </>
+                        ) : (
+                          <span>🚀 Launch Interactive Login Window</span>
+                        )}
+                      </button>
+
+                      {authCookieCount > 0 && (
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: "#00BA8C",
+                            background: "rgba(0, 186, 140, 0.12)",
+                            padding: "6px 12px",
+                            borderRadius: 99,
+                            border: "1px solid rgba(0, 186, 140, 0.3)",
+                          }}
+                        >
+                          ✓ Session Active ({authCookieCount} Cookies Saved)
+                        </span>
+                      )}
+                    </div>
+
+                    {authStatusMessage && (
+                      <p style={{ marginTop: 10, fontSize: 12, color: authStatusMessage.includes("✓") ? "#00BA8C" : "#F0AB00", marginBottom: 0 }}>
+                        {authStatusMessage}
+                      </p>
+                    )}
+
+                    <p style={{ marginTop: 12, fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 0 }}>
+                      💡 <strong>How it works:</strong> TrustLens will open a visible Chrome window. Log in manually (enter phone/email, OTP, CAPTCHA). Once logged in, TrustLens will automatically detect your active session and close Chrome! You can also close the Chrome window manually at any time to capture your session immediately.
+                    </p>
                   </div>
-                  <div className="input-group">
-                    <label className="input-label">Password</label>
-                    <input
+                )}
+
+                {/* Tab 2: Storage State JSON / Cookies */}
+                {authMode === "storage_state" && (
+                  <div style={{ padding: 16, background: "rgba(0, 0, 0, 0.2)", borderRadius: 8, border: "1px solid rgba(255, 255, 255, 0.08)" }}>
+                    <label className="input-label" style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>
+                      Paste Session `storageState.json` or Cookie Array
+                    </label>
+                    <textarea
                       className="input-field"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      rows={6}
+                      placeholder='{"cookies": [{"name": "session-id", "value": "..."}], "origins": []}'
+                      value={storageStateJson}
+                      onChange={(e) => setStorageStateJson(e.target.value)}
+                      style={{ width: "100%", fontFamily: "Geist Mono, monospace", fontSize: 11 }}
                     />
+                    <p style={{ marginTop: 8, fontSize: 11, color: "var(--text-secondary)", marginBottom: 0 }}>
+                      Export cookies from Chrome DevTools or Playwright `context.storageState()` and paste here.
+                    </p>
                   </div>
-                </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 12,
-                  }}
-                >
-                  <div className="input-group">
-                    <label className="input-label">Username Selector</label>
-                    <input
-                      className="input-field"
-                      placeholder="#username"
-                      value={usernameSelector}
-                      onChange={(e) => setUsernameSelector(e.target.value)}
-                    />
+                )}
+
+                {/* Tab 3: Classic Form Credentials */}
+                {authMode === "credentials" && (
+                  <div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                      <div className="input-group">
+                        <label className="input-label">Login URL</label>
+                        <input
+                          className="input-field"
+                          placeholder="https://example.com/login"
+                          value={loginUrl}
+                          onChange={(e) => setLoginUrl(e.target.value)}
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label className="input-label">Submit Selector</label>
+                        <input
+                          className="input-field"
+                          placeholder='button[type="submit"]'
+                          value={submitSelector}
+                          onChange={(e) => setSubmitSelector(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                      <div className="input-group">
+                        <label className="input-label">Username</label>
+                        <input
+                          className="input-field"
+                          placeholder="user@example.com"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label className="input-label">Password</label>
+                        <input
+                          className="input-field"
+                          type="password"
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div className="input-group">
+                        <label className="input-label">Username Selector</label>
+                        <input
+                          className="input-field"
+                          placeholder="#username"
+                          value={usernameSelector}
+                          onChange={(e) => setUsernameSelector(e.target.value)}
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label className="input-label">Password Selector</label>
+                        <input
+                          className="input-field"
+                          placeholder="#password"
+                          value={passwordSelector}
+                          onChange={(e) => setPasswordSelector(e.target.value)}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="input-group">
-                    <label className="input-label">Password Selector</label>
-                    <input
-                      className="input-field"
-                      placeholder="#password"
-                      value={passwordSelector}
-                      onChange={(e) => setPasswordSelector(e.target.value)}
-                    />
-                  </div>
-                </div>
+                )}
               </div>
             )}
           </div>

@@ -114,6 +114,12 @@ export const DARK_PATTERN_RULES: DarkPatternRule[] = [
     description: 'The only method to cancel a subscription is to call a phone number or send an email, creating friction unavailable online. Violates FTC Click-to-Cancel Rule 2024 which mandates online cancellation if online signup is offered.',
     severity: 'critical', regulation: ['US-CCPA'], detect: 'dom',
   },
+  {
+    id: 'DP-OB-07', category: 'obstruction', principle: 'symmetry-of-choice',
+    title: 'No Data Export / Portability Option',
+    description: 'Account settings area lacks a self-serve "Download my data" option. Violates GDPR Art. 20 and India DPDPA 2023 §13.',
+    severity: 'medium', regulation: ['EU-GDPR', 'US-CCPA'], detect: 'dom',
+  },
 
 
 
@@ -178,6 +184,12 @@ export const DARK_PATTERN_RULES: DarkPatternRule[] = [
     description: 'A free trial automatically converts to a paid subscription without a clear pre-expiry warning email or on-page disclosure. Violates FTC Click-to-Cancel Rule and EU Consumer Rights Directive.',
     severity: 'critical', regulation: ['US-CCPA'], detect: 'dom',
   },
+  {
+    id: 'DP-HC-01', category: 'sneaking', principle: 'transparency',
+    title: 'Hidden Fees / Drip Pricing at Final Step',
+    description: 'Mandatory processing, service, or administrative fees are revealed only at the final checkout step.',
+    severity: 'critical', regulation: ['US-CCPA', 'EU-GDPR'], detect: 'dom',
+  },
 
   // ═══════════════════════════════════════════════════════════
   // FORCED ACTION (DP-FA) — Requires unrelated actions
@@ -219,6 +231,12 @@ export const DARK_PATTERN_RULES: DarkPatternRule[] = [
     title: 'Forced Social Login Without Alternative',
     description: 'Users are forced to log in via Facebook, Google, or Apple with no email/password alternative, requiring third-party data sharing as a condition of use.',
     severity: 'high', regulation: ['EU-GDPR', 'US-CCPA'], detect: 'dom',
+  },
+  {
+    id: 'DP-FA-07', category: 'forced-action', principle: 'user-autonomy',
+    title: 'Forced Mobile / Phone Gate for Pricing Details',
+    description: 'Pricing or quote details are hidden behind a required phone number entry wall before allowing access to product costs.',
+    severity: 'high', regulation: ['US-CCPA'], detect: 'dom',
   },
 
   // ═══════════════════════════════════════════════════════════
@@ -290,6 +308,12 @@ export const DARK_PATTERN_RULES: DarkPatternRule[] = [
     description: 'Dynamic counters like "5 people are viewing this!" or "3 items left in cart" are used to create artificial social scarcity. These are provably fake when the counter increments even when no other users are active.',
     severity: 'critical', regulation: ['US-CCPA'], detect: 'dom',
   },
+  {
+    id: 'DP-FS-01', category: 'scarcity-urgency', principle: 'user-autonomy',
+    title: 'Manufactured Scarcity / Artificial Stock Counter',
+    description: 'Artificial "Only X items left!" or stock pressure counters designed to induce rushed decision-making.',
+    severity: 'high', regulation: ['US-CCPA'], detect: 'dom',
+  },
 
   // ═══════════════════════════════════════════════════════════
   // SOCIAL PRESSURE (DP-SP) — Emotional manipulation
@@ -316,6 +340,12 @@ export const DARK_PATTERN_RULES: DarkPatternRule[] = [
     id: 'DP-SP-04', category: 'social-pressure', principle: 'transparency',
     title: 'Review Count Displayed Without Verification Source',
     description: 'Star ratings or review counts displayed without attribution to a verified platform (e.g., "4.9 stars — 12,847 reviews" with no source link). May violate FTC Endorsement Guides and EU DSA Art. 31.',
+    severity: 'medium', regulation: ['US-CCPA'], detect: 'dom',
+  },
+  {
+    id: 'DP-SP-05', category: 'social-pressure', principle: 'user-autonomy',
+    title: 'Fake Activity / Live Viewer Badges',
+    description: 'Social pressure badges ("X people viewing this right now!") designed to pressure immediate purchase.',
     severity: 'medium', regulation: ['US-CCPA'], detect: 'dom',
   },
 
@@ -375,6 +405,12 @@ export const DARK_PATTERN_RULES: DarkPatternRule[] = [
     description: 'The decline option uses a sad face emoji, downward arrow, or disappointed imagery to create visual shame without using guilt-language that NLP detectors can catch.',
     severity: 'medium', regulation: ['US-CCPA'], detect: 'visual',
   },
+  {
+    id: 'DP-CS-05', category: 'confirmshaming', principle: 'user-autonomy',
+    title: 'Guilt-Framed Opt-Out Text (Confirmshaming)',
+    description: 'Decline options use emotionally manipulative language ("No thanks, I prefer paying full price") to shame users.',
+    severity: 'medium', regulation: ['US-CCPA'], detect: 'dom',
+  },
 
   // ═══════════════════════════════════════════════════════════
   // MISDIRECTION (DP-MD) — Visual steering
@@ -426,6 +462,24 @@ export const DARK_PATTERN_RULES: DarkPatternRule[] = [
     title: 'Strikethrough "Original" Price Without Verification',
     description: 'A crossed-out "original" or "RRP" price is displayed next to a sale price without evidence the item was ever sold at that price. Classic reference pricing deception violating FTC Act §5 and UK CPR.',
     severity: 'high', regulation: ['US-CCPA'], detect: 'dom',
+  },
+  {
+    id: 'DP-MD-09', category: 'misdirection', principle: 'symmetry-of-choice',
+    title: 'Asymmetric Button Styling in Action Dialogs',
+    description: 'The accept/continue button is highlighted in high contrast while the reject/cancel option is hidden in low contrast text.',
+    severity: 'high', regulation: ['EU-GDPR', 'US-CCPA'], detect: 'dom',
+  },
+  {
+    id: 'DP-BS-01', category: 'misdirection', principle: 'transparency',
+    title: 'Bait and Switch Offer Alteration',
+    description: 'The advertised price or offer terms are altered silently between the product page and checkout flow.',
+    severity: 'critical', regulation: ['US-CCPA', 'EU-GDPR'], detect: 'dom',
+  },
+  {
+    id: 'DP-DA-01', category: 'misdirection', principle: 'transparency',
+    title: 'Disguised Advertisements in Content Feed',
+    description: 'Sponsored ads or promotional links are styled to mimic organic page content without prominent ad disclosures.',
+    severity: 'medium', regulation: ['US-CCPA'], detect: 'dom',
   },
 
   // ═══════════════════════════════════════════════════════════

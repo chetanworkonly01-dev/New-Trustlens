@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 
-export default function SignInPage() {
+function SignInForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -53,7 +53,6 @@ export default function SignInPage() {
         <div
           style={{
             backgroundColor: "var(--bg-darkcard)",
-            // borderRadius: "16px",
             boxShadow: "0 20px 60px rgba(0, 0, 0, 0.08)",
             padding: "32px",
           }}
@@ -117,7 +116,6 @@ export default function SignInPage() {
                   width: "100%",
                   padding: "12px 16px",
                   border: "1px solid #d1d5db",
-                  // borderRadius: "8px",
                   fontSize: "15px",
                   outline: "none",
                   transition: "border-color 0.2s, box-shadow 0.2s",
@@ -158,7 +156,6 @@ export default function SignInPage() {
                   width: "100%",
                   padding: "12px 16px",
                   border: "1px solid #d1d5db",
-                  // borderRadius: "8px",
                   fontSize: "15px",
                   outline: "none",
                   transition: "border-color 0.2s, box-shadow 0.2s",
@@ -204,10 +201,8 @@ export default function SignInPage() {
                 backgroundColor: "var(--kpmg-dynamic)",
                 color: "var(--kpmg-inverse)",
                 border: "none",
-                // borderRadius: "8px",
                 fontSize: "15px",
                 fontWeight: 600,
-                // cursor: loading ? "default" : "pointer",
                 opacity: loading ? 0.6 : 1,
                 transition: "background-color 0.2s",
               }}
@@ -253,5 +248,27 @@ export default function SignInPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            display: "flex",
+            minHeight: "63vh",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--text-secondary)",
+          }}
+        >
+          Loading...
+        </div>
+      }
+    >
+      <SignInForm />
+    </Suspense>
   );
 }

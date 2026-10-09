@@ -1,10 +1,9 @@
-/**
- * Migration script: Convert existing JSON file-based audits to PostgreSQL database
- * 
- * Usage: npm run migrate:audits
- */
-import fs from 'fs';
 import path from 'path';
+import dotenv from 'dotenv';
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+dotenv.config();
+
+import fs from 'fs';
 import { initializeDatabase, executeQuery } from '../lib/db';
 import { setAudit } from '../lib/store/audit-store-db';
 import type { AuditResult } from '../lib/types/audit';

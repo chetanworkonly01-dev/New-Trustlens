@@ -69,18 +69,21 @@ export async function PATCH(
     finding.rejectionReason = reason || 'Marked as false positive';
     finding.rejectedAt = new Date().toISOString();
 
-    // Save learning feedback into dark_pattern_learning table in PostgreSQL
-    try {
-      await recordDarkPatternFeedback({
-        domain: audit.config?.url || finding.pageUrl || '*',
-        patternType: finding.category || finding.ruleId || 'dark_pattern',
-        elementSelector: finding.element || '*',
-        action: 'false_positive',
-        reason: reason || 'Marked as false positive by auditor',
-      });
-    } catch (learnErr) {
+    // Save rich learning feedback into dark_pattern_learning table in PostgreSQL asynchronously (non-blocking)
+    const elementDesc = finding.element || finding.elementSelector || finding.title || 'Interactive UI Component';
+    const richPatternType = `${finding.ruleId || 'DP-RULE'}: ${finding.title || finding.category || 'Dark Pattern'}`;
+    const richReason = reason
+      ? `${reason} (Pattern: ${finding.description || 'Dismissed by auditor'})`
+      : `Marked as false positive by auditor: ${finding.description || 'Dismissed finding'}`;
+
+    recordDarkPatternFeedback({
+      patternType: richPatternType,
+      elementSelector: elementDesc,
+      action: 'false_positive',
+      reason: richReason,
+    }).catch(learnErr => {
       console.warn('[RejectFinding] Failed to save dark pattern learning record:', learnErr);
-    }
+    });
   }
 
   // ── Recalculate ethics score excluding rejected findings ──

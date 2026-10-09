@@ -97,7 +97,7 @@ async function gotoWithFallback(
         return;
       }
     }
-    throw new Error(`Navigation failed for ${url} and no cached HTML available`);
+    console.warn(`[JourneyTester] Navigation warning for ${url}: unable to reach page directly and no cached HTML available.`);
   }
 }
 

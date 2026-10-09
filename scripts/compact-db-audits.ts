@@ -1,5 +1,6 @@
 import { initializeDatabase, executeQuery } from '../lib/db';
-import { setAudit } from '../lib/store/audit-store-db';
+import { sanitizeAuditForStorage } from '../lib/store/audit-store-db';
+import { compressPayload, decompressPayload } from '../lib/db/compression';
 import type { AuditResult } from '../lib/types/audit';
 
 async function compactDatabaseAudits() {
@@ -17,27 +18,22 @@ async function compactDatabaseAudits() {
       );
       if (dataRows.length === 0 || !dataRows[0].audit_data) continue;
 
-      const rawAudit: AuditResult = dataRows[0].audit_data;
+      const rawAudit = decompressPayload<AuditResult>(dataRows[0].audit_data);
+      if (!rawAudit) continue;
 
-      // Clean unpruned page screenshots inside pillarResults
-      if (rawAudit.pillarResults) {
-        if (rawAudit.pillarResults.performance && rawAudit.pillarResults.performance.pages) {
-          rawAudit.pillarResults.performance.pages = rawAudit.pillarResults.performance.pages.map((p) => ({
-            ...p,
-            screenshot: undefined,
-          }));
-        }
-        if (rawAudit.pillarResults.darkpatterns && rawAudit.pillarResults.darkpatterns.findings) {
-          rawAudit.pillarResults.darkpatterns.findings = rawAudit.pillarResults.darkpatterns.findings.map((f) => ({
-            ...f,
-            evidence: f.evidence ? ({ ...f.evidence, screenshotDataUrl: undefined } as any) : (f.evidence as any),
-          }));
-        }
-      }
+      // Clean unpruned page screenshots inside pillarResults and storageState in config
+      const sanitized = sanitizeAuditForStorage(rawAudit);
 
-      // Re-save via setAudit (applies sanitizeAuditForStorage & updates all columns)
-      await setAudit(id, rawAudit);
-      console.log(`[Compaction] Compacted audit ${id}`);
+      await executeQuery(
+        `UPDATE audits SET audit_config = $1, audit_data = $2, pillar_results = $3 WHERE id = $4`,
+        [
+          JSON.stringify(sanitized.config || {}),
+          compressPayload(sanitized),
+          JSON.stringify(sanitized.pillarResults || null),
+          id,
+        ]
+      );
+      console.log(`[Compaction] Compacted & GZIP compressed audit ${id}`);
     } catch (err) {
       console.error(`[Compaction] Failed to compact audit ${id}:`, err);
     }

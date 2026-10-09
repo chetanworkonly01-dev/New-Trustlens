@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllAuditsAsync } from "@/lib/store/audit-store";
+import { getAllAuditsAsync, getAuditCountAsync } from "@/lib/store/audit-store";
 import { getSessionFromCookiesAsync } from "@/lib/auth";
 import type { AuditResult } from "@/lib/types/audit";
 
@@ -10,7 +10,14 @@ type PillarResults = NonNullable<AuditResult["pillarResults"]>;
 export async function GET(request: NextRequest) {
   const session = await getSessionFromCookiesAsync(request);
   const userId = session?.user?.id;
-  const audits = await getAllAuditsAsync(userId);
+  
+  const limitParam = request.nextUrl.searchParams.get("limit");
+  const limit = limitParam && limitParam !== "all" ? parseInt(limitParam, 10) : undefined;
+
+  const [audits, dbTotalCount] = await Promise.all([
+    getAllAuditsAsync(userId, limit),
+    getAuditCountAsync(userId),
+  ]);
   const summary = audits.map((a) => {
     const pillars: string[] = (a.config as { enabledPillars?: string[] }).enabledPillars || [];
     const pillarResults = a.pillarResults as PillarResults | undefined;
@@ -83,16 +90,12 @@ export async function GET(request: NextRequest) {
         : undefined,
     };
   });
-  const limitParam = request.nextUrl.searchParams.get("limit");
-  const limit = limitParam && limitParam !== "all" ? parseInt(limitParam, 10) : undefined;
-  const totalCount = summary.length;
-  const slicedSummary = limit ? summary.slice(0, limit) : summary;
-
   if (limitParam) {
+    const hasMore = limit ? summary.length < dbTotalCount : false;
     return NextResponse.json({
-      audits: slicedSummary,
-      totalCount,
-      hasMore: totalCount > slicedSummary.length,
+      audits: summary,
+      totalCount: dbTotalCount,
+      hasMore,
     });
   }
 

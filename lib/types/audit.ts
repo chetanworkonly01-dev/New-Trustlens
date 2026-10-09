@@ -15,13 +15,17 @@ export type AuditStatus =
   | "complete"
   | "error";
 
+export type AuthMode = "interactive" | "storage_state" | "credentials";
+
 export interface LoginConfig {
-  loginUrl: string;
-  usernameSelector: string;
-  passwordSelector: string;
-  submitSelector: string;
-  username: string;
-  password: string;
+  authMode?: AuthMode;
+  loginUrl?: string;
+  storageState?: Record<string, any> | string;
+  usernameSelector?: string;
+  passwordSelector?: string;
+  submitSelector?: string;
+  username?: string;
+  password?: string;
   otpSelector?: string;
   otpValue?: string;
   successIndicator?: string;

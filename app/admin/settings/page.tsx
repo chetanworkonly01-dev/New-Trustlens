@@ -625,11 +625,11 @@ export default function AdminSettingsPage() {
                                   style={{
                                     fontSize: "12px",
                                     color: "#6b7280",
-                                    fontStyle: "italic",
-                                    padding: "6px 12px",
+                                    fontStyle: "normal",
+                                    // padding: "12px 12px",
                                   }}
                                 >
-                                  🔒 Protected
+                                  Protected
                                 </span>
                               ) : (
                                 <button
