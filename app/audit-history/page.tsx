@@ -38,6 +38,8 @@ export default function AuditHistoryPage() {
 
   // Multi-audit selection for consolidation
   const [selectedAuditIds, setSelectedAuditIds] = useState<string[]>([]);
+  const [showDomainDropdown, setShowDomainDropdown] = useState<boolean>(false);
+  const [selectedDomain, setSelectedDomain] = useState<string>("");
   const [consolidating, setConsolidating] = useState<boolean>(false);
   const [consolidateError, setConsolidateError] = useState<string | null>(null);
 
@@ -118,9 +120,17 @@ export default function AuditHistoryPage() {
         new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
     );
 
+  // Dynamically group unique domains and their completed audit count
+  const domainAuditCounts = completed.reduce<Record<string, number>>((acc, a) => {
+    const d = extractDomain(a.config?.url) || "Unknown";
+    acc[d] = (acc[d] || 0) + 1;
+    return acc;
+  }, {});
+  const availableDomains = Object.keys(domainAuditCounts);
+
   // Consolidation domain matching & selection logic
   const firstSelected = completed.find((a) => selectedAuditIds.includes(a.id));
-  const activeDomain = firstSelected ? extractDomain(firstSelected.config?.url) : null;
+  const activeDomain = selectedDomain || (firstSelected ? extractDomain(firstSelected.config?.url) : null);
   const matchingAudits = activeDomain
     ? completed.filter((a) => extractDomain(a.config?.url) === activeDomain)
     : [];
@@ -128,13 +138,33 @@ export default function AuditHistoryPage() {
     matchingAudits.length > 0 &&
     matchingAudits.every((a) => selectedAuditIds.includes(a.id));
 
+  const handleDomainSelect = (domain: string) => {
+    setSelectedDomain(domain);
+    if (domain) {
+      const ids = completed
+        .filter((a) => extractDomain(a.config?.url) === domain)
+        .map((a) => a.id);
+      setSelectedAuditIds(ids);
+    } else {
+      setSelectedAuditIds([]);
+    }
+  };
+
   const handleToggleSelect = (auditId: string) => {
     setSelectedAuditIds((prev) => {
-      if (prev.includes(auditId)) {
-        return prev.filter((id) => id !== auditId);
+      const exists = prev.includes(auditId);
+      const updated = exists ? prev.filter((id) => id !== auditId) : [...prev, auditId];
+      if (updated.length === 0) {
+        setSelectedDomain("");
       } else {
-        return [...prev, auditId];
+        const item = completed.find((a) => a.id === updated[0]);
+        if (item) {
+          const dom = extractDomain(item.config?.url);
+          setSelectedDomain(dom);
+          setShowDomainDropdown(true);
+        }
       }
+      return updated;
     });
   };
 
@@ -289,7 +319,56 @@ export default function AuditHistoryPage() {
                 📋 Audit History
               </h2> */}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {/* Select All Button — aligned on the left of Show All */}
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setShowDomainDropdown((prev) => {
+                  const next = !prev;
+                  if (!next) {
+                    setSelectedDomain("");
+                    setSelectedAuditIds([]);
+                  }
+                  return next;
+                });
+              }}
+              style={{
+                fontWeight: 600,
+                borderColor: showDomainDropdown ? "var(--accent-blue)" : undefined,
+                background: showDomainDropdown ? "rgba(0, 145, 218, 0.12)" : undefined,
+              }}
+            >
+              {showDomainDropdown ? "Cancel Select" : "Select All"}
+            </button>
+
+            {/* Domain Select Dropdown — appears beside Show All when Select All clicked */}
+            {showDomainDropdown && (
+              <select
+                className="btn btn-secondary btn-sm"
+                value={selectedDomain}
+                onChange={(e) => handleDomainSelect(e.target.value)}
+                style={{
+                  padding: "6px 12px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  borderColor: "var(--accent-blue)",
+                  background: "var(--card-bg, #1a2234)",
+                  color: "var(--kpmg-dynamic)",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                }}
+              >
+                <option value="">Domain Select</option>
+                {availableDomains.map((dom) => (
+                  <option key={dom} value={dom}>
+                    {dom} ({domainAuditCounts[dom]})
+                  </option>
+                ))}
+              </select>
+            )}
+
             {hasMore && (
               <button
                 className="btn btn-secondary btn-sm"
@@ -299,7 +378,9 @@ export default function AuditHistoryPage() {
                 {loadingMore ? "Loading..." : `Show All (${totalCount})`}
               </button>
             )}
-            {selectedAuditIds.length >= 2 && (
+
+            {/* Consolidate Report Button — shown only when domain is selected & >= 2 audits */}
+            {selectedDomain && selectedAuditIds.length >= 2 && (
               <button
                 className="btn btn-primary btn-sm"
                 onClick={handleConsolidateReport}
@@ -332,7 +413,7 @@ export default function AuditHistoryPage() {
                   </>
                 ) : (
                   <>
-                    <span style={{ fontSize: 13 }}></span>
+                    <span style={{ fontSize: 13 }}>⚡</span>
                     <span>Consolidate Report ({selectedAuditIds.length})</span>
                   </>
                 )}
@@ -396,13 +477,13 @@ export default function AuditHistoryPage() {
           </div>
         )}
 
-        {/* Domain Consolidation Control Bar */}
+        {/* Domain Selection Status Bar */}
         {activeDomain && (
           <div
             style={{
               marginBottom: 16,
-              padding: "12px 18px",
-              borderRadius: 10,
+              padding: "10px 16px",
+              borderRadius: 8,
               background: "rgba(0, 145, 218, 0.08)",
               border: "1px solid rgba(0, 145, 218, 0.25)",
               display: "flex",
@@ -422,55 +503,33 @@ export default function AuditHistoryPage() {
                   boxShadow: "0 0 8px #0091DA",
                 }}
               />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--kpmg-dynamic)" }}>
-                  Domain Locked:{" "}
-                  <span style={{ color: "var(--accent-blue, #0091DA)" }}>{activeDomain}</span>
-                </div>
-                <div style={{ fontSize: 12, color: "var(--offshade-text)" }}>
-                  {selectedAuditIds.length} of {matchingAudits.length} audit{matchingAudits.length !== 1 ? "s" : ""} selected
+              <div style={{ fontSize: 13, color: "var(--kpmg-dynamic)" }}>
+                Selected Domain:{" "}
+                <span style={{ fontWeight: 700, color: "var(--accent-blue, #0091DA)" }}>{activeDomain}</span>
+                <span style={{ color: "var(--offshade-text)", marginLeft: 8 }}>
+                  ({selectedAuditIds.length} of {matchingAudits.length} selected
                   {completed.length - matchingAudits.length > 0 &&
-                    ` (${completed.length - matchingAudits.length} different domain audit${completed.length - matchingAudits.length !== 1 ? "s" : ""} disabled)`}
-                </div>
+                    ` · ${completed.length - matchingAudits.length} other domain audits disabled`}
+                  )
+                </span>
               </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  if (isAllDomainSelected) {
-                    setSelectedAuditIds([]);
-                  } else {
-                    setSelectedAuditIds(matchingAudits.map((a) => a.id));
-                  }
-                }}
-                style={{
-                  fontSize: 12,
-                  padding: "5px 12px",
-                  fontWeight: 600,
-                  borderColor: "rgba(0, 145, 218, 0.35)",
-                }}
-              >
-                {isAllDomainSelected
-                  ? "Deselect All"
-                  : `Select All for ${activeDomain} (${matchingAudits.length})`}
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setSelectedAuditIds([])}
-                style={{
-                  fontSize: 12,
-                  padding: "5px 12px",
-                  color: "var(--offshade-text)",
-                }}
-              >
-                Clear
-              </button>
-            </div>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setSelectedDomain("");
+                setSelectedAuditIds([]);
+              }}
+              style={{
+                fontSize: 12,
+                padding: "4px 12px",
+                color: "var(--offshade-text)",
+              }}
+            >
+              Clear Selection
+            </button>
           </div>
         )}
 
@@ -544,7 +603,7 @@ export default function AuditHistoryPage() {
                 className="glass-card"
                 onClick={() => {
                   if (!isDisabled) {
-                    handleToggleSelect(a.id);
+                    router.push(`/audit/${a.id}/report`);
                   }
                 }}
                 style={{
@@ -566,6 +625,9 @@ export default function AuditHistoryPage() {
                   position: "relative",
                   borderRadius: "12px",
                   padding: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 16,
                 }}
                 onMouseEnter={(e) => {
                   if (!isDisabled) {
@@ -586,14 +648,51 @@ export default function AuditHistoryPage() {
                   }
                 }}
               >
-                {/* Top row: score circle + info + badge */}
+                {/* Selection Checkbox on the left, vertically centered */}
                 <div
                   style={{
                     display: "flex",
-                    gap: 16,
-                    alignItems: "flex-start",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    padding: "4px",
                   }}
+                  onClick={(e) => e.stopPropagation()}
                 >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    disabled={isDisabled}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleToggleSelect(a.id);
+                    }}
+                    style={{
+                      width: 18,
+                      height: 18,
+                      cursor: isDisabled ? "not-allowed" : "pointer",
+                      accentColor: "#0091DA",
+                    }}
+                    title={
+                      isDisabled
+                        ? "Disabled (different domain)"
+                        : isSelected
+                          ? "Deselect audit"
+                          : "Select audit for consolidation"
+                    }
+                  />
+                </div>
+
+                {/* Main Card Body */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {/* Top row: score circle + info + badge */}
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 16,
+                      alignItems: "flex-start",
+                    }}
+                  >
                   {/* Score circle */}
                   <div
                     style={{
@@ -836,51 +935,46 @@ export default function AuditHistoryPage() {
                       gap: 6,
                     }}
                   >
-                    {/* Selection status badge */}
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 5,
-                        padding: "3px 9px",
-                        borderRadius: 99,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        background: isSelected
-                          ? "#0091DA"
-                          : isDisabled
-                            ? "rgba(128, 128, 128, 0.15)"
-                            : "rgba(0, 145, 218, 0.08)",
-                        color: isSelected
-                          ? "#ffffff"
-                          : isDisabled
-                            ? "rgba(180, 180, 180, 0.7)"
-                            : "#0091DA",
-                        border: isSelected
-                          ? "1px solid #0091DA"
-                          : isDisabled
-                            ? "1px solid rgba(128, 128, 128, 0.3)"
-                            : "1px solid rgba(0, 145, 218, 0.25)",
-                        userSelect: "none",
-                      }}
-                    >
-                      {isSelected ? (
-                        <>
-                          <span>✓</span>
-                          <span>Selected</span>
-                        </>
-                      ) : isDisabled ? (
-                        <>
-                          <span>🔒</span>
-                          <span>Different Domain</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>○</span>
-                          <span>Select</span>
-                        </>
-                      )}
-                    </div>
+                    {isDisabled && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          padding: "3px 9px",
+                          borderRadius: 99,
+                          fontWeight: 600,
+                          background: "rgba(128, 128, 128, 0.15)",
+                          color: "rgba(180, 180, 180, 0.7)",
+                          border: "1px solid rgba(128, 128, 128, 0.3)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          userSelect: "none",
+                        }}
+                      >
+                        <span>🔒</span>
+                        <span>Different Domain</span>
+                      </span>
+                    )}
+                    {isSelected && !isDisabled && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          padding: "3px 9px",
+                          borderRadius: 99,
+                          fontWeight: 600,
+                          background: "#0091DA",
+                          color: "#ffffff",
+                          border: "1px solid #0091DA",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          userSelect: "none",
+                        }}
+                      >
+                        <span>✓</span>
+                        <span>Selected</span>
+                      </span>
+                    )}
 
                     {a.trustScore ? (
                       <span
@@ -1031,6 +1125,7 @@ export default function AuditHistoryPage() {
                     })}
                   </div>
                 )}
+                </div>
               </div>
             );
           })}
